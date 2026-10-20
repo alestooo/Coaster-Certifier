@@ -1,0 +1,33 @@
+{
+  "name": "coaster-certifier",
+  "version": "1.0.0",
+  "description": "Simulador web de montaña rusa con librería de física propia, pruebas analíticas y evaluación del recorrido. Proyecto de Física I, CENFOTEC",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest run",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "headless": "node scripts/headless.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alestooo/Coaster-Certifier.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/alestooo/Coaster-Certifier/issues"
+  },
+  "homepage": "https://github.com/alestooo/Coaster-Certifier#readme",
+  "dependencies": {
+    "chart.js": "^4.5.1"
+  },
+  "devDependencies": {
+    "vite": "^8.3.4",
+    "vitest": "^5.0.5"
+  },
+  "private": true
+}

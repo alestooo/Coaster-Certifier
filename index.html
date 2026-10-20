@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Certificador de montaña rusa</title>
+  </head>
+
+  <body>
+    <!-- Minor: ampliar esta pantalla con parámetros y gráficas. -->
+    <main>
+      <h1>Certificador de montaña rusa</h1>
+      <p>Prueba inicial: descenso recto sin fricción.</p>
+
+      <div class="controls">
+        <button id="start" type="button">Iniciar</button>
+        <button id="pause" type="button">Pausar</button>
+        <button id="reset" type="button">Reiniciar</button>
+      </div>
+
+      <canvas
+        id="simulation"
+        width="900"
+        height="320"
+        aria-label="Representación del descenso del vagón"
+      ></canvas>
+
+      <pre id="results"></pre>
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
