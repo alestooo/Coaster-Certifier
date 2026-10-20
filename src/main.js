@@ -1,87 +1,54 @@
-// Responsable: Alejandro.
-// Integración inicial.
-// Minor podrá extraer los controles a ui/controls.js.
-
 import "./ui/styles.css";
+import "./ui/menu.css";
 
-import {
-  DEFAULT_CONFIG,
-  createInitialState,
-  step,
-} from "./physics/index.js";
+const menuScreen = document.querySelector("#menu-screen");
+const gameScreen = document.querySelector("#game-screen");
+const playButton = document.querySelector("#play-button");
+const backButton = document.querySelector("#back-button");
+const creditsButton = document.querySelector("#credits-button");
+const creditsDialog = document.querySelector("#credits-dialog");
 
-import { renderSimulation } from "./ui/renderer.js";
+let simulatorLoaded = false;
 
-const config = { ...DEFAULT_CONFIG };
+playButton.addEventListener("click", async () => {
+  playButton.disabled = true;
 
-const canvas = document.querySelector("#simulation");
-const results = document.querySelector("#results");
+  menuScreen.hidden = true;
+  gameScreen.hidden = false;
 
-let state = createInitialState(config);
-let running = false;
-let previousTime = null;
-let accumulator = 0;
-
-function draw() {
-  renderSimulation(canvas, state, config);
-
-  results.textContent = [
-    `Estado: ${state.status}`,
-    `Tiempo: ${state.time.toFixed(2)} s`,
-    `Distancia: ${state.distance.toFixed(2)} m`,
-    `Rapidez: ${state.speed.toFixed(2)} m/s`,
-    `Normal: ${state.forces.normal.toFixed(2)} N`,
-    `Energía cinética: ${state.energies.kinetic.toFixed(2)} J`,
-    `Energía potencial: ${state.energies.gravitational.toFixed(2)} J`,
-    `Energía mecánica: ${state.energies.mechanical.toFixed(2)} J`,
-  ].join("\n");
-}
-
-document.querySelector("#start").addEventListener("click", () => {
-  if (state.status === "running") {
-    running = true;
-  }
-});
-
-document.querySelector("#pause").addEventListener("click", () => {
-  running = false;
-});
-
-document.querySelector("#reset").addEventListener("click", () => {
-  state = createInitialState(config);
-  running = false;
-  accumulator = 0;
-  previousTime = null;
-  draw();
-});
-
-function animate(timestamp) {
-  const elapsed =
-    previousTime === null
-      ? 0
-      : Math.min((timestamp - previousTime) / 1000, 0.1);
-
-  previousTime = timestamp;
-
-  if (running) {
-    accumulator += elapsed;
-
-    while (accumulator >= config.timeStep) {
-      state = step(state, config, config.timeStep);
-      accumulator -= config.timeStep;
-
-      if (state.status !== "running") {
-        running = false;
-        accumulator = 0;
-        break;
-      }
+  try {
+    if (!simulatorLoaded) {
+      await import("./simulator.js");
+      simulatorLoaded = true;
     }
 
-    draw();
+    document.querySelector("#game-title").focus();
+  } catch (error) {
+    console.error("No se pudo abrir el simulador:", error);
+
+    gameScreen.hidden = true;
+    menuScreen.hidden = false;
+
+    alert("No se pudo abrir el simulador. Revisá la consola del navegador.");
+    playButton.focus();
+  } finally {
+    playButton.disabled = false;
   }
+});
 
-  requestAnimationFrame(animate);
-}
+backButton.addEventListener("click", () => {
+  document.querySelector("#pause").click();
 
-draw();
-requestAnimationFrame(animate);
+  gameScreen.hidden = true;
+  menuScreen.hidden = false;
+
+  playButton.focus();
+});
+
+creditsButton.addEventListener("click", () => {
+  creditsDialog.showModal();
+});
+
+creditsDialog.addEventListener("close", () => {
+  creditsButton.focus();
+});
