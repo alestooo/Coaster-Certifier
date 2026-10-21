@@ -17,7 +17,7 @@ let previousTime = null;
 let accumulator = 0;
 
 function draw() {
-  renderSimulation(canvas, state, config);
+  renderSimulation(canvas, state, config, passengers);
 
   results.textContent = [
     `Estado: ${state.status}`,

@@ -1,0 +1,392 @@
+.page.setup-page {
+  width: min(100%, 1240px);
+  padding: 30px 30px 55px;
+}
+
+.setup-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.setup-brand {
+  color: #5b3879;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 1.2px;
+}
+
+.setup-brand > span {
+  color: #856d94;
+  font-weight: 500;
+}
+
+.setup-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: end;
+  gap: 24px;
+  margin: 40px 0 28px;
+}
+
+.setup-eyebrow {
+  color: #997aaf;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+}
+
+.setup-heading h1 {
+  margin: 10px 0;
+  color: #33223f;
+  font-size: clamp(30px, 4vw, 45px);
+  letter-spacing: -1.6px;
+  line-height: 1.1;
+}
+
+.setup-heading p {
+  margin: 0;
+  color: #8a7897;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.setup-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid #e8dff0;
+  border-radius: 12px;
+  background: #ffffffa8;
+}
+
+.setup-steps > span {
+  padding: 8px 10px;
+  color: #8b7697;
+  font-size: 12px;
+}
+
+.setup-steps > .current {
+  border-radius: 8px;
+  color: #8052a6;
+  background: #efe5fa;
+  font-weight: 750;
+}
+
+.party-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 25px;
+  padding: 25px 28px;
+  border: 1px solid #e6d9f0;
+  border-radius: 20px;
+  background: linear-gradient(110deg, #fff, #faf5ff);
+  box-shadow: 0 12px 35px #4d29630a;
+}
+
+.party-copy {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+}
+
+.party-mark {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  color: #9c70bf;
+  background: #eee4fa;
+  font-size: 25px;
+}
+
+.party-copy h2 {
+  margin: 0 0 6px;
+  color: #573a6a;
+  font-size: 16px;
+}
+
+.party-copy p {
+  margin: 0;
+  color: #887194;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.party-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.party-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-width: 62px;
+  min-height: 49px;
+  padding: 10px 12px;
+  border: 1px solid #e4d8ee;
+  border-radius: 12px;
+  color: #a083b3;
+  background: white;
+  cursor: pointer;
+}
+
+.party-option > span:last-child {
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.party-option.active {
+  border-color: #ab81d3;
+  color: #8153a7;
+  background: #eee2fb;
+  box-shadow: 0 0 0 3px #efe5fa;
+}
+
+.party-option:hover {
+  border-color: #a67cc8;
+}
+
+.party-icons {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.party-icons svg {
+  display: block;
+  width: 12px;
+  height: 19px;
+}
+
+.map-section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 33px 0 18px;
+}
+
+.map-section-heading h2 {
+  margin: 0;
+  color: #4d355f;
+  font-size: 19px;
+  letter-spacing: -0.4px;
+}
+
+.map-section-heading > span {
+  color: #856d94;
+  font-size: 12px;
+}
+
+.setup-page .map-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.setup-page .map-card {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  padding: 9px;
+  border: 2px solid #e8dff0;
+  border-radius: 20px;
+  color: #483255;
+  background: white;
+  box-shadow: 0 7px 24px #4d296307;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease;
+}
+
+.setup-page .map-card.selected {
+  border-color: #a170d2;
+  box-shadow:
+    0 0 0 4px #ebe0f7,
+    0 15px 30px #4d29630c;
+}
+
+.setup-page .map-card:not(:disabled):hover {
+  transform: translateY(-4px);
+  border-color: #a170d2;
+}
+
+.setup-page .map-card:disabled {
+  opacity: 0.66;
+  cursor: not-allowed;
+}
+
+.map-art {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.map-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 5px 8px;
+  border: 1px solid #ffffffb3;
+  border-radius: 6px;
+  color: #73568c;
+  background: #ffffffdd;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.map-card-body {
+  padding: 18px 12px 14px;
+}
+
+.map-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.map-card-title strong {
+  font-size: 18px;
+  letter-spacing: -0.4px;
+}
+
+.map-radio {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border: 1px solid #e2d5ee;
+  border-radius: 50%;
+  color: white;
+  font-size: 12px;
+}
+
+.map-card.selected .map-radio {
+  border-color: #9763c7;
+  background: #9763c7;
+}
+
+.map-card-body p {
+  min-height: 44px;
+  margin: 10px 0 18px;
+  color: #94809f;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.map-category {
+  display: block;
+  padding-top: 12px;
+  border-top: 1px solid #f1eaf7;
+  color: #856d94;
+  font-size: 12px;
+}
+
+.setup-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  margin-top: 30px;
+  padding: 22px 25px;
+  border: 1px solid #e5daef;
+  border-radius: 17px;
+  background: #ffffffba;
+}
+
+.setup-footer > div {
+  display: grid;
+  gap: 7px;
+}
+
+.setup-footer > div > span {
+  color: #856d94;
+  font-size: 12px;
+}
+
+.setup-footer strong {
+  color: #614073;
+  font-size: 13px;
+}
+
+.setup-footer .game-button {
+  width: auto;
+  min-height: 46px;
+  padding: 12px 20px;
+  border: 1px solid #9b6bc5;
+  border-radius: 11px;
+  box-shadow: 0 3px 0 #68428b;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  text-transform: none;
+}
+
+@media (max-width: 950px) {
+  .setup-page .map-grid {
+    gap: 12px;
+  }
+
+  .party-panel {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 700px) {
+  .page.setup-page {
+    padding: 23px 18px 40px;
+  }
+
+  .setup-brand {
+    display: none;
+  }
+
+  .setup-heading {
+    margin-top: 30px;
+  }
+
+  .setup-page .map-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .map-art {
+    max-height: 190px;
+  }
+
+  .party-panel {
+    padding: 20px;
+  }
+
+  .party-choices {
+    width: 100%;
+  }
+
+  .party-option {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 8px;
+  }
+
+  .setup-footer {
+    padding: 20px;
+  }
+
+  .setup-footer .game-button {
+    width: 100%;
+  }
+}

@@ -2,79 +2,25 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+
+    <meta
+      name="description"
+      content="Coaster-Certifier: simulador interactivo de montañas rusas basado en física."
+    />
+
+    <meta name="theme-color" content="#181336" />
+
     <title>Coaster-Certifier</title>
   </head>
 
   <body>
-    <!-- Pantalla de inicio -->
-    <section id="menu-screen" class="menu-screen" aria-label="Menú principal">
-      <div class="menu-content">
-        <h1 class="menu-title">
-          <img
-            class="menu-logo"
-            src="/assets/images/coaster-certifier-logo.png.png"
-            alt="Coaster-Certifier"
-          />
-        </h1>
+    <div id="app"></div>
 
-        <nav class="menu-actions" aria-label="Opciones">
-          <button id="play-button" class="game-button" type="button">
-            Jugar
-          </button>
-
-          <button
-            id="credits-button"
-            class="game-button game-button-secondary"
-            type="button"
-          >
-            Créditos
-          </button>
-        </nav>
-      </div>
-    </section>
-
-    <!-- Pantalla de simulación: conserva los IDs del código anterior -->
-    <main id="game-screen" hidden>
-      <button id="back-button" type="button">← Volver al menú</button>
-
-      <h1 id="game-title" tabindex="-1">Certificador de montaña rusa</h1>
-      <p>Prueba inicial: descenso recto sin fricción.</p>
-
-      <div class="controls">
-        <button id="start" type="button">Iniciar</button>
-        <button id="pause" type="button">Pausar</button>
-        <button id="reset" type="button">Reiniciar</button>
-      </div>
-
-      <canvas
-        id="simulation"
-        width="900"
-        height="320"
-        aria-label="Representación del descenso del vagón"
-      ></canvas>
-
-      <pre id="results"></pre>
-    </main>
-
-    <!-- Ventana de créditos -->
-    <dialog id="credits-dialog" aria-labelledby="credits-title">
-      <h2 id="credits-title">Créditos</h2>
-      <p><strong>Coaster-Certifier · Grupo A</strong></p>
-
-      <ul>
-        <li>Alejandro Soto Víquez</li>
-        <li>Dylan Josué Chaves Hernández</li>
-        <li>Minor Andrés Mora Vargas</li>
-      </ul>
-
-      <p>Universidad CENFOTEC · Física I · 2026</p>
-
-      <form method="dialog">
-        <button class="game-button" type="submit">Cerrar</button>
-      </form>
-    </dialog>
-
-    <script type="module" src="/src/main.js"></script>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

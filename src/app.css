@@ -1,0 +1,156 @@
+:root {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  color: #30233f;
+  background: #f6f3fb;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 3px solid #ac87e6;
+  outline-offset: 4px;
+}
+
+.menu-screen {
+  position: relative;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 40px 20px;
+  overflow: hidden;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgb(12 9 35 / 12%),
+      rgb(12 9 35 / 25%) 55%,
+      rgb(12 9 35 / 65%)
+    ),
+    url("/assets/backgrounds/coaster-menu-fondo.gif")
+      center / cover no-repeat;
+
+  background-color: #171333;
+}
+
+.menu-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  width: min(100%, 460px);
+}
+
+.menu-title {
+  margin: 0;
+  line-height: 0;
+}
+
+.menu-logo {
+  display: block;
+  width: min(380px, 78vw, 48svh);
+  height: auto;
+  filter: drop-shadow(0 16px 28px rgb(0 0 0 / 45%));
+}
+
+.menu-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+}
+
+.game-button {
+  position: relative;
+  width: 260px;
+  max-width: 100%;
+  min-height: 56px;
+  padding: 14px 28px;
+
+  border: 2px solid #dcbaff;
+  border-radius: 15px;
+
+  color: #fff9e9;
+  background: linear-gradient(180deg, #a165ec, #7440ba);
+
+  box-shadow:
+    0 5px 0 #402165,
+    0 12px 28px rgb(0 0 0 / 20%);
+
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+
+  transition:
+    transform 160ms ease,
+    filter 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.game-button:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+}
+
+.game-button:active {
+  transform: translateY(3px);
+  box-shadow:
+    0 2px 0 #402165,
+    0 6px 16px rgb(0 0 0 / 18%);
+}
+
+.game-button.secondary {
+  width: 220px;
+  min-height: 48px;
+  border-color: #9c84b9;
+  color: #f4eaff;
+  background: rgb(35 27 61 / 94%);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 22%);
+  font-size: 15px;
+  font-weight: 650;
+}
+
+@media (max-width: 600px) {
+  .menu-content {
+    gap: 26px;
+  }
+
+  .game-button {
+    min-height: 52px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
