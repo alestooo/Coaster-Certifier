@@ -38,10 +38,10 @@
       onclick={onHome}
       aria-label="Volver al inicio"
     >
-      <img
-        src="/assets/images/coaster-certifier-logo.png"
-        alt=""
-      />
+    <img
+      src="/android-chrome-512x512.png"
+      alt=""
+    />
 
       <span>
         <strong>Coaster-Certifier</strong>
