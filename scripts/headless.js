@@ -4,3 +4,25 @@
 // Crear output/ si no existe.
 // Exportar CSV con tiempo, posición, rapidez, fuerzas y energías.
 // No usar navegador, Canvas ni módulos de ui/.
+
+// configuración fija
+//       ↓
+// createInitialState()
+//       ↓
+// step()
+//       ↓
+// step()
+//       ↓
+// step()
+//       ↓
+// ...
+//       ↓
+// guardar resultados
+//       ↓
+// CSV
+//////////////
+// npm run headless
+
+// o
+
+// npm run headless

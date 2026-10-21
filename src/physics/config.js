@@ -9,8 +9,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   friction: 0.01,
 
   mapId: "slope",
-  loopRadius: 6,
-
+  loopRadius: 7,
   brakingLength: 80,
 
   // station: frenos que disipan energía.

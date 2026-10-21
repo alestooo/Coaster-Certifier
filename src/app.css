@@ -154,3 +154,26 @@ summary:focus-visible {
     transition: none !important;
   }
 }
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: #7440ba #e7def5;
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #e7def5;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #7440ba;
+  border-radius: 999px;
+  border: 2px solid #e7def5;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #5f329a;
+}
