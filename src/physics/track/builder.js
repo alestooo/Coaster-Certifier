@@ -7,7 +7,7 @@ import { layoutNodes } from "./layouts.js";
 import { maxOf, minOf } from "../utils.js";
 
 /**
- * @typedef {import("./hermite.js").CurvePoint & {section: string, segmentIndex: number, kind: string}} TrackPoint
+ * @typedef {import("./hermite.js").CurvePoint & {distance: number, section: string, segmentIndex: number, kind: string}} TrackPoint
  */
 
 /**

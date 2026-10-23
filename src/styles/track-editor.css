@@ -1,329 +1,514 @@
-/* Estilos del editor de pista personalizada (TrackEditor.svelte). */
+/* Editor de pista personalizada a escala (TrackEditor.svelte). */
+
 .track-editor {
-    padding: 20px;
-    background: white;
-    border: 1px solid #e6daef;
-    border-radius: 18px;
-    margin: 18px 0;
-    color: #674b7e;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-family: var(--font-sans);
+}
+
+.editor-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.editor-eyebrow {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.8px;
+  color: var(--faint);
+}
+
+.editor-heading h2 {
+  margin: 4px 0 4px;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.editor-heading p {
+  margin: 0;
+  max-width: 560px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.editor-templates {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  color: var(--muted);
+}
+
+.track-editor .chip {
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--primary-strong);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.track-editor .chip:hover {
+  background: var(--primary-soft);
+  border-color: var(--border-strong);
+}
+
+.track-editor .chip.scale-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 6px;
+  background: var(--surface);
+}
+
+.track-editor .chip.scale-toggle[aria-pressed="true"] {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-text);
+}
+
+/* Escenario SVG */
+.editor-stage {
+  position: relative;
+  border-radius: 14px;
+  overflow: visible;
+  touch-action: none;
+  user-select: none;
+}
+
+.editor-stage > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 1px var(--border);
+  transition: opacity 0.15s;
+}
+
+.editor-stage.invalid > svg .rail,
+.editor-stage.invalid > svg .rail-shadow {
+  opacity: 0.35;
+}
+
+.editor-stage .grid line {
+  stroke: #e3dbee;
+  stroke-width: 0.7;
+}
+
+.editor-stage .grid line.major {
+  stroke: #d2c6e2;
+  stroke-width: 1;
+}
+
+.editor-stage .grid text {
+  font-size: 10px;
+  font-weight: 700;
+  fill: var(--faint);
+}
+
+.editor-stage .station {
+  fill: #ebe3f4;
+  stroke: #bfa9d6;
+  stroke-width: 1;
+}
+
+.editor-stage .station-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  fill: #9b84b3;
+  text-transform: uppercase;
+}
+
+.editor-stage .brake {
+  fill: #f4c7cf;
+}
+
+.editor-stage .guide {
+  fill: none;
+  stroke: #b8a6cf;
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.editor-stage .rail-shadow {
+  fill: none;
+  stroke: #cbbfdc;
+  stroke-width: 9;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.editor-stage .rail {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 4.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.editor-stage .loop-label,
+.editor-stage .crest-label {
+  font-size: 11px;
+  font-weight: 800;
+  fill: #a8741a;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.editor-stage .crest-label {
+  fill: var(--primary-strong);
+}
+
+.editor-stage .marker circle {
+  fill: var(--primary-strong);
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.editor-stage .marker text {
+  font-size: 10px;
+  font-weight: 800;
+  fill: #ffffff;
+}
+
+/* Manijas */
+.track-editor .editor-point {
+  position: absolute;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  background: #a98ac4;
+  color: #ffffff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 0 3px 10px rgb(70 40 110 / 22%);
+  cursor: grab;
+  touch-action: none;
+  transition: box-shadow 0.15s, background 0.15s;
+}
+
+.track-editor .editor-point:hover {
+  background: var(--primary);
+}
+
+.track-editor .editor-point.selected {
+  background: var(--primary-strong);
+  box-shadow: 0 0 0 5px rgb(122 75 198 / 22%), 0 4px 14px rgb(70 40 110 / 25%);
+}
+
+.track-editor .editor-point.has-loop {
+  border-color: var(--accent);
+}
+
+.track-editor .editor-point.erroneous {
+  background: var(--danger);
+  box-shadow: 0 0 0 5px rgb(217 70 90 / 22%);
+}
+
+.track-editor .editor-point.fixed-point {
+  background: #b7abc4;
+  cursor: default;
+}
+
+.editor-stage.dragging .editor-point {
+  cursor: grabbing;
+}
+
+.track-editor .editor-point:focus-visible,
+.track-editor input:focus-visible,
+.track-editor button:focus-visible {
+  outline: 3px solid #c9a4e3;
+  outline-offset: 3px;
+}
+
+.editor-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+/* Escala H / W */
+.editor-scale {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.editor-scale label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 64px;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.editor-scale label > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.editor-scale input[type="range"] {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.editor-scale strong {
+  text-align: right;
+  color: var(--primary-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Barra de herramientas */
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.track-editor .tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 13px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface-soft);
+  color: var(--primary-strong);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.track-editor .tool:hover:not(:disabled) {
+  background: var(--primary-soft);
+  transform: translateY(-1px);
+}
+
+.track-editor .tool:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.track-editor .tool.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-text);
+}
+
+.track-editor .tool.primary:hover:not(:disabled) {
+  background: var(--primary-strong);
+}
+
+.track-editor .tool.danger {
+  background: #fff1f4;
+  border-color: #f0d4dc;
+  color: #b35e76;
+}
+
+.track-editor .tool.loop {
+  background: var(--accent-soft);
+  border-color: #efd29a;
+  color: #936521;
+}
+
+.track-editor .tool.loop.remove-loop {
+  background: #fff1f4;
+  border-color: #f0d4dc;
+  color: #b35e76;
+}
+
+.counter {
+  margin-left: auto;
+  padding: 8px 11px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text-soft);
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Punto seleccionado */
+.point-settings {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+}
+
+.point-settings-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.point-settings-heading strong {
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+.point-settings-heading span {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.point-settings p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.point-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.point-fields label {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.point-fields input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.point-fields input:disabled {
+  opacity: 0.5;
+}
+
+.loop-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.loop-tools > span {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.editor-message {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: #9c7130;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Estadísticas */
+.editor-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.editor-stats div {
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+
+.editor-stats dt {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.editor-stats dd {
+  margin: 3px 0 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 760px) {
+  .track-editor {
+    padding: 14px;
   }
 
-  .editor-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 15px;
-  }
-
-  .editor-eyebrow {
-    font-size: 9px;
-    letter-spacing: 1.6px;
-    color: #a487b8;
-  }
-
-  .editor-heading h2 {
-    font-size: 23px;
-    margin: 5px 0 6px;
-  }
-
-  .editor-heading p {
-    margin: 0;
-    font-size: 12px;
-    color: #9982a9;
-  }
-
-  .editor-count,
-  .loop-count {
-    padding: 8px 11px;
-    background: #f1e9f8;
-    color: #80559c;
-    border-radius: 9px;
-    font-size: 11px;
-    font-weight: 700;
-    white-space: nowrap;
-  }
-
-  .editor-surface {
-    position: relative;
-    touch-action: none;
-  }
-
-  .editor-surface > svg {
-    display: block;
-    width: 100%;
-    height: auto;
-  }
-
-  .track-editor button {
-    box-sizing: border-box;
-    font: inherit;
-    cursor: pointer;
-    transition:
-      background 0.16s,
-      box-shadow 0.16s,
-      border-color 0.16s;
-  }
-
-  .track-editor button:focus-visible,
-  .track-editor input:focus-visible {
-    outline: 3px solid #c9a4e3;
-    outline-offset: 3px;
-  }
-
-  .editor-surface .editor-point {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    border: 3px solid white;
-    border-radius: 50%;
-    background: #aa86c3;
-    color: white;
-    font-weight: 750;
-    font-size: 12px;
-    box-shadow: 0 3px 10px #70418b22;
-    touch-action: none;
-    cursor: grab;
-  }
-
-  .editor-surface .editor-point.selected {
-    background: #704095;
-    box-shadow:
-      0 0 0 5px #9e6dc52c,
-      0 4px 14px #70418b22;
-  }
-
-  .editor-surface .editor-point:active {
-    cursor: grabbing;
-  }
-
-  .editor-surface .editor-point.fixed-point {
-    background: #b5a7bf;
-    cursor: pointer;
-  }
-
-  .editor-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin: 18px 0 14px;
-  }
-
-  .track-editor .editor-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 11px 15px;
-    border-radius: 11px;
-    border: 1px solid transparent;
-    font-size: 12px;
-    font-weight: 650;
-    min-height: 42px;
-  }
-
-  .editor-button svg {
-    width: 18px;
-    height: 18px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    flex-shrink: 0;
-  }
-
-  .track-editor .add-button {
-    background: #7850a0;
-    color: white;
-    box-shadow: 0 4px 10px #7850a025;
-  }
-
-  .track-editor .add-button:hover {
-    background: #62388b;
-  }
-
-  .track-editor .delete-button {
-    background: #fff1f4;
-    color: #b35e76;
-    border-color: #f0d4dc;
-  }
-
-  .track-editor .delete-button:hover {
-    background: #ffe5ec;
-  }
-
-  .track-editor .editor-button:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    box-shadow: none;
-  }
-
-  .loop-count {
-    margin-left: auto;
-    background: #fff3dc;
-    color: #ab7b2f;
-  }
-
-  .editor-point-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 12px;
-  }
-
-  .editor-point-tabs button {
-    padding: 7px 10px;
-    border: 1px solid #e7dcef;
-    border-radius: 8px;
-    background: white;
-    color: #9a7eae;
-    font-size: 11px;
-  }
-
-  .editor-point-tabs button.active {
-    background: #f0e5f9;
-    border-color: #cfaee4;
-    color: #704095;
-  }
-
-  .point-settings {
-    padding: 16px;
-    border-radius: 13px;
-    border: 1px solid #e9dff2;
-    background: #fbf8fe;
-  }
-
-  .point-settings-heading {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 14px;
-  }
-
-  .point-settings-heading strong {
-    font-size: 13px;
-  }
-
-  .point-settings-heading span {
-    font-size: 10px;
-    color: #a18aaf;
-  }
-
-  .point-settings p {
-    font-size: 12px;
-    line-height: 1.6;
-    margin: 0;
-  }
-
+  .editor-scale,
   .point-fields {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
+    grid-template-columns: 1fr 1fr;
   }
 
-  .loop-derived {
-    margin: 10px 0 0;
-    padding: 8px 10px;
-    border-radius: 8px;
-    background: #fff7e6;
-    color: #8f6a2a;
+  .editor-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .track-editor .editor-point {
+    width: 28px;
+    height: 28px;
     font-size: 11px;
-    line-height: 1.5;
   }
 
-  .point-fields label {
-    display: grid;
-    gap: 7px;
-    font-size: 11px;
-    color: #8c6ba2;
+  .counter {
+    margin-left: 0;
   }
-
-  .point-fields input {
-    box-sizing: border-box;
-    width: 100%;
-    min-width: 0;
-    border: 1px solid #dccce8;
-    background: white;
-    border-radius: 9px;
-    padding: 10px 12px;
-    color: #684a7e;
-    font: inherit;
-    font-size: 13px;
-  }
-
-  .loop-tools {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-top: 14px;
-  }
-
-  .track-editor .loop-button {
-    background: #f8e8c7;
-    color: #936521;
-    border-color: #efd29a;
-  }
-
-  .track-editor .loop-button:hover {
-    background: #f3dba9;
-  }
-
-  .track-editor .loop-button.remove-loop {
-    background: #fff1f4;
-    color: #b35e76;
-    border-color: #f0d4dc;
-  }
-
-  .loop-tools > span {
-    font-size: 11px;
-    color: #a18aaf;
-  }
-
-  .editor-message {
-    padding: 10px;
-    border-radius: 9px;
-    background: #fff3dc;
-    color: #9c7130;
-    font-size: 12px;
-  }
-
-  .editor-footnote {
-    font-size: 11px;
-    line-height: 1.7;
-    color: #a18aaf;
-    margin: 14px 0 0;
-  }
-
-  @media (max-width: 600px) {
-    .track-editor {
-      padding: 14px;
-    }
-
-    .editor-heading {
-      align-items: flex-start;
-    }
-
-    .editor-heading h2 {
-      font-size: 20px;
-    }
-
-    .point-fields {
-      grid-template-columns: 1fr 1fr;
-    }
-
-    .editor-surface .editor-point {
-      width: 29px;
-      height: 29px;
-      font-size: 10px;
-    }
-
-    .loop-count {
-      margin-left: 0;
-    }
-  }
+}
