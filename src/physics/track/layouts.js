@@ -140,13 +140,21 @@ export function layoutNodes(config) {
     }
 
     default:
-      return config.customPoints.map((point, index) =>
-        node(
+      return config.customPoints.map((point, index, points) => {
+        const last = points.length - 1;
+        const isCrest =
+          index > 0 &&
+          index < last &&
+          !point.loopHeight &&
+          point.y > points[index - 1].y &&
+          point.y > points[index + 1].y;
+
+        return node(
           point.x * W,
           point.y * H,
-          index === 0 ? "start" : index === config.customPoints.length - 1 ? "end" : "plain",
+          index === 0 ? "start" : index === last ? "end" : isCrest ? "crest" : "plain",
           { loopHeight: point.loopHeight, loopTopRadius: point.loopTopRadius }
-        )
-      );
+        );
+      });
   }
 }

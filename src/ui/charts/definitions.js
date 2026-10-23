@@ -205,8 +205,8 @@ const LOAD_RANGE_PADDING = 0.5;
  */
 export function yAxisRange(kind, config, values) {
   const finite = values.filter(Number.isFinite);
-  const dataMin = finite.length ? Math.min(...finite) : 0;
-  const dataMax = finite.length ? Math.max(...finite) : 0;
+  const dataMin = finite.length ? finite.reduce((low, value) => Math.min(low, value), Infinity) : 0;
+  const dataMax = finite.length ? finite.reduce((high, value) => Math.max(high, value), -Infinity) : 0;
 
   if (kind === "load") {
     return {

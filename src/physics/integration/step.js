@@ -156,6 +156,13 @@ export function createInitialState(input = {}) {
 function advanceInBrakeZone(current, values, substep, config, track) {
   const deceleration = config.brakeDeceleration + config.friction * config.gravity;
   const [distance0, velocity0, dissipated0] = values;
+
+  if (velocity0 <= 0) {
+    // Sin avance dentro de la zona: el freno retiene al tren donde está.
+    const held = makeState(current.time, distance0, 0, dissipated0, config, track, current.events);
+    return { state: { ...held, status: "finished" }, elapsed: 0 };
+  }
+
   const stopTime = Math.abs(velocity0) / deceleration;
   const direction = Math.sign(velocity0);
   let elapsed = Math.min(substep, stopTime);

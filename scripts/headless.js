@@ -172,3 +172,8 @@ try {
 
   process.exitCode = 1;
 }
+
+process.on("exit", code => {
+  // Garantiza el código de salida aunque la salida estándar siga vaciándose.
+  if (code === 0 && process.exitCode) process.exit(process.exitCode);
+});

@@ -43,21 +43,20 @@ export function checkDesignConditions(input) {
     });
   }
 
-  const crests = track.markers.filter(marker => marker.role === "crest");
+  track.nodes
+    .filter(node => node.role === "crest")
+    .forEach((crest, index, crests) => {
+      const suffix = crests.length > 1 ? ` ${index + 1}` : "";
 
-  for (const crest of crests) {
-    const node = track.nodes.find(node => node.role === "crest");
-    const height = node?.y ?? 0;
-
-    checks.push({
-      id: `crest-${crest.label}`,
-      name: "Energía suficiente para superar la cresta de la colina",
-      ok: head > height,
-      severity: "error",
-      formula: "H + v₀²/(2g) > h_c",
-      detail: `${head.toFixed(2)} m frente a ${height.toFixed(2)} m de la cresta`
+      checks.push({
+        id: `crest-${index + 1}`,
+        name: `Energía suficiente para superar la cresta de la colina${suffix}`,
+        ok: head > crest.y,
+        severity: "error",
+        formula: "H + v₀²/(2g) > h_c",
+        detail: `${head.toFixed(2)} m frente a ${crest.y.toFixed(2)} m de la cresta`
+      });
     });
-  }
 
   if (config.brakeMode === "station") {
     const idealSpeedSquared = 2 * g * config.initialHeight + config.initialSpeed ** 2;
@@ -165,7 +164,7 @@ export function evaluateRun(history, input) {
   const summary = summarizeRun(history, config, track);
 
   const violations = [...final.events];
-  const completion = completionViolation(final, track);
+  const completion = final.events.length === 0 ? completionViolation(final, track) : null;
 
   if (completion) violations.push(completion);
 

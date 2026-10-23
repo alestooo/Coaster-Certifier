@@ -3,6 +3,8 @@
  * puntos críticos. Todas las magnitudes en unidades del SI.
  */
 
+import { maxOf, minOf } from "../utils.js";
+
 /**
  * @typedef {Object} Extreme
  * @property {number} value
@@ -109,10 +111,10 @@ function summarizeSections(history, track) {
       duration: last.time - first.time,
       entrySpeed: first.speed,
       exitSpeed: last.speed,
-      maxSpeed: Math.max(...states.map(state => state.speed)),
-      maxLoad: Math.max(...states.map(state => state.load)),
-      minLoad: Math.min(...states.map(state => state.load)),
-      minNormal: Math.min(...states.map(state => state.forces.normal)),
+      maxSpeed: maxOf(states, state => state.speed),
+      maxLoad: maxOf(states, state => state.load),
+      minLoad: minOf(states, state => state.load),
+      minNormal: minOf(states, state => state.forces.normal),
       dissipated: last.energies.dissipated - first.energies.dissipated
     };
   });
@@ -172,10 +174,10 @@ function summarizeBraking(history, config, track) {
     brakeForce:
       config.brakeMode === "station"
         ? config.mass * config.brakeDeceleration
-        : Math.max(...history.map(state => Math.abs(state.forces.spring))),
+        : maxOf(history, state => Math.abs(state.forces.spring)),
     impulse: config.mass * entrySpeed,
     energyToDissipate: 0.5 * config.mass * entrySpeed * entrySpeed,
-    maxCompression: Math.max(...history.map(state => state.springCompression))
+    maxCompression: maxOf(history, state => state.springCompression)
   };
 }
 

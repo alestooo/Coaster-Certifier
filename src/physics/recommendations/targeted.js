@@ -1,5 +1,6 @@
 import { CRITERIA } from "../evaluation/criteria.js";
 import { MAX_BRAKE_DECELERATION } from "../constants.js";
+import { maxOf } from "../utils.js";
 
 /** Margen multiplicativo aplicado a las correcciones calculadas. */
 const MARGIN = 1.1;
@@ -120,7 +121,10 @@ export function targetedPatches(config, run) {
     }
 
     case CRITERIA.MIN_SPEED: {
-      const obstacle = Math.max(...run.track.nodes.map(node => node.y).filter(y => y < config.initialHeight));
+      const obstacle = maxOf(
+        run.track.nodes.filter(node => node.y < config.initialHeight),
+        node => node.y
+      );
       patches.push({ initialHeight: round((obstacle + lossHead + 0.5) * MARGIN) });
       patches.push({ friction: round(config.friction / 2, 4) });
       break;

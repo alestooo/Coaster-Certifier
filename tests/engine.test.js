@@ -231,3 +231,53 @@ describe("Recomendaciones", () => {
     expect(detail.explanation).toMatch(/v² > gR/);
   });
 });
+
+describe("Robustez (hallazgos de revisión)", () => {
+  it("resume historiales de más de 150 000 estados sin desbordar la pila", () => {
+    const run = runSimulation({ ...IDEAL, mapId: "slope", initialHeight: 20, brakeMode: "spring", springConstant: 6000, maxCompression: 60, maxTime: 90 }, { timeStep: 0.0005 });
+
+    expect(run.history.length).toBeGreaterThan(150000);
+    expect(Number.isFinite(run.verdict.summary.braking.maxCompression)).toBe(true);
+    expect(Number.isFinite(run.verdict.summary.maxSpeed.value)).toBe(true);
+  });
+
+  it("registra una sola causa cuando el tren se detiene por rapidez insuficiente", () => {
+    const run = simulate({ mapId: "valley", initialHeight: 10, trackWidth: 260, hillHeight: 14, hillCrestRadius: 30, friction: 0.02 });
+
+    expect(run.verdict.violations).toHaveLength(1);
+    expect(run.verdict.violations[0].code).toBe(CRITERIA.MIN_SPEED);
+  });
+
+  it("marca las crestas interiores de un trazado personalizado y evalúa su energía", () => {
+    const run = simulate({
+      mapId: "custom",
+      initialHeight: 20,
+      trackWidth: 200,
+      customPoints: [
+        { x: 0, y: 1, loopHeight: 0, loopTopRadius: 0 },
+        { x: 0.3, y: 0, loopHeight: 0, loopTopRadius: 0 },
+        { x: 0.55, y: 0.5, loopHeight: 0, loopTopRadius: 0 },
+        { x: 0.8, y: 0, loopHeight: 0, loopTopRadius: 0 },
+        { x: 1, y: 0, loopHeight: 0, loopTopRadius: 0 }
+      ]
+    });
+
+    expect(run.track.markers.map(marker => marker.label)).toEqual(["A", "D", "E", "F"]);
+    expect(run.verdict.designChecks.some(check => check.id.startsWith("crest"))).toBe(true);
+  });
+
+  it("rechaza dos loops personalizados que se solapan", () => {
+    expect(() =>
+      simulate({
+        mapId: "custom",
+        trackWidth: 120,
+        customPoints: [
+          { x: 0, y: 1, loopHeight: 0, loopTopRadius: 0 },
+          { x: 0.3, y: 0, loopHeight: 30, loopTopRadius: 6 },
+          { x: 0.45, y: 0, loopHeight: 30, loopTopRadius: 6 },
+          { x: 1, y: 0, loopHeight: 0, loopTopRadius: 0 }
+        ]
+      })
+    ).toThrow(/espacio horizontal/);
+  });
+});

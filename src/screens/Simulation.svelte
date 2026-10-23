@@ -56,6 +56,7 @@
 
   let cartMass = $state(CART_MASS);
   let masses = $state(people.map(passenger => passenger.mass));
+  let applied = $state({ cartMass: CART_MASS, masses: people.map(passenger => passenger.mass) });
 
   let runner = new SimulationRunner(untrack(() => config));
   let draft = $state<SimulationConfig>(copyConfig(untrack(() => runner.config)));
@@ -111,6 +112,7 @@
       runner.apply(next);
 
       draft = copyConfig(next);
+      applied = { cartMass, masses: [...masses] };
       signature = fingerprint();
       designConfirmed = true;
       onMapChange(next.mapId);
@@ -125,8 +127,8 @@
 
   function discard() {
     draft = copyConfig(runner.config);
-    cartMass = CART_MASS;
-    masses = people.map(passenger => passenger.mass);
+    cartMass = applied.cartMass;
+    masses = [...applied.masses];
     signature = fingerprint();
     errorField = "";
     errorMessage = "";
@@ -134,7 +136,8 @@
 
   function loadScenario(id: ScenarioId) {
     runner.pause();
-    draft = { ...draft, ...scenarioConfig(id) } as SimulationConfig;
+    // Cada escenario parte de los valores por defecto: no hereda campos del borrador anterior.
+    draft = copyConfig(resolveConfig(scenarioConfig(id)));
     cartMass = CART_MASS;
     masses = people.map(() => DEFAULT_PASSENGER_MASS);
     apply();

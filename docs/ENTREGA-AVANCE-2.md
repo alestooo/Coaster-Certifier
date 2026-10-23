@@ -21,7 +21,7 @@ https://github.com/alestooo/Coaster-Certifier
 | Acción | Comando |
 | --- | --- |
 | Instalar dependencias | `npm install` |
-| Correr las pruebas (67 pruebas, 11 de validación analítica) | `npm test` |
+| Correr las pruebas (71 pruebas, 11 de validación analítica) | `npm test` |
 | Ejecución headless (escribe `output/certification.csv` y `output/certification.summary.json`) | `npm run headless` |
 | Headless con otro escenario (`npm run headless -- --list` los enumera) | `npm run headless -- --scenario valley` |
 

@@ -192,7 +192,7 @@ Parámetros (`SimulationConfig`): `mass` (kg), `gravity` (m/s²), `initialHeight
 
 ## 5. Pruebas de validación
 
-`npm test` ejecuta 67 pruebas (vitest) en cinco archivos. Las de **validación analítica** comparan el motor con soluciones cerradas:
+`npm test` ejecuta 71 pruebas (vitest) en cinco archivos. Las de **validación analítica** comparan el motor con soluciones cerradas:
 
 | Escenario | Solución cerrada | Tolerancia declarada y justificación |
 | --- | --- | --- |

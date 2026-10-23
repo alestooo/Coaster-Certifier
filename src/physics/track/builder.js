@@ -4,6 +4,7 @@ import { hermitePoint, arcLengthTable, parameterAt } from "./hermite.js";
 import { lineMetrics, linePoint } from "./line.js";
 import { createLoop, loopPoint, loopExtent } from "./loop.js";
 import { layoutNodes } from "./layouts.js";
+import { maxOf, minOf } from "../utils.js";
 
 /**
  * @typedef {import("./hermite.js").CurvePoint & {section: string, segmentIndex: number, kind: string}} TrackPoint
@@ -129,7 +130,17 @@ function assertLoopsFit(nodes) {
     const previous = nodes[index - 1];
     const next = nodes[index + 1];
 
-    if (minX < previous.x || maxX > next.x || loop.exitX >= next.x) {
+    const previousLimit = previous.loopHeight
+      ? createLoop({
+          x: previous.x,
+          y: previous.y,
+          height: previous.loopHeight,
+          topRadius: previous.loopTopRadius ?? previous.loopHeight / 2,
+          section: ""
+        }).exitX
+      : previous.x;
+
+    if (minX < previousLimit || maxX > next.x || loop.exitX >= next.x) {
       throw new ConfigError(
         `El loop del punto ${index + 1} necesita más espacio horizontal: ` +
           "separá los puntos vecinos o reducí la altura del loop.",
@@ -292,8 +303,8 @@ export function buildTrack(input) {
     brakeStart,
     brakeX,
     endX: brakeX + config.brakingLength,
-    maxHeight: Math.max(...points.map(point => point.y)),
-    minX: Math.min(0, ...points.map(point => point.x)),
+    maxHeight: maxOf(points, point => point.y),
+    minX: Math.min(0, minOf(points, point => point.x)),
     maxX: brakeX + config.brakingLength,
     points,
     loops: segments.filter(segment => segment.kind === "loop")
