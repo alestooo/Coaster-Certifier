@@ -6,7 +6,6 @@ const SAMPLES = 160;
 const LOOP_SHAPE = 0.5;
 const TAU = 2 * Math.PI;
 
-// Curva entre puntos del recorrido.
 function curve(start, end, u, startSlope = 0) {
   const dx = end.x - start.x;
   const tangent = startSlope * dx;
@@ -38,17 +37,6 @@ function curve(start, end, u, startSlope = 0) {
   };
 }
 
-// Loop con radio local variable:
-//
-// radio(theta) = R * (1 + q * cos(theta))
-//
-// Con q = 0,5:
-// - radio inferior: 1,5R
-// - radio superior: 0,5R
-// - altura: 2R
-//
-// La entrada y la salida son horizontales,
-// pero se encuentran en posiciones diferentes.
 function loopGeometry(segment, localDistance) {
   const radius = segment.radius;
 
@@ -59,10 +47,6 @@ function loopGeometry(segment, localDistance) {
 
   let theta = normalized;
 
-  // Invertir:
-  // s/R = theta + q * sin(theta)
-  //
-  // Su derivada siempre es positiva.
   for (let iteration = 0; iteration < 8; iteration++) {
     theta -=
       (

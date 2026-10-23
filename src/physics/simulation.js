@@ -247,8 +247,6 @@ export function step(state, input, dt) {
       };
     }
 
-    // Solución exacta del frenado horizontal:
-    // evita oscilaciones numéricas alrededor de velocidad cero.
     if (
       config.brakeMode === "station" &&
       values[0] >= track.springStart

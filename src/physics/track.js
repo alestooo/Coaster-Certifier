@@ -1,5 +1,3 @@
-
-
 export function getTrackGeometry(distance, config) {
   const s = Math.max(0, Math.min(distance, config.trackLength));
   const angle = -Math.asin(

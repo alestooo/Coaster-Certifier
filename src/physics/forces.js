@@ -37,7 +37,6 @@ export function calculateForces(
   const frictionLimit =
     config.friction * Math.max(0, normal);
 
-  // Se usa el mismo coeficiente como umbral de adherencia.
   const friction =
     Math.abs(velocity) < 1e-10
       ? -Math.sign(drive) *

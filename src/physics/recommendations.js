@@ -61,8 +61,6 @@ export function explainFailure(state, config) {
       "Se revisará la configuración completa antes de sugerir cambios.";
   }
 
-  // Ya no se aplica la incompatibilidad del círculo:
-  // geometry.js ahora utiliza curvatura variable.
   return {
     title,
     explanation,
@@ -309,7 +307,6 @@ function candidateList(original) {
     }
   }
 
-  // Combinar altura y tamaño del loop.
   if (original.mapId === "loop") {
     for (const heightFactor of [0.9, 0.95, 1.05, 1.1]) {
       for (const radiusFactor of [0.9, 1.05, 1.1, 1.2]) {
@@ -324,7 +321,6 @@ function candidateList(original) {
     }
   }
 
-  // Ajustar los loops de la pista personalizada.
   if (original.mapId === "custom") {
     for (const factor of [0.85, 0.95, 1.05, 1.15, 1.3]) {
       add({
@@ -385,7 +381,6 @@ export function* recommendationSearch(input, failedState) {
 
   let tested = 0;
 
-  // Búsqueda finita: puede encontrar menos de tres opciones.
   for (const candidate of candidates.slice(0, 72)) {
     const strategy = candidate.changes
       .map(change => change.key)
@@ -456,8 +451,6 @@ export function* recommendationSearch(input, failedState) {
       candidate.config.gravity *
       candidate.config.initialHeight;
 
-    // Margen de 0,02 g para evitar recomendar
-    // una configuración pegada al límite numérico.
     const valid =
       stoppedAtEnd &&
       state.events.length === 0 &&

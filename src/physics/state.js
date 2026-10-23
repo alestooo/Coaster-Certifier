@@ -1,6 +1,3 @@
-// Responsable: Alejandro.
-// Este archivo no debe depender del navegador.
-
 import { validateConfig } from "./config.js";
 import { getTrackGeometry } from "./track.js";
 import { calculateEnergies } from "./energy.js";
