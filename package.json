@@ -1,13 +1,14 @@
 {
   "name": "coaster-certifier",
-  "version": "1.0.0",
-  "description": "Simulador web de montaña rusa con librería de física propia, pruebas analíticas y evaluación del recorrido. Proyecto de Física I, CENFOTEC",
-  "main": "index.js",
+  "version": "0.9.0",
+  "description": "Certificador de montañas rusas: simulador web con librería de física propia, pruebas de validación analítica, dictamen de aprobación y ejecución headless. Proyecto de Física I (FUN-18), Universidad CENFOTEC.",
   "scripts": {
-    "test": "vitest run",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "headless": "node scripts/headless.js",
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
@@ -15,9 +16,15 @@
     "type": "git",
     "url": "git+https://github.com/alestooo/Coaster-Certifier.git"
   },
-  "keywords": [],
+  "keywords": [
+    "physics",
+    "simulation",
+    "roller-coaster",
+    "svelte",
+    "education"
+  ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "module",
   "bugs": {
     "url": "https://github.com/alestooo/Coaster-Certifier/issues"
@@ -29,10 +36,15 @@
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@types/node": "^26.6.5",
+    "@vitest/coverage-v8": "^5.0.5",
     "svelte-check": "^4.7.7",
     "typescript": "^6.0.3",
     "vite": "^8.3.4",
     "vitest": "^5.0.5"
   },
-  "private": true
+  "private": true,
+  "engines": {
+    "node": ">=18.17"
+  }
 }
