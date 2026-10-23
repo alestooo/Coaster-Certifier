@@ -7,6 +7,8 @@ Proyecto de Simulación · Física I (FUN-18) · Universidad CENFOTEC · 2026-C3
 - **Aplicación desplegada:** https://coaster-certifier.vercel.app
 - **Repositorio público:** https://github.com/alestooo/Coaster-Certifier
 
+![Laboratorio de certificación: trazado del anexo aprobado, con puntos críticos A–F, dictamen, magnitudes y gráficas](docs/img/laboratorio.png)
+
 ---
 
 ## 1. Comandos
@@ -227,6 +229,8 @@ El código de salida es 0 si el trazado aprueba, 2 si se rechaza y 1 ante una co
 4. **Gráficas en tiempo real** (Chart.js, ejes con unidades): rapidez, energías, energía disipada, fuerza normal con N = 0, aceleraciones tangencial y normal, carga con banda [−1, +5] g y energía elástica; eje horizontal en tiempo o posición; marcadores de puntos críticos, tramos e incumplimientos; descarga PNG.
 5. **Dictamen** con incumplimientos (condición, instante, tramo, posición, valor, límite), condiciones de diseño y **tres alternativas verificadas** calculadas a partir de la física del fallo.
 6. **Reporte completo** imprimible (PDF): resultado, puntos críticos, extremos, frenado, tramos, condiciones de diseño y parámetros; exportación CSV y JSON.
+
+![Reporte de certificación con puntos críticos y extremos del recorrido](docs/img/reporte.png)
 
 ## 8. Supuestos y limitaciones
 
