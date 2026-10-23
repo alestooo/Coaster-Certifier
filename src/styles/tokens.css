@@ -1,0 +1,39 @@
+/* Sistema de diseño de Coaster-Certifier: tokens compartidos por toda la interfaz. */
+:root {
+  --font-sans: "Nunito", "Segoe UI", system-ui, sans-serif;
+
+  --page-bg: #f6f3fb;
+  --surface: #ffffff;
+  --surface-soft: #f7f2fc;
+  --surface-muted: #efe8f7;
+  --border: #e6ddef;
+  --border-strong: #d5c6e4;
+
+  --text: #2d2140;
+  --text-soft: #5f4a75;
+  --muted: #8a789a;
+  --faint: #b3a4c2;
+
+  --primary: #7a4bc6;
+  --primary-strong: #5f329a;
+  --primary-soft: #efe6fb;
+  --primary-text: #ffffff;
+
+  --accent: #f2a93b;
+  --accent-soft: #fff1d6;
+  --success: #2f9d78;
+  --success-soft: #e3f5ec;
+  --danger: #d9465a;
+  --danger-soft: #fde6ea;
+  --info: #3a7bd5;
+  --info-soft: #e7f0ff;
+
+  --radius-sm: 8px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --shadow-sm: 0 2px 8px rgb(60 30 90 / 6%);
+  --shadow: 0 10px 30px rgb(60 30 90 / 8%);
+  --shadow-lg: 0 24px 60px rgb(40 20 70 / 18%);
+
+  --control-height: 40px;
+}
