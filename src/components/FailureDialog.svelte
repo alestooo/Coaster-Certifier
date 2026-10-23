@@ -1,27 +1,10 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
 
-  import {
-    explainFailure
-  } from "../physics/recommendations.js";
+  import { explainFailure } from "../physics/index.js";
+  import type { SimulationConfig, SimulationState } from "../lib/types";
 
-  import {
-    DEFAULT_CONFIG,
-    createInitialState
-  } from "../physics/index.js";
-
-  import type {
-    TrackPoint
-  } from "./TrackEditor.svelte";
-
-  type Config = {
-    -readonly [K in keyof typeof DEFAULT_CONFIG]:
-      K extends "mapId" | "brakeMode"
-        ? string
-        : K extends "customPoints"
-          ? TrackPoint[]
-          : number;
-  };
+  type Config = SimulationConfig;
 
   type Change = {
     key: string;
@@ -36,7 +19,9 @@
     changes: Change[];
     time: number;
     maxLoad: number;
+    minLoad: number;
     maxCompression: number;
+    targeted?: boolean;
   };
 
   let {
@@ -44,7 +29,7 @@
     config,
     onApply
   }: {
-    failedState: ReturnType<typeof createInitialState>;
+    failedState: SimulationState;
     config: Config;
     onApply: (config: Config) => void;
   } = $props();
@@ -98,7 +83,12 @@
           ? "Aporta más energía para superar subidas y mantener el contacto."
           : "Reduce la energía inicial y la rapidez, lo que puede disminuir las cargas y la exigencia del frenado.";
 
-      case "trackLength":
+      case "initialSpeed":
+        return increasing
+          ? "Aporta energía cinética inicial adicional al salir de la cadena."
+          : "Reduce la energía con la que el tren inicia el descenso.";
+
+      case "trackWidth":
         return increasing
           ? "Distribuye los cambios de altura sobre más distancia y suaviza las curvas del perfil."
           : "Acorta el trazado, modifica la pendiente y reduce la distancia expuesta a la fricción.";
@@ -108,11 +98,25 @@
           ? "Disipa más energía durante el recorrido y reduce la energía de llegada."
           : "Conserva más energía para superar subidas y alcanzar la zona final.";
 
-      case "loopRadius":
-        return (
-          "Modifica la curvatura y la altura del loop; " +
-          "la opción se comprueba tanto en su base como en su cima."
-        );
+      case "loopHeight":
+        return increasing
+          ? "Un loop más alto exige más energía pero abre la base (R_B = h_L − R) y reduce la carga en B."
+          : "Un loop más bajo necesita menos energía para mantener el contacto en la cima C.";
+
+      case "loopTopRadius":
+        return increasing
+          ? "Un radio mayor en la cima reduce la carga en C, pero exige más energía (H ≥ h_L + R/2) y cierra la base."
+          : "Un radio menor en la cima abre la base del loop en lágrima (menos g en B) y pide menos altura.";
+
+      case "hillHeight":
+        return increasing
+          ? "Una colina más alta llega a la cresta con menos rapidez y aumenta la carga mínima."
+          : "Una colina más baja se supera con menos energía.";
+
+      case "hillCrestRadius":
+        return increasing
+          ? "Una cresta más abierta reduce la aceleración normal y evita la sensación de ingravidez (n_D = 1 − v²/(g·ρ_c))."
+          : "Una cresta más cerrada aumenta el airtime; el motor comprobó que sigue dentro del límite.";
 
       case "brakingLength":
         return increasing
@@ -128,6 +132,9 @@
         return increasing
           ? "Un resorte más rígido necesita menos compresión para almacenar la misma energía."
           : "Un resorte menos rígido cambia la compresión y la respuesta del rebote.";
+
+      case "springDamping":
+        return "Un amortiguador viscoso disipa la energía almacenada en el resorte y evita el rebote indefinido.";
 
       case "maxCompression":
         return increasing
@@ -150,7 +157,11 @@
       ],
       [
         "Ancho del trazado",
-        `${format(candidate.trackLength)} m`
+        `${format(candidate.trackWidth)} m`
+      ],
+      [
+        "Rapidez inicial",
+        `${format(candidate.initialSpeed)} m/s`
       ],
       [
         "Masa total",
@@ -166,22 +177,29 @@
       ]
     ];
 
-    if (candidate.mapId === "loop") {
+    if (candidate.mapId === "loop" || candidate.mapId === "reference") {
       values.push([
-        "Radio del loop",
-        `${format(candidate.loopRadius)} m`
+        "Loop h_L · R",
+        `${format(candidate.loopHeight)} m · ${format(candidate.loopTopRadius)} m`
+      ]);
+    }
+
+    if (candidate.mapId === "valley" || candidate.mapId === "reference") {
+      values.push([
+        "Colina h_c · ρ_c",
+        `${format(candidate.hillHeight)} m · ${format(candidate.hillCrestRadius)} m`
       ]);
     }
 
     if (candidate.mapId === "custom") {
-      const radii = candidate.customPoints
-        .filter(point => point.loopRadius > 0)
-        .map(point => `${format(point.loopRadius)} m`);
+      const loops = candidate.customPoints
+        .filter(point => point.loopHeight > 0)
+        .map(point => `${format(point.loopHeight)} m / R ${format(point.loopTopRadius)} m`);
 
       values.push([
         "Loops",
-        radii.length
-          ? radii.join(" · ")
+        loops.length
+          ? loops.join(" · ")
           : "Sin loops"
       ]);
     }
@@ -189,8 +207,8 @@
     if (candidate.brakeMode === "spring") {
       values.push(
         [
-          "Resorte",
-          `${format(candidate.springConstant)} N/m`
+          "Resorte k · c",
+          `${format(candidate.springConstant)} N/m · ${format(candidate.springDamping)} N·s/m`
         ],
         [
           "Compresión permitida",
@@ -260,12 +278,7 @@
     };
 
     worker.postMessage(
-      JSON.parse(
-        JSON.stringify({
-          config,
-          state: failedState
-        })
-      )
+      JSON.parse(JSON.stringify({ config }))
     );
   }
 
@@ -372,8 +385,10 @@
 
     <p>
       Cada prueba conserva tu recorrido, masa y límites.
-      Se priorizan estrategias distintas y se comprueba
-      el movimiento completo antes de ofrecerlas.
+      Las alternativas marcadas «calculada» salen de la
+      física del fallo (energía, curvatura o frenado); todas
+      se comprueban simulando el movimiento completo antes
+      de ofrecerlas.
     </p>
 
     {#if busy}
@@ -395,7 +410,7 @@
           </div>
 
           <span class="verified">
-            ✓ Comprobada
+            ✓ Comprobada{option.targeted ? " · calculada" : ""}
           </span>
         </div>
 
@@ -439,7 +454,8 @@
           <small>
             Llegada detenida: {option.time.toFixed(2)} s ·
             carga máxima: {option.maxLoad.toFixed(2)} g ·
-            límite: {option.config.maxLoad} g
+            mínima: {option.minLoad.toFixed(2)} g ·
+            límites: {option.config.minLoad} / +{option.config.maxLoad} g
           </small>
 
           <button
@@ -462,7 +478,7 @@
       </p>
     {/if}
 
-    {#if !busy && !detail.impossible}
+    {#if !busy}
       <button type="button" onclick={search}>
         Volver a comprobar
       </button>

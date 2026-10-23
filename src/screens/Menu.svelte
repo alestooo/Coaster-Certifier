@@ -13,7 +13,7 @@
   aria-label="Menú principal de Coaster-Certifier"
 >
   <div class="version-badge">
-    BETA · v0.8
+    AVANCE 2 · v0.9
   </div>
 
   <div class="menu-content">

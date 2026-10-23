@@ -23,7 +23,7 @@
   <div class="setup-heading">
     <div>
       <span class="setup-eyebrow">
-        CUATRO FORMAS DE EXPLORAR
+        SEIS FORMAS DE EXPLORAR
       </span>
 
       <h1>Elegí el recorrido.</h1>
@@ -37,7 +37,7 @@
 
   <div class="map-section-heading">
     <h2>Montañas rusas</h2>
-    <span>4 recorridos disponibles</span>
+    <span>{MAPS.length} recorridos disponibles</span>
   </div>
 
   <div class="map-grid four-maps">
@@ -58,7 +58,9 @@
           <span class="map-badge">
             {map.id === "custom"
               ? "Editor de puntos"
-              : "Disponible"}
+              : map.id === "reference"
+                ? "Trazado del anexo"
+                : "Disponible"}
           </span>
         </div>
 
@@ -74,9 +76,7 @@
           <p>{map.description}</p>
 
           <span class="map-category">
-            {map.id === "custom"
-              ? "Hasta 3 loops y 9 puntos"
-              : "Parámetros físicos ajustables"}
+            {map.tag}
           </span>
         </div>
       </button>
@@ -110,7 +110,7 @@
 
   .four-maps {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px;
   }
 

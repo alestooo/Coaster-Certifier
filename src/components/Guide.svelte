@@ -1,135 +1,92 @@
 <script lang="ts">
-  import {
-    SCENARIOS,
-    type PresetId
-  } from "../game/scenarios";
+  import { SCENARIO_CARDS, type ScenarioId } from "../game/scenarios";
 
-  let {
-    onPreset
-  }: {
-    onPreset: (id: PresetId) => void;
-  } = $props();
+  let { onPreset }: { onPreset: (id: ScenarioId) => void } = $props();
 
   let dialog: HTMLDialogElement;
+
+  let approvedScenarios = $derived(SCENARIO_CARDS.filter(card => card.approved));
+  let rejectedScenarios = $derived(SCENARIO_CARDS.filter(card => !card.approved));
 
   function close() {
     dialog.close();
   }
+
+  function choose(id: ScenarioId) {
+    onPreset(id);
+    close();
+  }
 </script>
 
-<button
-  class="guide-trigger"
-  type="button"
-  onclick={() => dialog.showModal()}
->
-  ? Guía y pruebas
+<button class="guide-trigger" type="button" onclick={() => dialog.showModal()}>
+  ? Guía y escenarios
 </button>
 
-<dialog
-  bind:this={dialog}
-  class="guide-dialog"
-  aria-labelledby="guide-title"
->
+<dialog bind:this={dialog} class="guide-dialog" aria-labelledby="guide-title">
   <div class="guide-heading">
     <div>
       <span>COASTER-CERTIFIER</span>
-
-      <h2 id="guide-title">
-        Guía y pruebas rápidas
-      </h2>
+      <h2 id="guide-title">Guía y escenarios de referencia</h2>
     </div>
 
-    <button
-      type="button"
-      onclick={close}
-      aria-label="Cerrar guía"
-    >
-      ✕
-    </button>
+    <button type="button" onclick={close} aria-label="Cerrar guía">✕</button>
   </div>
 
   <div class="guide-body">
     <ol>
-      <li>
-        Elegí un recorrido y prepará los pasajeros.
-      </li>
-
-      <li>
-        Ajustá los valores y presioná
-        «Aplicar y reiniciar».
-      </li>
-
-      <li>
-        Iniciá; observá el tren, los indicadores
-        y las gráficas.
-      </li>
+      <li>Ajustá los parámetros (símbolos del anexo) y presioná «Aplicar y reiniciar».</li>
+      <li>Iniciá la animación, avanzá paso a paso o usá «Completar» para obtener el dictamen al instante.</li>
+      <li>Revisá el dictamen, las gráficas y el reporte completo; exportá CSV, JSON o PDF.</li>
     </ol>
 
-    <h3>Elegí cómo termina el recorrido</h3>
+    <h3>Qué evalúa el dictamen</h3>
+
+    <ul>
+      <li><strong>Contacto:</strong> N = m·(g·cos θ + κ·v²) debe ser positiva. Con «ruedas de seguridad» la normal puede ser negativa fuera del loop, pero la carga no puede bajar de n_mín.</li>
+      <li><strong>Carga sobre los pasajeros:</strong> n = N/(m·g) dentro de [n_mín, n_máx] (anexo: −1 g y +5 g).</li>
+      <li><strong>Recorrido completo:</strong> el tren debe superar las subidas con v &gt; v_mín y llegar a la zona de frenado.</li>
+      <li><strong>Frenado:</strong> detención antes del final de la zona (frenos) o compresión x ≤ x_máx sin rebote indefinido (resorte).</li>
+    </ul>
+
+    <h3>Cómo termina el recorrido</h3>
 
     <p>
-      <strong>Estación:</strong>
-      un freno independiente disipa energía hasta
-      detener el tren. Si falta distancia,
-      se rechaza la configuración.
+      <strong>Frenos de estación:</strong> desaceleración constante a_f (≤ 1 g): d_det = v_E²/(2·a_f).
+      <strong>Resorte:</strong> F = −k·x almacena energía y la devuelve; con amortiguamiento c la disipa y el tren queda en reposo.
     </p>
 
-    <p>
-      <strong>Resorte:</strong>
-      almacena energía y puede devolverla,
-      haciendo rebotar el tren.
-    </p>
+    <h3>Escenarios que aprueban</h3>
 
-    <h3>Configuraciones comprobadas</h3>
-
-    <p>
-      Los botones cargan y reinician el caso,
-      sin iniciarlo. Usan 425 kg por carrito y
-      75 kg por persona: con una persona,
-      la masa total es 500 kg.
-    </p>
-
-    {#each SCENARIOS as scenario}
+    {#each approvedScenarios as scenario}
       <article>
         <div>
-          <h4>{scenario.title}</h4>
+          <h4>✔ {scenario.title}</h4>
           <p>{scenario.description}</p>
-          <small>{scenario.values}</small>
+          <small>{scenario.summary}</small>
         </div>
-
-        <button
-          type="button"
-          onclick={() => {
-            onPreset(scenario.id);
-            close();
-          }}
-        >
-          Cargar prueba
-        </button>
+        <button type="button" onclick={() => choose(scenario.id)}>Cargar</button>
       </article>
     {/each}
 
-    <h3>Qué podés comparar</h3>
+    <h3>Escenarios que se rechazan (didácticos)</h3>
+
+    {#each rejectedScenarios as scenario}
+      <article class="rejected">
+        <div>
+          <h4>✘ {scenario.title}</h4>
+          <p>{scenario.description}</p>
+          <small>{scenario.summary}</small>
+        </div>
+        <button type="button" onclick={() => choose(scenario.id)}>Cargar</button>
+      </article>
+    {/each}
+
+    <h3>Supuestos del modelo</h3>
 
     <p>
-      Más altura aporta energía. Más masa aumenta
-      fuerzas y energías; en la bajada ideal no
-      aumenta la rapidez. Con resorte, más masa
-      puede aumentar la compresión.
-    </p>
-
-    <p>
-      La normal debe ser positiva.
-      Las pruebas de loop con 8 g son exploratorias;
-      el límite del proyecto sigue siendo +5 g.
-      Su cumplimiento requiere otra geometría de loop.
-    </p>
-
-    <p>
-      Modelo de masa concentrada, fricción μN,
-      sin resistencia del aire. La carga mostrada
-      es N/(mg); el dictamen final del anexo
-      todavía no está completo.
+      Tren como partícula sobre una vía rígida en un plano vertical, gravedad uniforme, fricción efectiva μ·|N|
+      sin modelo separado de arrastre, ruedas sin energía de rotación. Los escenarios usan 425 kg por carrito y
+      75 kg por persona; la masa no cambia la rapidez ni las cargas en g, solo escala fuerzas y energías.
     </p>
   </div>
 </dialog>
@@ -140,8 +97,8 @@
   }
 
   .guide-dialog {
-    width: min(760px, calc(100vw - 32px));
-    max-height: 85dvh;
+    width: min(780px, calc(100vw - 32px));
+    max-height: 88dvh;
     box-sizing: border-box;
     padding: 0;
     border: 1px solid #e4d6ee;
@@ -177,7 +134,12 @@
   .guide-body {
     padding: 10px 24px 24px;
     overflow: auto;
-    max-height: calc(85dvh - 105px);
+    max-height: calc(88dvh - 105px);
+  }
+
+  .guide-body h3 {
+    margin: 18px 0 8px;
+    font-size: 14px;
   }
 
   .guide-body p,
@@ -191,19 +153,26 @@
     gap: 15px;
     align-items: center;
     justify-content: space-between;
-    padding: 15px;
-    margin: 10px 0;
-    background: #f9f5fd;
-    border: 1px solid #eee3f6;
+    padding: 13px 15px;
+    margin: 8px 0;
+    background: #f4faf6;
+    border: 1px solid #dcefe4;
     border-radius: 12px;
   }
 
+  .guide-body article.rejected {
+    background: #fdf5f6;
+    border-color: #f2dde1;
+  }
+
   .guide-body article h4 {
-    margin: 0 0 5px;
+    margin: 0 0 4px;
+    font-size: 13px;
   }
 
   .guide-body article p {
-    margin: 0 0 7px;
+    margin: 0 0 5px;
+    font-size: 12px;
   }
 
   .guide-body small {

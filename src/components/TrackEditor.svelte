@@ -1,9 +1,12 @@
 <script lang="ts">
-  export type TrackPoint = {
-    x: number;
-    y: number;
-    loopRadius: number;
-  };
+  import type { TrackPoint } from "../lib/types";
+  import { assertLoopShape, CUSTOM_LIMITS, CONFIG_LIMITS } from "../physics/index.js";
+  import { formatNumber } from "../ui/format";
+
+  import "../styles/track-editor.css";
+
+  /** Loop por defecto al agregarlo: lágrima con c = 0,5. */
+  const DEFAULT_LOOP = { loopHeight: 12, loopTopRadius: 3 };
 
   let {
     points,
@@ -32,7 +35,11 @@
   );
 
   let loopCount = $derived(
-    points.filter(point => point.loopRadius > 0).length
+    points.filter(point => point.loopHeight > 0).length
+  );
+
+  let loopBottomRadius = $derived(
+    chosen && chosen.loopHeight > 0 ? chosen.loopHeight - chosen.loopTopRadius : 0
   );
 
   let path = $derived(
@@ -101,37 +108,33 @@
     move(dragging, x, y);
   }
 
-  function changeRadius(radius: number) {
+  function changeLoop(loopHeight: number, loopTopRadius: number) {
     message = "";
 
-    if (
-      !chosen ||
-      fixed ||
-      !Number.isFinite(radius)
-    ) {
+    if (!chosen || fixed || !Number.isFinite(loopHeight) || !Number.isFinite(loopTopRadius)) {
       return;
     }
 
-    if (
-      radius > 0 &&
-      !chosen.loopRadius &&
-      loopCount >= 3
-    ) {
-      message = "Ya hay tres loops.";
+    const height = Math.max(0, Math.min(CONFIG_LIMITS.loopHeight[1], loopHeight));
+    const topRadius = Math.max(0, Math.min(CONFIG_LIMITS.loopTopRadius[1], loopTopRadius));
+
+    if (height > 0 && !chosen.loopHeight && loopCount >= CUSTOM_LIMITS.maxLoops) {
+      message = `Ya hay ${CUSTOM_LIMITS.maxLoops} loops.`;
       return;
+    }
+
+    if (height > 0) {
+      try {
+        assertLoopShape(height, topRadius);
+      } catch (problem) {
+        message = problem instanceof Error ? problem.message : "Loop inválido.";
+      }
     }
 
     onChange(
       points.map((point, index) =>
         index === selected
-          ? {
-              ...point,
-
-              loopRadius: Math.max(
-                0,
-                Math.min(15, radius)
-              )
-            }
+          ? { ...point, loopHeight: height, loopTopRadius: height > 0 ? topRadius : 0 }
           : { ...point }
       )
     );
@@ -140,7 +143,7 @@
   function addPoint() {
     message = "";
 
-    if (points.length >= 9) return;
+    if (points.length >= CUSTOM_LIMITS.maxPoints) return;
 
     let index = 0;
 
@@ -190,7 +193,8 @@
           points[index + 1].y
         ) / 2,
 
-      loopRadius: 0
+      loopHeight: 0,
+      loopTopRadius: 0
     });
 
     selected = index + 1;
@@ -240,7 +244,7 @@
     </div>
 
     <span class="editor-count">
-      {points.length} / 9 puntos
+      {points.length} / {CUSTOM_LIMITS.maxPoints} puntos
     </span>
   </div>
 
@@ -289,7 +293,7 @@
       />
 
       {#each points as point}
-        {#if point.loopRadius > 0}
+        {#if point.loopHeight > 0}
           <circle
             cx={left + point.x * width}
             cy={top + (1 - point.y) * height - 23}
@@ -298,6 +302,16 @@
             stroke="#d79a2c"
             stroke-width="4"
           />
+          <text
+            x={left + point.x * width}
+            y={top + (1 - point.y) * height - 20}
+            text-anchor="middle"
+            fill="#a8741a"
+            font-size="10"
+            font-weight="700"
+          >
+            {point.loopHeight} m
+          </text>
         {/if}
       {/each}
 
@@ -385,7 +399,7 @@
       class="editor-button add-button"
       type="button"
       onclick={addPoint}
-      disabled={points.length >= 9}
+      disabled={points.length >= CUSTOM_LIMITS.maxPoints}
     >
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M12 5v14M5 12h14" />
@@ -410,7 +424,7 @@
     </button>
 
     <span class="loop-count">
-      {loopCount} / 3 loops
+      {loopCount} / {CUSTOM_LIMITS.maxLoops} loops
     </span>
   </div>
 
@@ -496,32 +510,59 @@
           </label>
 
           <label>
-            Radio del loop (m)
+            Altura del loop h_L (m)
 
             <input
               type="number"
               min="0"
-              max="15"
-              step=".1"
-              value={chosen.loopRadius}
+              max={CONFIG_LIMITS.loopHeight[1]}
+              step=".5"
+              value={chosen.loopHeight}
               onchange={event =>
-                changeRadius(
+                changeLoop(
+                  event.currentTarget.valueAsNumber,
+                  chosen.loopTopRadius || event.currentTarget.valueAsNumber / 4
+                )}
+            />
+          </label>
+
+          <label>
+            Radio en la cima R (m)
+
+            <input
+              type="number"
+              min="0"
+              max={CONFIG_LIMITS.loopTopRadius[1]}
+              step=".25"
+              disabled={!chosen.loopHeight}
+              value={chosen.loopTopRadius}
+              onchange={event =>
+                changeLoop(
+                  chosen.loopHeight,
                   event.currentTarget.valueAsNumber
                 )}
             />
           </label>
         </div>
 
+        {#if chosen.loopHeight > 0}
+          <p class="loop-derived">
+            Lágrima: radio en la base R_B = h_L − R = {formatNumber(loopBottomRadius, 2)} m ·
+            {Math.abs(chosen.loopTopRadius - chosen.loopHeight / 2) < 1e-9 ? "circular" : `forma c = ${formatNumber(1 - (2 * chosen.loopTopRadius) / chosen.loopHeight, 2)}`} ·
+            debe cumplirse h_L ≥ 2R.
+          </p>
+        {/if}
+
         <div class="loop-tools">
           <button
             class="editor-button loop-button"
-            class:remove-loop={chosen.loopRadius > 0}
+            class:remove-loop={chosen.loopHeight > 0}
             type="button"
             onclick={() =>
-              changeRadius(
-                chosen.loopRadius ? 0 : 2
-              )}
-            disabled={!chosen.loopRadius && loopCount >= 3}
+              chosen.loopHeight
+                ? changeLoop(0, 0)
+                : changeLoop(DEFAULT_LOOP.loopHeight, DEFAULT_LOOP.loopTopRadius)}
+            disabled={!chosen.loopHeight && loopCount >= CUSTOM_LIMITS.maxLoops}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -529,12 +570,12 @@
               />
             </svg>
 
-            {chosen.loopRadius
+            {chosen.loopHeight
               ? "Quitar loop de este punto"
               : "Agregar loop aquí"}
           </button>
 
-          <span>0 m significa sin loop.</span>
+          <span>Altura 0 m significa sin loop.</span>
         </div>
       {/if}
     </div>
@@ -549,328 +590,7 @@
   <p class="editor-footnote">
     La línea es una guía entre puntos.
     La curva física se actualiza con «Aplicar diseño».
-    Los círculos son símbolos; su radio real
-    se calcula en metros.
+    Los círculos son símbolos; la altura y los
+    radios reales se calculan en metros.
   </p>
 </section>
-
-<style>
-  .track-editor {
-    padding: 20px;
-    background: white;
-    border: 1px solid #e6daef;
-    border-radius: 18px;
-    margin: 18px 0;
-    color: #674b7e;
-  }
-
-  .editor-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 15px;
-  }
-
-  .editor-eyebrow {
-    font-size: 9px;
-    letter-spacing: 1.6px;
-    color: #a487b8;
-  }
-
-  .editor-heading h2 {
-    font-size: 23px;
-    margin: 5px 0 6px;
-  }
-
-  .editor-heading p {
-    margin: 0;
-    font-size: 12px;
-    color: #9982a9;
-  }
-
-  .editor-count,
-  .loop-count {
-    padding: 8px 11px;
-    background: #f1e9f8;
-    color: #80559c;
-    border-radius: 9px;
-    font-size: 11px;
-    font-weight: 700;
-    white-space: nowrap;
-  }
-
-  .editor-surface {
-    position: relative;
-    touch-action: none;
-  }
-
-  .editor-surface > svg {
-    display: block;
-    width: 100%;
-    height: auto;
-  }
-
-  .track-editor button {
-    box-sizing: border-box;
-    font: inherit;
-    cursor: pointer;
-    transition:
-      background 0.16s,
-      box-shadow 0.16s,
-      border-color 0.16s;
-  }
-
-  .track-editor button:focus-visible,
-  .track-editor input:focus-visible {
-    outline: 3px solid #c9a4e3;
-    outline-offset: 3px;
-  }
-
-  .editor-surface .editor-point {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    border: 3px solid white;
-    border-radius: 50%;
-    background: #aa86c3;
-    color: white;
-    font-weight: 750;
-    font-size: 12px;
-    box-shadow: 0 3px 10px #70418b22;
-    touch-action: none;
-    cursor: grab;
-  }
-
-  .editor-surface .editor-point.selected {
-    background: #704095;
-    box-shadow:
-      0 0 0 5px #9e6dc52c,
-      0 4px 14px #70418b22;
-  }
-
-  .editor-surface .editor-point:active {
-    cursor: grabbing;
-  }
-
-  .editor-surface .editor-point.fixed-point {
-    background: #b5a7bf;
-    cursor: pointer;
-  }
-
-  .editor-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin: 18px 0 14px;
-  }
-
-  .track-editor .editor-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 11px 15px;
-    border-radius: 11px;
-    border: 1px solid transparent;
-    font-size: 12px;
-    font-weight: 650;
-    min-height: 42px;
-  }
-
-  .editor-button svg {
-    width: 18px;
-    height: 18px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    flex-shrink: 0;
-  }
-
-  .track-editor .add-button {
-    background: #7850a0;
-    color: white;
-    box-shadow: 0 4px 10px #7850a025;
-  }
-
-  .track-editor .add-button:hover {
-    background: #62388b;
-  }
-
-  .track-editor .delete-button {
-    background: #fff1f4;
-    color: #b35e76;
-    border-color: #f0d4dc;
-  }
-
-  .track-editor .delete-button:hover {
-    background: #ffe5ec;
-  }
-
-  .track-editor .editor-button:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    box-shadow: none;
-  }
-
-  .loop-count {
-    margin-left: auto;
-    background: #fff3dc;
-    color: #ab7b2f;
-  }
-
-  .editor-point-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 12px;
-  }
-
-  .editor-point-tabs button {
-    padding: 7px 10px;
-    border: 1px solid #e7dcef;
-    border-radius: 8px;
-    background: white;
-    color: #9a7eae;
-    font-size: 11px;
-  }
-
-  .editor-point-tabs button.active {
-    background: #f0e5f9;
-    border-color: #cfaee4;
-    color: #704095;
-  }
-
-  .point-settings {
-    padding: 16px;
-    border-radius: 13px;
-    border: 1px solid #e9dff2;
-    background: #fbf8fe;
-  }
-
-  .point-settings-heading {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 14px;
-  }
-
-  .point-settings-heading strong {
-    font-size: 13px;
-  }
-
-  .point-settings-heading span {
-    font-size: 10px;
-    color: #a18aaf;
-  }
-
-  .point-settings p {
-    font-size: 12px;
-    line-height: 1.6;
-    margin: 0;
-  }
-
-  .point-fields {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .point-fields label {
-    display: grid;
-    gap: 7px;
-    font-size: 11px;
-    color: #8c6ba2;
-  }
-
-  .point-fields input {
-    box-sizing: border-box;
-    width: 100%;
-    min-width: 0;
-    border: 1px solid #dccce8;
-    background: white;
-    border-radius: 9px;
-    padding: 10px 12px;
-    color: #684a7e;
-    font: inherit;
-    font-size: 13px;
-  }
-
-  .loop-tools {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-top: 14px;
-  }
-
-  .track-editor .loop-button {
-    background: #f8e8c7;
-    color: #936521;
-    border-color: #efd29a;
-  }
-
-  .track-editor .loop-button:hover {
-    background: #f3dba9;
-  }
-
-  .track-editor .loop-button.remove-loop {
-    background: #fff1f4;
-    color: #b35e76;
-    border-color: #f0d4dc;
-  }
-
-  .loop-tools > span {
-    font-size: 11px;
-    color: #a18aaf;
-  }
-
-  .editor-message {
-    padding: 10px;
-    border-radius: 9px;
-    background: #fff3dc;
-    color: #9c7130;
-    font-size: 12px;
-  }
-
-  .editor-footnote {
-    font-size: 11px;
-    line-height: 1.7;
-    color: #a18aaf;
-    margin: 14px 0 0;
-  }
-
-  @media (max-width: 600px) {
-    .track-editor {
-      padding: 14px;
-    }
-
-    .editor-heading {
-      align-items: flex-start;
-    }
-
-    .editor-heading h2 {
-      font-size: 20px;
-    }
-
-    .point-fields {
-      grid-template-columns: 1fr;
-    }
-
-    .editor-surface .editor-point {
-      width: 29px;
-      height: 29px;
-      font-size: 10px;
-    }
-
-    .loop-count {
-      margin-left: 0;
-    }
-  }
-</style>

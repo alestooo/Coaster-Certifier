@@ -18,6 +18,7 @@
   } from "./game/passengers";
 
   import { DEFAULT_CONFIG } from "./physics/index.js";
+  import type { SimulationConfig } from "./lib/types";
 
   type Screen =
     | "menu"
@@ -69,7 +70,7 @@
   let simulationConfig = $derived({
     ...DEFAULT_CONFIG,
     mass: calculateTotalMass(session.passengers),
-    mapId: session.mapId
+    mapId: session.mapId as SimulationConfig["mapId"]
   });
 
   function chooseRoute() {
@@ -147,9 +148,9 @@
   <Simulation
     config={simulationConfig}
     passengers={session.passengers}
-    onBack={() => (screen = "menu")}
     onEditPassengers={() => (screen = "passengers")}
     onChangeMap={() => (screen = "setup")}
+    onMapChange={mapId => (session.mapId = mapId)}
   />
 {/if}
 

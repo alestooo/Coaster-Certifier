@@ -1,0 +1,22 @@
+/* Al imprimir solo se conserva el reporte de certificación. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .report-sheet,
+  .report-sheet * {
+    visibility: visible;
+  }
+
+  .report-sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  @page {
+    margin: 14mm;
+  }
+}

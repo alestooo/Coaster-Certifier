@@ -4,8 +4,8 @@ import "./app.css";
 import "./styles/shared.css";
 import "./styles/setup.css";
 import "./styles/passengers.css";
-import "./styles/simulation.css";
 import "./styles/credits.css";
+import "./styles/print.css";
 
 const target = document.getElementById("app");
 

@@ -18,7 +18,11 @@
       ? "#e1f0e9"
       : kind === "custom"
         ? "#f5e8e0"
-        : "#eae3f8"}
+        : kind === "reference"
+          ? "#fdf0dd"
+          : kind === "incline"
+            ? "#e6ecf7"
+            : "#eae3f8"}
   />
 
   <circle
@@ -44,6 +48,19 @@
       <path
         d="M20 38L205 133Q215 140 230 140H300"
       />
+    {:else if kind === "incline"}
+      <path d="M20 36L230 140H300" />
+    {:else if kind === "reference"}
+      <path
+        d="M14 34C40 50 42 139 80 139H105C147 139 147 55 105 55C70 55 72 139 112 139H150Q190 85 230 139H302"
+      />
+      <g fill="#8050c8" font-size="11" font-weight="700" font-family="system-ui">
+        <text x="8" y="26">A</text>
+        <text x="92" y="156">B</text>
+        <text x="100" y="48">C</text>
+        <text x="186" y="94">D</text>
+        <text x="232" y="156">E</text>
+      </g>
     {:else if kind === "valley"}
       <path
         d="M20 40C60 55 75 139 120 139S172 73 204 73S250 139 300 139"
