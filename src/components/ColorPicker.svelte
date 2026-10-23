@@ -4,45 +4,45 @@
     value,
     presets,
     onChange,
+    compact = false
   }: {
     label: string;
     value: string;
     presets: string[];
     onChange: (color: string) => void;
+    compact?: boolean;
   } = $props();
+
+  let isCustom = $derived(!presets.some(color => color.toLowerCase() === value.toLowerCase()));
 </script>
 
-<fieldset class="color-control">
+<fieldset class="color-control" class:compact>
   <legend>{label}</legend>
 
-  <div class="color-control-row">
-    <div class="color-presets">
-      {#each presets as color}
-        <button
-          type="button"
-          class="color-dot"
-          class:active={value.toLowerCase() === color.toLowerCase()}
-          style:background-color={color}
-          aria-label={`${label}: ${color}`}
-          aria-pressed={value.toLowerCase() === color.toLowerCase()}
-          onclick={() => onChange(color)}
-        ></button>
-      {/each}
-    </div>
+  <div class="color-row">
+    {#each presets as color}
+      <button
+        type="button"
+        class="swatch"
+        class:active={value.toLowerCase() === color.toLowerCase()}
+        style:background-color={color}
+        aria-label={`${label}: ${color}`}
+        aria-pressed={value.toLowerCase() === color.toLowerCase()}
+        onclick={() => onChange(color)}
+      ></button>
+    {/each}
 
-    <label class="custom-color">
+    <label class="custom" class:active={isCustom} title="Elegir un color personalizado">
       <input
         type="color"
-        value={value}
+        {value}
         aria-label={`Elegir ${label.toLowerCase()} personalizado`}
-        oninput={(event) => onChange(event.currentTarget.value)}
+        oninput={event => onChange(event.currentTarget.value)}
       />
-
-      <span>Elegir color</span>
+      <span class="custom-ring" style:background-color={value}></span>
+      <span class="custom-plus" aria-hidden="true">+</span>
     </label>
   </div>
-
-  <span class="color-value">{value.toUpperCase()}</span>
 </fieldset>
 
 <style>
@@ -54,88 +54,94 @@
   }
 
   legend {
-    margin-bottom: 12px;
-    color: #4e3d61;
-    font-size: 13px;
-    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text-soft);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
   }
 
-  .color-control-row {
+  .compact legend {
+    font-size: 11px;
+  }
+
+  .color-row {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
-    gap: 16px;
-  }
-
-  .color-presets {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 11px;
-    padding: 3px;
-  }
-
-  .color-dot {
-    width: 29px;
-    height: 29px;
-    padding: 0;
-    border: 3px solid white;
-    border-radius: 50%;
-    box-shadow: 0 0 0 1px #e0d7ea;
-    cursor: pointer;
-  }
-
-  .color-dot.active {
-    outline: 2px solid #8b5cc7;
-    outline-offset: 3px;
-  }
-
-  .color-dot:hover {
-    transform: scale(1.08);
-  }
-
-  .custom-color {
-    display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 10px;
-    border: 1px solid #e5dced;
-    border-radius: 9px;
-    color: #76528f;
-    background: #fcfaff;
-    font-size: 12px;
+  }
+
+  .swatch {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 2px solid var(--surface);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--border-strong);
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+  }
+
+  .compact .swatch {
+    width: 26px;
+    height: 26px;
+  }
+
+  .swatch:hover {
+    transform: scale(1.1);
+  }
+
+  .swatch.active {
+    box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--primary);
+  }
+
+  .custom {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    margin: 0;
+    border-radius: 50%;
     cursor: pointer;
   }
 
-  input {
-    width: 25px;
-    height: 25px;
+  .compact .custom {
+    width: 26px;
+    height: 26px;
+  }
+
+  .custom input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     padding: 0;
-    overflow: hidden;
     border: 0;
-    border-radius: 6px;
-    background: transparent;
+    opacity: 0;
     cursor: pointer;
   }
 
-  input::-webkit-color-swatch-wrapper {
-    padding: 0;
+  .custom-ring {
+    position: absolute;
+    inset: 0;
+    border: 2px solid var(--surface);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--border-strong);
+    background-image: conic-gradient(#f87171, #fbbf24, #4ade80, #60a5fa, #c084fc, #f87171);
   }
 
-  input::-webkit-color-swatch {
-    border: 0;
-    border-radius: 5px;
+  .custom.active .custom-ring {
+    box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--primary);
   }
 
-  input::-moz-color-swatch {
-    border: 0;
-    border-radius: 5px;
-  }
-
-  .color-value {
-    display: block;
-    margin-top: 9px;
-    color: #94819f;
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
+  .custom-plus {
+    position: relative;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 900;
+    text-shadow: 0 1px 2px rgb(0 0 0 / 45%);
+    pointer-events: none;
   }
 </style>
