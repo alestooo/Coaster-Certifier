@@ -11,9 +11,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   mapId: "slope",
   loopRadius: 7,
   brakingLength: 80,
-
-  // station: frenos que disipan energía.
-  // spring: resorte que puede producir rebote.
+  
   brakeMode: "station",
   brakeDeceleration: 5,
 
