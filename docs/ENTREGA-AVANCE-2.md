@@ -35,7 +35,8 @@ Requiere Node.js ≥ 18.17. Sin motores físicos de terceros; la librería vive 
 - Criterios del dictamen del anexo: contacto N > 0 (estricto o con ruedas de seguridad), carga en [−1, +5] g, rapidez mínima en subida, compresión máxima, detención dentro de la zona de frenado; registro de cada incumplimiento con instante, tramo, posición, valor y límite; condiciones de diseño por conservación de energía.
 - Pruebas: 67 en vitest, con validación analítica (plano inclinado con y sin fricción, conservación de la energía, balance con fricción, frenado MRUA, resorte, cima y base del loop, cresta de la colina, independencia de la masa, convergencia y la Tabla 5 del anexo), más pureza, determinismo, geometría, configuración, criterios y 12 escenarios de referencia.
 - Script headless con CSV (25 columnas con unidad) y resumen JSON; dictamen impreso en consola.
-- Aplicación desplegada: seis trazados, pasajeros, parámetros ajustables con símbolo/unidad/rango, animación con cámara, línea de tiempo y velocidad, indicador g y fuerzas; siete gráficas en tiempo real con ejes y unidades, banda de carga permitida, marcadores A–F e incumplimientos; dictamen aprobado/rechazado, recomendaciones verificadas por simulación y reporte completo exportable (CSV, JSON, PDF).
+- Aplicación desplegada: seis trazados dibujados a escala, editor de pista a escala real, tren con pasajeros personalizables que reaccionan a la carga, escenario ilustrado a escala con cámara completa o de seguimiento, parámetros con símbolo/unidad/rango, barra de transporte con línea de tiempo y velocidad, indicadores de rapidez y carga; siete gráficas en tiempo real con ejes y unidades, banda de carga permitida, marcadores A–F e incumplimientos; dictamen aprobado/rechazado, recomendaciones verificadas por simulación e informe completo exportable (CSV, JSON, PDF).
+- Pruebas de extremo a extremo con Playwright sobre el build (`npm run e2e`).
 
 **Pendiente para la Entrega Final**
 

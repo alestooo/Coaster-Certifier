@@ -7,7 +7,15 @@ Proyecto de Simulación · Física I (FUN-18) · Universidad CENFOTEC · 2026-C3
 - **Aplicación desplegada:** https://coaster-certifier.vercel.app
 - **Repositorio público:** https://github.com/alestooo/Coaster-Certifier
 
-![Laboratorio de certificación: trazado del anexo aprobado, con puntos críticos A–F, dictamen, magnitudes y gráficas](docs/img/laboratorio.png)
+![Laboratorio de certificación: escenario a escala con el trazado del anexo aprobado, indicadores, dictamen y gráficas](docs/img/laboratorio.png)
+
+| Cámara de seguimiento a escala real | Editor de pista a escala |
+| --- | --- |
+| ![Tren bajando la caída inicial con la cadena de subida y los soportes](docs/img/seguimiento.png) | ![Editor con grilla en metros, nodos arrastrables y plantillas](docs/img/editor.png) |
+
+| Selección del recorrido | Tren y pasajeros |
+| --- | --- |
+| ![Seis trazados dibujados a escala a partir de su geometría](docs/img/recorridos.png) | ![Personalización de pasajeros con vista previa de la reacción a 5 g](docs/img/pasajeros.png) |
 
 ---
 
@@ -22,6 +30,7 @@ Proyecto de Simulación · Física I (FUN-18) · Universidad CENFOTEC · 2026-C3
 | *Headless* con otro escenario / paso / carpeta | `npm run headless -- --scenario valley --dt 0.005 --out salida` |
 | *Headless* con una configuración propia en JSON | `npm run headless -- --config mi-trazado.json` |
 | Listar los escenarios de referencia | `npm run headless -- --list` |
+| Pruebas de extremo a extremo en Chrome (Playwright, usa el Chrome instalado) | `npm run e2e` · `npm run e2e:headed` |
 | Servidor de desarrollo | `npm run dev` |
 | Compilar para producción | `npm run build` |
 | Verificación de tipos (Svelte + JSDoc) | `npm run check` |
@@ -208,7 +217,7 @@ Parámetros (`SimulationConfig`): `mass` (kg), `gravity` (m/s²), `initialHeight
 | Convergencia | subpaso 1 ms frente a 0,25 ms | 1e-5 relativo en v |
 | Tabla 5 del anexo | loop circular H = 30 m, v₀ = 2 m/s, h_L = 21,5 m ⇒ 6,6 g en la base | 0,1 g |
 
-Además: pureza (el estado de entrada congelado no se modifica), determinismo (dos ejecuciones idénticas), geometría (longitud `2π·R_ref`, altura `h_L`, radios en cima y base, continuidad de posición y ángulo en cada unión, `ρ_c = w²/(6h_c)`), validación de configuración (todos los rangos, enumerados, forma del loop, puntos personalizados), criterios (cada código de incumplimiento con su registro completo), dictamen, CSV, recomendaciones y los 12 escenarios de referencia con su dictamen esperado.
+Además, `npm run e2e` recorre la aplicación compilada en Chrome (menú → recorrido → tren → laboratorio → dictamen e informe, loop circular rechazado con alternativas, editor de pista personalizada y pantalla de pasajeros). Y en la librería: pureza (el estado de entrada congelado no se modifica), determinismo (dos ejecuciones idénticas), geometría (longitud `2π·R_ref`, altura `h_L`, radios en cima y base, continuidad de posición y ángulo en cada unión, `ρ_c = w²/(6h_c)`), validación de configuración (todos los rangos, enumerados, forma del loop, puntos personalizados), criterios (cada código de incumplimiento con su registro completo), dictamen, CSV, recomendaciones y los 12 escenarios de referencia con su dictamen esperado.
 
 Cobertura de `src/physics/` con `npm run test:coverage`: ≈ 87 % de líneas.
 
@@ -223,12 +232,13 @@ El código de salida es 0 si el trazado aprueba, 2 si se rechaza y 1 ante una co
 
 ## 7. Interfaz
 
-1. **Recorrido**: seis trazados (certificación del anexo con puntos A–F, loop, valle y colina, línea, plano inclinado, personalizado con hasta tres loops y nueve puntos).
-2. **Pasajeros**: hasta cuatro personas (dos por carrito), apariencia y masa individual.
-3. **Laboratorio**: parámetros con símbolo, unidad, rango y explicación; sistema de frenado y modelo de contacto; masas; **Iniciar / Pausar / Paso / Completar / Reiniciar**, velocidad de reproducción, cámara completa o de seguimiento, línea de tiempo para revisar cualquier instante; capas del dibujo (tramos, puntos críticos, estela de rapidez, fuerzas, indicador g).
-4. **Gráficas en tiempo real** (Chart.js, ejes con unidades): rapidez, energías, energía disipada, fuerza normal con N = 0, aceleraciones tangencial y normal, carga con banda [−1, +5] g y energía elástica; eje horizontal en tiempo o posición; marcadores de puntos críticos, tramos e incumplimientos; descarga PNG.
-5. **Dictamen** con incumplimientos (condición, instante, tramo, posición, valor, límite), condiciones de diseño y **tres alternativas verificadas** calculadas a partir de la física del fallo.
-6. **Reporte completo** imprimible (PDF): resultado, puntos críticos, extremos, frenado, tramos, condiciones de diseño y parámetros; exportación CSV y JSON.
+1. **Recorrido**: seis trazados dibujados **a escala real** a partir de su geometría (certificación del anexo con puntos A–F, loop, valle y colina, línea, plano inclinado, personalizado).
+2. **Tren**: hasta cuatro personas (dos por carrito) con nombre, tono de piel, seis peinados, tres prendas, seis accesorios, estado de ánimo (afecta sus reacciones a la carga) y masa individual; vista previa de la reacción a 0 g y a 5 g.
+3. **Editor de pista a escala**: la curva real del motor se redibuja al arrastrar cada nodo (grilla en metros, loops en lágrima con h_L y R, colinas con su altura, plantillas, controles de altura y ancho).
+4. **Laboratorio**: escenario ilustrado a escala (vía con rieles, soportes, estación, cadena de subida, árboles y parque) con un tren cuyos pasajeros reaccionan a la carga; una barra de transporte (**Reproducir / Certificar / paso / reiniciar**, velocidad, línea de tiempo, cámara completa o de seguimiento, capas); indicadores de rapidez y carga, reparto de energía y lecturas clave; panel lateral con pestañas **Diseño** (parámetros con símbolo, unidad, rango y ayuda), **Tren** (masas) y **Dictamen**.
+5. **Gráficas en tiempo real** (Chart.js, ejes con unidades): rapidez, energías, energía disipada, fuerza normal con N = 0, aceleraciones tangencial y normal, carga con banda [−1, +5] g y energía elástica; una gráfica o las siete a la vez; eje horizontal en tiempo o posición; marcadores de puntos críticos, tramos e incumplimientos; descarga PNG.
+6. **Dictamen** con incumplimientos (condición, instante, tramo, posición, valor, límite), condiciones de diseño y **tres alternativas verificadas** calculadas a partir de la física del fallo.
+7. **Informe completo** imprimible (PDF): resultado, puntos críticos, extremos, frenado, tramos, condiciones de diseño y parámetros; exportación CSV y JSON.
 
 ![Reporte de certificación con puntos críticos y extremos del recorrido](docs/img/reporte.png)
 
