@@ -1,45 +1,67 @@
 import { geometryAt } from "../../physics/track/geometry.js";
+import { clamp } from "./draw.js";
 
 /** Márgenes del encuadre completo (px CSS). */
-const MARGIN_X = 36;
-const MARGIN_TOP = 64;
-const MARGIN_BOTTOM = 60;
+const MARGIN_X = 28;
+const MARGIN_TOP = 54;
+const MARGIN_BOTTOM = 58;
 
-/** Punto de la pantalla donde se ancla el tren en modo seguimiento. */
-const FOLLOW_ANCHOR_X = 0.56;
-const FOLLOW_ANCHOR_Y = 0.62;
+/** Anclaje del tren en pantalla en modo seguimiento (fracción del lienzo). */
+const FOLLOW_ANCHOR_X = 0.5;
+const FOLLOW_ANCHOR_Y = 0.6;
+
+/** Franja mínima de suelo visible bajo la vía en modo seguimiento (px). */
+const FOLLOW_GROUND_MARGIN = 110;
+
+/** Píxeles por metro en modo seguimiento con zoom 1 (escala real). */
+const FOLLOW_PX_PER_METRE = 12;
 
 export const MIN_ZOOM = 1;
 export const MAX_ZOOM = 2.5;
-const DEFAULT_FOLLOW_ZOOM = 1.8;
+const DEFAULT_FOLLOW_ZOOM = 1.6;
+
+/** Dimensiones del tren en metros. */
+export const CART_LENGTH_M = 2.8;
+export const CART_GAP_M = 0.45;
+
+/**
+ * Escala visual mínima: en el encuadre completo el tren se dibuja al menos
+ * con este largo en píxeles aunque la escala real lo haría más pequeño.
+ * En modo seguimiento todo se dibuja a escala real.
+ */
+export const MIN_TRAIN_PX = 34;
 
 /** Longitud de vía prolongada hacia atrás desde A, sobre la tangente inicial (m). */
-export const LIFT_TANGENT_LENGTH = 24;
+export const LIFT_TANGENT_LENGTH = 20;
 
 /** Avance horizontal de la rampa de la cadena por cada metro de altura. */
-const LIFT_RUN_PER_HEIGHT = 1.2;
+const LIFT_RUN_PER_HEIGHT = 1.35;
 
-/** Espacio reservado a la derecha del final de la vía para la estación (m). */
-const STATION_OVERHANG_METRES = 6;
+/** Espacio de mundo reservado alrededor del trazado (m). */
+const WORLD_PAD_LEFT = 10;
+const WORLD_PAD_RIGHT = 34;
+const WORLD_PAD_TOP = 9;
+export const WORLD_DEPTH = 4;
 
 /**
  * @typedef {Object} Camera
  * @property {number} width Ancho del lienzo (px CSS).
  * @property {number} height Alto del lienzo (px CSS).
- * @property {number} scale Píxeles por metro, con zoom aplicado.
- * @property {number} baseScale Píxeles por metro del encuadre completo.
- * @property {number} zoom Factor de zoom (1 en encuadre completo).
+ * @property {number} scale Píxeles por metro.
+ * @property {number} trainScale Píxeles por metro usados para el tren (con escala visual mínima).
+ * @property {number} zoom Zoom pedido (1 en encuadre completo).
  * @property {boolean} follow Verdadero en modo seguimiento.
  * @property {(x: number) => number} toX Metros → píxeles (horizontal).
  * @property {(y: number) => number} toY Metros → píxeles (vertical, y hacia arriba).
  * @property {number} groundY Altura en píxeles del suelo (y = 0).
  * @property {{x: number, y: number}[]} lift Perfil de la rampa de la cadena (m).
+ * @property {{minX: number, maxX: number, minY: number, maxY: number}} world Extensión del mundo (m).
+ * @property {number} viewCenterX Centro horizontal visible (m), para el paralaje.
  */
 
 /**
  * Perfil de la subida por cadena: del suelo hasta la cresta previa a A,
- * siguiendo la tangente inicial de la vía para que los vagones traseros
- * descansen sobre la línea dibujada.
+ * siguiendo la tangente inicial de la vía.
  *
  * @param {any} track
  * @returns {{x: number, y: number}[]}
@@ -57,11 +79,25 @@ export function liftProfile(track) {
 }
 
 /**
+ * Extensión del mundo dibujado (m).
+ * @param {any} track
+ * @param {{x: number, y: number}[]} lift
+ */
+export function worldBounds(track, lift) {
+  return {
+    minX: Math.min(lift[0].x, track.minX) - WORLD_PAD_LEFT,
+    maxX: track.endX + WORLD_PAD_RIGHT,
+    minY: -WORLD_DEPTH,
+    maxY: Math.max(track.maxHeight, ...lift.map(point => point.y), 1) + WORLD_PAD_TOP
+  };
+}
+
+/**
  * Prepara el lienzo para la densidad de píxeles del dispositivo y
  * devuelve el contexto con el tamaño lógico (px CSS).
  *
  * @param {HTMLCanvasElement} canvas
- * @returns {{ctx: CanvasRenderingContext2D, width: number, height: number} | null}
+ * @returns {{ctx: CanvasRenderingContext2D, width: number, height: number, ratio: number} | null}
  */
 export function prepareCanvas(canvas) {
   const ctx = canvas.getContext("2d");
@@ -82,7 +118,7 @@ export function prepareCanvas(canvas) {
 
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
 
-  return { ctx, width, height };
+  return { ctx, width, height, ratio };
 }
 
 /**
@@ -96,42 +132,78 @@ export function prepareCanvas(canvas) {
 export function createCamera(width, height, scene) {
   const { track, state } = scene;
   const lift = liftProfile(track);
+  const world = worldBounds(track, lift);
   const follow = scene.camera?.mode === "follow";
 
-  const zoom = follow
-    ? Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Number(scene.camera?.zoom) || DEFAULT_FOLLOW_ZOOM))
-    : 1;
+  if (follow) {
+    const zoom = clamp(Number(scene.camera?.zoom) || DEFAULT_FOLLOW_ZOOM, MIN_ZOOM, MAX_ZOOM);
+    const scale = FOLLOW_PX_PER_METRE * zoom;
+    const anchorY = height * FOLLOW_ANCHOR_Y;
+    const centerY = Math.max(state.position.y, (height - FOLLOW_GROUND_MARGIN - anchorY) / scale);
+    const centerX = state.position.x;
 
-  const minX = Math.min(lift[0].x, track.minX);
-  const maxX = track.endX + STATION_OVERHANG_METRES;
-  const maxY = Math.max(track.maxHeight, ...lift.map(point => point.y), 1);
+    const toX = (/** @type {number} */ x) => width * FOLLOW_ANCHOR_X + (x - centerX) * scale;
+    const toY = (/** @type {number} */ y) => anchorY - (y - centerY) * scale;
 
-  const baseScale = Math.min(
-    (width - 2 * MARGIN_X) / Math.max(1, maxX - minX),
-    (height - MARGIN_TOP - MARGIN_BOTTOM) / maxY
-  );
+    return {
+      width,
+      height,
+      scale,
+      trainScale: scale,
+      zoom,
+      follow,
+      toX,
+      toY,
+      groundY: toY(0),
+      lift,
+      world,
+      viewCenterX: centerX
+    };
+  }
 
-  const scale = baseScale * zoom;
-  const offsetX = (width - (maxX - minX) * baseScale) / 2 - minX * baseScale;
+  const spanX = Math.max(1, world.maxX - world.minX);
+  const spanY = Math.max(1, world.maxY);
+  const scale = Math.min((width - 2 * MARGIN_X) / spanX, (height - MARGIN_TOP - MARGIN_BOTTOM) / spanY);
+  const offsetX = (width - spanX * scale) / 2 - world.minX * scale;
+  const groundY = height - MARGIN_BOTTOM;
 
-  const toX = follow
-    ? (/** @type {number} */ x) => width * FOLLOW_ANCHOR_X + (x - state.position.x) * scale
-    : (/** @type {number} */ x) => offsetX + x * baseScale;
-
-  const toY = follow
-    ? (/** @type {number} */ y) => height * FOLLOW_ANCHOR_Y - (y - state.position.y) * scale
-    : (/** @type {number} */ y) => height - MARGIN_BOTTOM - y * baseScale;
+  const toX = (/** @type {number} */ x) => offsetX + x * scale;
+  const toY = (/** @type {number} */ y) => groundY - y * scale;
 
   return {
     width,
     height,
     scale,
-    baseScale,
-    zoom,
+    trainScale: Math.max(scale, MIN_TRAIN_PX / CART_LENGTH_M),
+    zoom: 1,
     follow,
     toX,
     toY,
-    groundY: toY(0),
-    lift
+    groundY,
+    lift,
+    world,
+    viewCenterX: (world.minX + world.maxX) / 2
+  };
+}
+
+/**
+ * Cámara auxiliar que proyecta el mundo sobre un lienzo fuera de pantalla
+ * (coordenadas de mundo → píxeles de la capa estática).
+ *
+ * @param {Camera} camera
+ * @returns {Camera}
+ */
+export function layerCamera(camera) {
+  const { world, scale } = camera;
+  const toX = (/** @type {number} */ x) => (x - world.minX) * scale;
+  const toY = (/** @type {number} */ y) => (world.maxY - y) * scale;
+
+  return {
+    ...camera,
+    width: (world.maxX - world.minX) * scale,
+    height: (world.maxY - world.minY) * scale,
+    toX,
+    toY,
+    groundY: toY(0)
   };
 }

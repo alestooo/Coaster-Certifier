@@ -2,8 +2,8 @@ import { TRAIL_COLORS } from "./palette.js";
 
 /** Máximo de puntos de la estela por cuadro. */
 const MAX_TRAIL_POINTS = 400;
-const TRAIL_WIDTH = 3;
-const TRAIL_ALPHA = 0.85;
+const TRAIL_WIDTH_PX = 2.2;
+const TRAIL_ALPHA = 0.7;
 
 /**
  * Mezcla lineal de dos colores [r, g, b].
@@ -59,9 +59,11 @@ export function drawTrail({ ctx, camera, scene }) {
   if (history.length < 2) return;
 
   const samples = sampleHistory(history);
-  const maxSpeed = Math.max(1e-6, ...samples.map(state => state.speed));
+  let maxSpeed = 1e-6;
 
-  ctx.lineWidth = TRAIL_WIDTH * camera.zoom;
+  for (const sample of samples) maxSpeed = Math.max(maxSpeed, sample.speed);
+
+  ctx.lineWidth = Math.max(TRAIL_WIDTH_PX, camera.scale * 0.12);
   ctx.lineCap = "round";
 
   for (let index = 1; index < samples.length; index++) {
