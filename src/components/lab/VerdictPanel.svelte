@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CheckCircle2, XCircle, Hourglass, Clock3, FileText, Download, Printer, Lightbulb, AlertTriangle, ChevronRight } from "lucide-svelte";
   import FailureDialog from "../FailureDialog.svelte";
   import type { SimulationConfig, SimulationState, Verdict } from "../../lib/types";
   import { formatNumber, formatSeconds } from "../../ui/format";
@@ -6,214 +7,323 @@
   let {
     verdict,
     running,
-    started,
     state,
     config,
     onApplyRecommendation,
-    onOpenReport
+    onOpenReport,
+    onExportCsv,
+    onExportJson
   }: {
     verdict: Verdict | null;
     running: boolean;
-    started: boolean;
     state: SimulationState;
     config: SimulationConfig;
     onApplyRecommendation: (config: SimulationConfig) => void;
     onOpenReport: () => void;
+    onExportCsv: () => void;
+    onExportJson: () => void;
   } = $props();
 
   let finished = $derived(state.status !== "running");
 
-  let pill = $derived.by(() => {
-    if (running) return { text: "EN CURSO", kind: "live" };
-    if (!finished) return { text: started ? "PAUSADO" : "LISTO PARA SIMULAR", kind: "idle" };
-    return verdict?.approved ? { text: "APROBADO", kind: "ok" } : { text: "RECHAZADO", kind: "bad" };
+  let badge = $derived.by(() => {
+    if (running) return { text: "EN CURSO", kind: "live", icon: Clock3, hint: "El dictamen se emite cuando el tren se detiene o incumple un criterio." };
+    if (!finished) return { text: "SIN DICTAMEN", kind: "idle", icon: Hourglass, hint: "Presioná Certificar para simular el recorrido completo, o Reproducir para verlo." };
+    return verdict?.approved
+      ? { text: "APROBADO", kind: "ok", icon: CheckCircle2, hint: "El trazado cumple todos los criterios del anexo." }
+      : { text: "RECHAZADO", kind: "bad", icon: XCircle, hint: "Se detectó al menos un incumplimiento." };
   });
 
   let violations = $derived(verdict?.violations ?? []);
-  let failedChecks = $derived((verdict?.designChecks ?? []).filter(check => !check.ok));
+  let checks = $derived(verdict?.designChecks ?? []);
+  let failedChecks = $derived(checks.filter(check => !check.ok));
+  let summary = $derived(verdict?.summary ?? null);
 </script>
 
 <div class="verdict">
-  <div class="verdict-head">
+  <div class="badge {badge.kind}">
+    <badge.icon size={26} />
     <div>
-      <span class="eyebrow">DICTAMEN DEL TRAZADO</span>
-      <span class="pill {pill.kind}">{pill.text}</span>
+      <strong>{badge.text}</strong>
+      <span>{badge.hint}</span>
     </div>
-
-    <button type="button" onclick={onOpenReport} disabled={!verdict}>📄 Reporte completo</button>
   </div>
 
-  {#if !finished}
-    <p class="hint">
-      El dictamen se emite cuando el tren se detiene en la estación o incumple un criterio.
-      Criterios: contacto N &gt; 0, carga en [{config.minLoad}, {config.maxLoad}] g, detención dentro de la zona de frenado.
-    </p>
-
-    {#if failedChecks.length}
-      <ul class="checks">
-        {#each failedChecks as check}
-          <li class={check.severity}>
-            <strong>{check.severity === "error" ? "✘" : "⚠"} {check.name}</strong>
-            <span>{check.formula} · {check.detail}</span>
-          </li>
-        {/each}
-      </ul>
-    {/if}
-  {:else if verdict}
-    <ul class="reasons">
-      {#each verdict.reasons as reason}
-        <li>{reason}</li>
-      {/each}
+  {#if finished && verdict && summary}
+    <ul class="facts">
+      <li><span>Carga máxima</span><strong class:bad={summary.maxLoad.value > config.maxLoad}>{formatNumber(summary.maxLoad.value, 2)} g</strong><small>{summary.maxLoad.section}</small></li>
+      <li><span>Carga mínima</span><strong class:bad={summary.minLoad.value < (config.contactModel === "strict" ? 0 : config.minLoad)}>{formatNumber(summary.minLoad.value, 2)} g</strong><small>{summary.minLoad.section}</small></li>
+      <li><span>Rapidez máxima</span><strong>{formatNumber(summary.maxSpeed.value * 3.6, 0)} km/h</strong><small>{summary.maxSpeed.section}</small></li>
+      <li><span>Detención</span><strong>{summary.braking.stoppingDistance === null || summary.braking.stoppingDistance === undefined ? "—" : `${formatNumber(summary.braking.stoppingDistance, 1)} m`}</strong><small>de {formatNumber(config.brakingLength, 0)} m disponibles</small></li>
     </ul>
 
     {#if violations.length}
-      <table class="violations">
-        <thead>
-          <tr>
-            <th>Condición</th>
-            <th>Instante</th>
-            <th>Tramo · posición</th>
-            <th>Valor</th>
-            <th>Límite</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each violations as violation}
-            <tr>
-              <td>{violation.condition}</td>
-              <td>{formatSeconds(violation.time)}</td>
-              <td>{violation.section} · s = {formatNumber(violation.position)} m</td>
-              <td class="num">{formatNumber(violation.value, 3)} {violation.unit}</td>
-              <td class="num">{violation.comparison} {formatNumber(violation.limit, 3)} {violation.unit}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
+      <ul class="violations">
+        {#each violations as violation}
+          <li>
+            <AlertTriangle size={15} />
+            <div>
+              <strong>{violation.condition}</strong>
+              <span>
+                {formatNumber(violation.value, 3)} {violation.unit} frente a {violation.comparison} {formatNumber(violation.limit, 3)} {violation.unit}
+                · {violation.section} · s = {formatNumber(violation.position, 1)} m · t = {formatSeconds(violation.time)}
+              </span>
+            </div>
+          </li>
+        {/each}
+      </ul>
 
       <FailureDialog failedState={state} {config} onApply={onApplyRecommendation} />
+    {/if}
+
+    <details class="checks">
+      <summary><ChevronRight size={14} class="chev" /> Condiciones de diseño por energía · {checks.filter(check => check.ok).length}/{checks.length} cumplidas</summary>
+      <ul>
+        {#each checks as check}
+          <li class:fail={!check.ok} class:warn={!check.ok && check.severity === "warning"}>
+            <strong>{check.ok ? "✔" : check.severity === "error" ? "✘" : "⚠"} {check.name}</strong>
+            <span><code>{check.formula}</code> · {check.detail}</span>
+          </li>
+        {/each}
+      </ul>
+    </details>
+
+    <div class="exports">
+      <button type="button" class="primary" onclick={onOpenReport}><FileText size={15} /> Informe completo</button>
+      <button type="button" onclick={onExportCsv} title="Serie temporal (CSV)"><Download size={14} /> CSV</button>
+      <button type="button" onclick={onExportJson} title="Configuración y dictamen (JSON)"><Download size={14} /> JSON</button>
+      <button type="button" onclick={() => { onOpenReport(); setTimeout(() => window.print(), 300); }} title="Imprimir o guardar como PDF"><Printer size={14} /> PDF</button>
+    </div>
+  {:else}
+    {#if failedChecks.length}
+      <ul class="pre-checks">
+        {#each failedChecks as check}
+          <li class={check.severity}>
+            <Lightbulb size={15} />
+            <div>
+              <strong>{check.name}</strong>
+              <span><code>{check.formula}</code> · {check.detail}</span>
+            </div>
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <p class="muted">Criterios evaluados: contacto con la vía, carga en [{config.minLoad}, +{config.maxLoad}] g, recorrido completo y detención dentro de la zona de frenado.</p>
     {/if}
   {/if}
 </div>
 
 <style>
   .verdict {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+    display: grid;
+    gap: 12px;
   }
 
-  .verdict-head {
-    display: flex;
-    justify-content: space-between;
+  .badge {
+    display: grid;
+    grid-template-columns: auto 1fr;
     align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 14px;
+    background: var(--surface-soft);
+    color: var(--muted);
   }
 
-  .verdict-head > div {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+  .badge div {
+    display: grid;
+    gap: 2px;
   }
 
-  .eyebrow {
-    font-size: 9px;
-    letter-spacing: 1.6px;
-    color: #a18ab1;
+  .badge strong {
+    font-size: 17px;
+    font-weight: 900;
+    letter-spacing: 1.5px;
   }
 
-  .pill {
-    display: inline-block;
-    padding: 7px 12px;
-    border-radius: 999px;
-    font-size: 13px;
-    font-weight: 800;
-    letter-spacing: 1px;
-    width: fit-content;
+  .badge span {
+    font-size: 11.5px;
+    line-height: 1.45;
   }
 
-  .pill.idle {
-    background: #f0e9f7;
-    color: #8b6b9f;
-  }
-
-  .pill.live {
-    background: #e9f0ff;
-    color: #3b63b8;
-  }
-
-  .pill.ok {
-    background: #e3f5ec;
+  .badge.ok {
+    background: var(--success-soft);
     color: #1f7a57;
   }
 
-  .pill.bad {
-    background: #fde6ea;
+  .badge.bad {
+    background: var(--danger-soft);
     color: #b7303f;
   }
 
-  .hint {
-    margin: 0;
-    font-size: 11.5px;
-    line-height: 1.6;
-    color: #8d75a0;
+  .badge.live {
+    background: var(--info-soft);
+    color: var(--info);
   }
 
-  .reasons {
-    margin: 0;
-    padding-left: 18px;
-    font-size: 12px;
-    line-height: 1.6;
-    color: #5a4470;
-  }
-
-  .checks {
+  .facts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  .facts li {
+    display: grid;
+    gap: 1px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: var(--surface-soft);
+  }
+
+  .facts span {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .facts strong {
+    font-size: 15px;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .facts strong.bad {
+    color: var(--danger);
+  }
+
+  .facts small {
+    font-size: 10.5px;
+    color: var(--faint);
+  }
+
+  .violations,
+  .pre-checks,
+  .checks ul {
     display: grid;
     gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .violations li,
+  .pre-checks li {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 10px;
+    background: var(--danger-soft);
+    color: #9d2a39;
+  }
+
+  .pre-checks li.warning {
+    background: var(--accent-soft);
+    color: #8a5a12;
+  }
+
+  .violations li div,
+  .pre-checks li div {
+    display: grid;
+    gap: 2px;
+  }
+
+  .violations strong,
+  .pre-checks strong {
+    font-size: 12px;
+  }
+
+  .violations span,
+  .pre-checks span {
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .checks summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-soft);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .checks summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .checks[open] summary :global(.chev) {
+    transform: rotate(90deg);
+  }
+
+  .checks ul {
+    margin-top: 8px;
   }
 
   .checks li {
     display: grid;
     gap: 2px;
     padding: 8px 10px;
-    border-radius: 8px;
-    font-size: 11.5px;
-    background: #fff6e5;
-    color: #8a6420;
-  }
-
-  .checks li.error {
-    background: #fde6ea;
-    color: #9d2a39;
-  }
-
-  .violations {
-    width: 100%;
-    border-collapse: collapse;
+    border-radius: 9px;
+    background: var(--success-soft);
+    color: #1f7a57;
     font-size: 11px;
   }
 
-  .violations th,
-  .violations td {
-    padding: 6px 7px;
-    border-bottom: 1px solid #f0e8f6;
-    text-align: left;
-    vertical-align: top;
+  .checks li.fail {
+    background: var(--danger-soft);
+    color: #9d2a39;
   }
 
-  .violations th {
-    font-size: 10px;
-    color: #a18ab1;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
+  .checks li.warn {
+    background: var(--accent-soft);
+    color: #8a5a12;
   }
 
-  .violations .num {
-    text-align: right;
-    white-space: nowrap;
-    font-variant-numeric: tabular-nums;
+  code {
+    font-size: 10.5px;
+  }
+
+  .exports {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    gap: 6px;
+  }
+
+  .exports button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 38px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text-soft);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .exports .primary {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: white;
+  }
+
+  .muted {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--muted);
   }
 </style>

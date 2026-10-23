@@ -1,38 +1,38 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { PLAYBACK_SPEEDS, type SimulationRunner, type PlaybackSpeed } from "../../lib/simulation-runner.svelte";
+  import { CheckCircle2, XCircle, Clock3, Hourglass } from "lucide-svelte";
+  import TransportBar from "./TransportBar.svelte";
+  import type { SimulationRunner } from "../../lib/simulation-runner.svelte";
   import type { Passenger } from "../../game/passengers";
+  import type { Verdict } from "../../lib/types";
   import { renderSimulation, RENDER_DEFAULT_OPTIONS } from "../../ui/renderer/index.js";
-  import { formatNumber, formatSeconds } from "../../ui/format";
 
   let {
     runner,
     passengers,
-    designConfirmed,
-    statusLabel
+    enabled,
+    verdict,
+    pendingMessage = ""
   }: {
     runner: SimulationRunner;
     passengers: Passenger[];
-    designConfirmed: boolean;
-    statusLabel: string;
+    enabled: boolean;
+    verdict: Verdict | null;
+    pendingMessage?: string;
   } = $props();
 
   let canvas: HTMLCanvasElement;
   let cameraMode = $state<"full" | "follow">("full");
   let zoom = $state(1.6);
-  let options = $state({ ...RENDER_DEFAULT_OPTIONS });
+  let options = $state<Record<string, boolean>>({ ...RENDER_DEFAULT_OPTIONS, showReadings: false });
 
-  let lastIndex = $derived(Math.max(0, runner.history.length - 1));
-  let scrubValue = $derived(runner.scrubIndex ?? lastIndex);
-  let viewState = $derived(runner.viewState);
-
-  const layerToggles: { key: keyof typeof RENDER_DEFAULT_OPTIONS; label: string }[] = [
-    { key: "showSections", label: "Tramos" },
-    { key: "showMarkers", label: "Puntos A–F" },
-    { key: "showTrail", label: "Estela" },
-    { key: "showForces", label: "Fuerzas" },
-    { key: "showGauge", label: "Indicador g" }
-  ];
+  let chip = $derived.by(() => {
+    if (runner.running) return { text: "En curso", kind: "live", icon: Clock3 };
+    if (!runner.isFinished) return { text: enabled ? "Listo para certificar" : "Aplicá el diseño", kind: "idle", icon: Hourglass };
+    return verdict?.approved
+      ? { text: "Trazado aprobado", kind: "ok", icon: CheckCircle2 }
+      : { text: "Trazado rechazado", kind: "bad", icon: XCircle };
+  });
 
   function draw() {
     if (!canvas) return;
@@ -62,196 +62,93 @@
     }
 
     frame = requestAnimationFrame(animate);
-
     return () => cancelAnimationFrame(frame);
   });
 </script>
 
 <div class="stage">
-  <div class="stage-toolbar">
-    <div class="run-buttons">
-      <button class="primary" type="button" disabled={!designConfirmed || !runner.canStart} onclick={() => runner.start()}>
-        ▶ Iniciar
-      </button>
-      <button type="button" disabled={!runner.running} onclick={() => runner.pause()}>❚❚ Pausar</button>
-      <button type="button" disabled={!designConfirmed || runner.isFinished || runner.running} onclick={() => runner.stepOnce()} title="Avanzar un paso de reporte">
-        ⏭ Paso
-      </button>
-      <button type="button" disabled={!designConfirmed || runner.isFinished} onclick={() => runner.runToEnd()} title="Simular el recorrido completo sin animación">
-        ⏩ Completar
-      </button>
-      <button type="button" onclick={() => runner.reset()}>↺ Reiniciar</button>
-    </div>
-
-    <label class="speed-label">
-      Velocidad
-      <select bind:value={runner.playbackSpeed} aria-label="Velocidad de reproducción">
-        {#each PLAYBACK_SPEEDS as speed}
-          <option value={speed as PlaybackSpeed}>{speed}×</option>
-        {/each}
-      </select>
-    </label>
-
-    <select aria-label="Cámara" bind:value={cameraMode}>
-      <option value="full">Recorrido completo</option>
-      <option value="follow">Seguir al tren</option>
-    </select>
-
-    <label class="zoom-label">
-      {zoom.toFixed(1)}×
-      <input aria-label="Zoom" type="range" min="1" max="2.5" step=".1" bind:value={zoom} disabled={cameraMode === "full"} />
-    </label>
-  </div>
-
   <div class="track-frame">
     <canvas bind:this={canvas} width="1200" height="520" aria-label="Pista y tren"></canvas>
-  </div>
 
-  <div class="layer-toggles" role="group" aria-label="Capas del dibujo">
-    {#each layerToggles as toggle}
-      <label>
-        <input type="checkbox" bind:checked={options[toggle.key]} />
-        {toggle.label}
-      </label>
-    {/each}
-  </div>
-
-  <div class="timeline">
-    <input
-      type="range"
-      min="0"
-      max={lastIndex}
-      step="1"
-      value={scrubValue}
-      disabled={runner.history.length < 2}
-      aria-label="Línea de tiempo del recorrido"
-      oninput={event => runner.scrubTo((event.currentTarget as HTMLInputElement).valueAsNumber)}
-    />
-
-    <div class="timeline-info">
-      <strong>{!designConfirmed ? "Aplicá primero tu diseño" : runner.running ? "En movimiento" : statusLabel}</strong>
-      <span>
-        {viewState.section} · t = {formatSeconds(viewState.time)} · s = {formatNumber(viewState.distance)} m
-        {#if runner.scrubIndex !== null}
-          · <button type="button" class="link" onclick={() => runner.scrubTo(null)}>volver al instante actual</button>
-        {/if}
-      </span>
+    <div class="stage-chip {chip.kind}">
+      <chip.icon size={15} />
+      <span>{chip.text}</span>
     </div>
+
+    {#if pendingMessage}
+      <div class="stage-pending">{pendingMessage}</div>
+    {/if}
   </div>
+
+  <TransportBar {runner} {enabled} bind:cameraMode bind:zoom bind:options />
 </div>
 
 <style>
   .stage {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    flex: 1;
     min-height: 0;
-  }
-
-  .stage-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    flex-wrap: wrap;
-  }
-
-  .run-buttons {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-
-  .stage-toolbar select {
-    width: auto;
-  }
-
-  .speed-label,
-  .zoom-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 0;
-    font-size: 11px;
-    color: #76528e;
-  }
-
-  .zoom-label {
-    width: 120px;
-    margin-left: auto;
   }
 
   .track-frame {
     position: relative;
-    flex: 1;
-    min-height: 300px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    aspect-ratio: 1200 / 520;
+    max-height: 560px;
+    border-radius: var(--radius);
     overflow: hidden;
-    border-radius: 12px;
-    background: #f8f4fd;
+    background: #ece5fc;
+    box-shadow: inset 0 0 0 1px var(--border);
   }
 
   .track-frame canvas {
     display: block;
     width: 100%;
     height: 100%;
-    object-fit: contain;
-    max-height: 100%;
   }
 
-  .layer-toggles {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    font-size: 11px;
-    color: #76528e;
-  }
-
-  .layer-toggles label {
+  .stage-chip {
+    position: absolute;
+    top: 12px;
+    right: 12px;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    margin: 0;
+    gap: 7px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 92%);
+    box-shadow: var(--shadow-sm);
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-soft);
+    backdrop-filter: blur(6px);
   }
 
-  .layer-toggles input {
-    width: auto;
-    accent-color: #8c63aa;
+  .stage-chip.ok {
+    color: #1f7a57;
+    background: rgb(227 245 236 / 95%);
   }
 
-  .timeline {
-    display: grid;
-    gap: 4px;
+  .stage-chip.bad {
+    color: #b7303f;
+    background: rgb(253 230 234 / 95%);
   }
 
-  .timeline input[type="range"] {
-    width: 100%;
-    margin: 0;
-    accent-color: #8c63aa;
+  .stage-chip.live {
+    color: var(--info);
+    background: rgb(231 240 255 / 95%);
   }
 
-  .timeline-info {
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    flex-wrap: wrap;
-    font-size: 11px;
-    color: #9980aa;
-  }
-
-  .timeline-info strong {
-    color: #76528e;
-  }
-
-  .link {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: #8050c8;
-    font-size: 11px;
-    text-decoration: underline;
-    cursor: pointer;
+  .stage-pending {
+    position: absolute;
+    left: 50%;
+    bottom: 14px;
+    transform: translateX(-50%);
+    padding: 9px 14px;
+    border-radius: 999px;
+    background: rgb(45 33 64 / 86%);
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    backdrop-filter: blur(6px);
   }
 </style>

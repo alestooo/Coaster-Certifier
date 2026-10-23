@@ -1,39 +1,40 @@
 <script lang="ts">
+  import { Flag, Shapes, Wind, OctagonPause, ShieldCheck, Cpu, Sparkles, Undo2, ChevronDown } from "lucide-svelte";
   import FieldControl from "./FieldControl.svelte";
   import { FIELD_GROUPS, type NumericKey } from "../../lib/field-definitions";
-  import { MIN_PASSENGER_MASS, MAX_PASSENGER_MASS } from "../../game/passengers";
   import type { SimulationConfig } from "../../lib/types";
   import { formatNumber } from "../../ui/format";
 
   let {
     draft,
-    cartMass,
-    masses,
-    cartCount,
     dirty,
     errorField = "",
     errorMessage = "",
     onPatch,
-    onCartMass,
-    onPassengerMass,
     onApply,
-    onDiscard
+    onDiscard,
+    onScenarios
   }: {
     draft: SimulationConfig;
-    cartMass: number;
-    masses: number[];
-    cartCount: number;
     dirty: boolean;
     errorField?: string;
     errorMessage?: string;
     onPatch: (patch: Partial<SimulationConfig>) => void;
-    onCartMass: (value: number) => void;
-    onPassengerMass: (index: number, value: number) => void;
     onApply: () => void;
     onDiscard: () => void;
+    onScenarios: () => void;
   } = $props();
 
-  let totalMass = $derived(cartCount * cartMass + masses.reduce((sum, mass) => sum + mass, 0));
+  const GROUP_ICONS: Record<string, typeof Flag> = {
+    initial: Flag,
+    geometry: Shapes,
+    losses: Wind,
+    braking: OctagonPause,
+    criteria: ShieldCheck,
+    numeric: Cpu
+  };
+
+  let open = $state<Record<string, boolean>>({ initial: true, geometry: true, losses: false, braking: true, criteria: false, numeric: false });
 
   let loopInfo = $derived.by(() => {
     if (!["loop", "reference"].includes(draft.mapId)) return null;
@@ -41,232 +42,312 @@
     const reference = draft.loopHeight / 2;
     const shape = 1 - draft.loopTopRadius / reference;
 
-    return {
-      bottomRadius: draft.loopHeight - draft.loopTopRadius,
-      shape,
-      circular: Math.abs(shape) < 1e-9
-    };
+    return { bottomRadius: draft.loopHeight - draft.loopTopRadius, shape, circular: Math.abs(shape) < 1e-9 };
   });
 
-  function numberFrom(event: Event) {
-    return (event.currentTarget as HTMLInputElement).valueAsNumber;
+  function groupSummary(id: string) {
+    switch (id) {
+      case "initial":
+        return `H ${formatNumber(draft.initialHeight, 1)} m · v₀ ${formatNumber(draft.initialSpeed, 1)} m/s`;
+      case "geometry":
+        return `W ${formatNumber(draft.trackWidth, 0)} m${loopInfo ? ` · loop ${formatNumber(draft.loopHeight, 1)} m` : ""}`;
+      case "losses":
+        return `μ ${formatNumber(draft.friction, 3)}`;
+      case "braking":
+        return draft.brakeMode === "station"
+          ? `frenos a_f ${formatNumber(draft.brakeDeceleration, 1)} m/s² · ${formatNumber(draft.brakingLength, 0)} m`
+          : `resorte k ${formatNumber(draft.springConstant, 0)} N/m`;
+      case "criteria":
+        return `${draft.minLoad} g a +${draft.maxLoad} g`;
+      default:
+        return `dt ${draft.timeStep} s`;
+    }
   }
 </script>
 
 <form
-  class="settings-form"
+  class="settings"
   onsubmit={event => {
     event.preventDefault();
     onApply();
   }}
 >
-  <div class="settings-heading">
-    <h2>Parámetros</h2>
-    <span class="settings-hint">Símbolos del anexo · unidades del SI</span>
+  <div class="settings-intro">
+    <p>Ajustá los parámetros del anexo y aplicá el diseño. Los símbolos son los del enunciado; las unidades, del SI.</p>
+    <button type="button" class="scenarios" onclick={onScenarios}><Sparkles size={14} /> Escenarios de referencia</button>
   </div>
 
-  <section class="settings-group">
-    <h3>Sistema de frenado y contacto</h3>
+  <section class="group">
+    <header class="group-head static">
+      <OctagonPause size={15} />
+      <h3>Frenado y contacto</h3>
+    </header>
 
-    <label class="select-field">
-      <span>Final del recorrido</span>
-      <select value={draft.brakeMode} onchange={event => onPatch({ brakeMode: (event.currentTarget as HTMLSelectElement).value as SimulationConfig["brakeMode"] })}>
-        <option value="station">Frenos de estación (desaceleración constante a_f)</option>
-        <option value="spring">Resorte de frenado (F = −k·x, opcionalmente amortiguado)</option>
-      </select>
-    </label>
-
-    <label class="select-field">
-      <span>Modelo de contacto con la vía</span>
-      <select value={draft.contactModel} onchange={event => onPatch({ contactModel: (event.currentTarget as HTMLSelectElement).value as SimulationConfig["contactModel"] })}>
-        <option value="strict">Estricto: N &gt; 0 en toda la vía</option>
-        <option value="safety-wheels">Ruedas de seguridad: n ≥ n_mín fuera del loop</option>
-      </select>
-    </label>
+    <div class="choice-grid">
+      <label class="choice" class:selected={draft.brakeMode === "station"}>
+        <input type="radio" name="brake" value="station" checked={draft.brakeMode === "station"} onchange={() => onPatch({ brakeMode: "station" })} />
+        <strong>Frenos de estación</strong>
+        <span>Desaceleración constante a_f en E → F</span>
+      </label>
+      <label class="choice" class:selected={draft.brakeMode === "spring"}>
+        <input type="radio" name="brake" value="spring" checked={draft.brakeMode === "spring"} onchange={() => onPatch({ brakeMode: "spring" })} />
+        <strong>Resorte</strong>
+        <span>F = −k·x, amortiguador opcional</span>
+      </label>
+      <label class="choice" class:selected={draft.contactModel === "strict"}>
+        <input type="radio" name="contact" value="strict" checked={draft.contactModel === "strict"} onchange={() => onPatch({ contactModel: "strict" })} />
+        <strong>Contacto estricto</strong>
+        <span>N &gt; 0 en toda la vía</span>
+      </label>
+      <label class="choice" class:selected={draft.contactModel === "safety-wheels"}>
+        <input type="radio" name="contact" value="safety-wheels" checked={draft.contactModel === "safety-wheels"} onchange={() => onPatch({ contactModel: "safety-wheels" })} />
+        <strong>Ruedas de seguridad</strong>
+        <span>Airtime hasta n_mín fuera del loop</span>
+      </label>
+    </div>
   </section>
 
   {#each FIELD_GROUPS as group (group.id)}
     {@const fields = group.fields.filter(field => !field.visible || field.visible(draft))}
     {#if fields.length}
-      <details class="settings-group" open={!group.collapsed}>
-        <summary><h3>{group.title}</h3></summary>
+      {@const Icon = GROUP_ICONS[group.id]}
+      <section class="group" class:open={open[group.id]}>
+        <button type="button" class="group-head" aria-expanded={open[group.id]} onclick={() => (open[group.id] = !open[group.id])}>
+          <Icon size={15} />
+          <h3>{group.title}</h3>
+          <small>{groupSummary(group.id)}</small>
+          <ChevronDown size={15} class="chevron" />
+        </button>
 
-        {#each fields as field (field.key)}
-          <FieldControl
-            {field}
-            value={draft[field.key]}
-            error={errorField === field.key}
-            onInput={value => onPatch({ [field.key as NumericKey]: value })}
-          />
-        {/each}
+        {#if open[group.id]}
+          <div class="group-body">
+            {#each fields as field (field.key)}
+              <FieldControl {field} value={draft[field.key]} error={errorField === field.key} onInput={value => onPatch({ [field.key as NumericKey]: value })} />
+            {/each}
 
-        {#if group.id === "geometry" && loopInfo}
-          <p class="derived-note">
-            Loop en lágrima: radio en la base R_B = h_L − R = <strong>{formatNumber(loopInfo.bottomRadius, 2)} m</strong>,
-            forma c = {formatNumber(loopInfo.shape, 2)}
-            {loopInfo.circular ? "(circular)" : "(0 = circular)"}.
-          </p>
+            {#if group.id === "geometry" && loopInfo}
+              <p class="note">
+                Loop en lágrima: radio en la base R_B = h_L − R = <strong>{formatNumber(loopInfo.bottomRadius, 2)} m</strong>
+                {loopInfo.circular ? "(circular)" : `· forma c = ${formatNumber(loopInfo.shape, 2)}`}
+              </p>
+            {/if}
+          </div>
         {/if}
-      </details>
+      </section>
     {/if}
   {/each}
 
-  <details class="settings-group" open>
-    <summary><h3>Masa del tren · {cartCount} {cartCount === 1 ? "carrito" : "carritos"}</h3></summary>
-
-    <label class="mass-field">
-      <span>Carrito vacío (kg)</span>
-      <input type="number" min="1" max="10000" step="any" required value={cartMass} onchange={event => onCartMass(numberFrom(event))} />
-    </label>
-
-    {#each masses as mass, index}
-      <label class="mass-field">
-        <span>Persona {index + 1} (kg)</span>
-        <input type="number" min={MIN_PASSENGER_MASS} max={MAX_PASSENGER_MASS} step="any" required value={mass} onchange={event => onPassengerMass(index, numberFrom(event))} />
-      </label>
-    {/each}
-
-    <p class="derived-note">
-      Masa total m = <strong>{formatNumber(totalMass, 1)} kg</strong>. La masa escala fuerzas y energías; no cambia la rapidez.
-    </p>
-  </details>
-
-  <div class="apply-bar">
-    <button class="primary" type="submit">Aplicar y reiniciar</button>
-
+  <div class="apply">
+    <button class="primary" type="submit">Aplicar diseño</button>
     {#if dirty}
-      <button type="button" class="ghost" onclick={onDiscard}>Descartar cambios</button>
-      <small>Cambios pendientes de aplicar</small>
+      <button type="button" class="ghost" onclick={onDiscard}><Undo2 size={14} /> Descartar</button>
     {/if}
-
     {#if errorMessage}
-      <p role="alert" class="physics-error">{errorMessage}</p>
+      <p role="alert" class="error">{errorMessage}</p>
+    {:else if dirty}
+      <p class="pending">Hay cambios sin aplicar.</p>
     {/if}
   </div>
 </form>
 
 <style>
-  .settings-form {
+  .settings {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 10px;
   }
 
-  .settings-heading {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    margin-bottom: 6px;
-  }
-
-  .settings-heading h2 {
-    margin: 0;
-  }
-
-  .settings-hint {
-    font-size: 10px;
-    letter-spacing: 1px;
-    color: #a18ab1;
-    text-transform: uppercase;
-  }
-
-  .settings-group {
-    padding: 10px 0 4px;
-    border-top: 1px solid #eee5f5;
-  }
-
-  .settings-group h3 {
-    display: inline;
-    margin: 0;
+  .settings-intro p {
+    margin: 0 0 8px;
     font-size: 12px;
-    font-weight: 750;
-    color: #6d4a8c;
-    letter-spacing: 0.2px;
+    line-height: 1.55;
+    color: var(--muted);
   }
 
-  .settings-group summary {
+  .scenarios {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    justify-content: center;
+    height: 38px;
+    border: 1px dashed var(--border-strong);
+    border-radius: 11px;
+    background: var(--accent-soft);
+    color: #8a5a12;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 800;
     cursor: pointer;
-    margin-bottom: 10px;
-    list-style: none;
-    display: flex;
+  }
+
+  .group {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .group-head {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 0;
+    background: var(--surface-soft);
+    color: var(--text-soft);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
   }
 
-  .settings-group summary::before {
-    content: "▸";
-    font-size: 11px;
-    color: #b093c7;
+  .group-head.static {
+    grid-template-columns: auto 1fr;
+    cursor: default;
+  }
+
+  .group-head h3 {
+    margin: 0;
+    font-size: 12.5px;
+    font-weight: 900;
+    color: var(--text);
+  }
+
+  .group-head small {
+    justify-self: end;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .group-head :global(.chevron) {
+    color: var(--faint);
     transition: transform 0.15s;
   }
 
-  .settings-group[open] summary::before {
-    transform: rotate(90deg);
+  .group.open .group-head :global(.chevron) {
+    transform: rotate(180deg);
   }
 
-  section.settings-group h3 {
-    display: block;
-    margin-bottom: 10px;
+  .group-body {
+    padding: 4px 12px 8px;
   }
 
-  .select-field,
-  .mass-field {
-    display: grid;
-    gap: 5px;
-    margin-bottom: 10px;
-    font-size: 12px;
-    color: #4e3a63;
-  }
-
-  .mass-field {
-    grid-template-columns: 1fr 96px;
-    align-items: center;
-  }
-
-  .mass-field input {
-    text-align: right;
-  }
-
-  .derived-note {
-    margin: 4px 0 8px;
+  .note {
+    margin: 6px 0 4px;
     padding: 8px 10px;
-    border-radius: 8px;
-    background: #f7f1fc;
-    color: #7a5f91;
+    border-radius: 9px;
+    background: var(--accent-soft);
+    color: #8a5a12;
     font-size: 11px;
     line-height: 1.5;
   }
 
-  .apply-bar {
-    position: sticky;
-    bottom: -15px;
+  .choice-grid {
     display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 10px 12px 12px;
+  }
+
+  .choice {
+    position: relative;
+    display: grid;
+    gap: 2px;
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .choice input {
+    position: absolute;
+    opacity: 0;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+  }
+
+  .choice.selected {
+    border-color: var(--primary);
+    background: var(--primary-soft);
+  }
+
+  .choice strong {
+    font-size: 11.5px;
+    color: var(--text);
+  }
+
+  .choice span {
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  .apply {
+    position: sticky;
+    bottom: -16px;
+    display: grid;
+    grid-template-columns: 1fr auto;
     gap: 6px;
     padding: 12px 0 4px;
-    background: #fff;
-    border-top: 1px solid #eee5f5;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
   }
 
-  .apply-bar button {
-    width: 100%;
+  .apply .primary {
+    height: 44px;
+    border: 0;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #9a6be0, var(--primary));
+    color: white;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 6px 16px rgb(122 75 198 / 28%);
   }
 
-  .apply-bar .ghost {
-    background: transparent;
-  }
-
-  .apply-bar small {
-    color: #a37935;
-    font-size: 10.5px;
-  }
-
-  .physics-error {
-    margin: 4px 0 0;
-    padding: 8px 10px;
-    border-radius: 8px;
-    background: #fff3f5;
-    color: #a24e60;
+  .apply .ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text-soft);
+    font: inherit;
     font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .apply .error,
+  .apply .pending {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: 9px;
+    font-size: 11.5px;
     line-height: 1.5;
+  }
+
+  .apply .error {
+    background: var(--danger-soft);
+    color: #9d2a39;
+  }
+
+  .apply .pending {
+    background: var(--accent-soft);
+    color: #8a5a12;
   }
 </style>

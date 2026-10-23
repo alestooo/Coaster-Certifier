@@ -3,13 +3,8 @@
   top: 0;
   z-index: 30;
   width: 100%;
-  border-bottom: 1px solid #ffffff1c;
-  background: linear-gradient(
-    115deg,
-    #342047,
-    #4b2868
-  );
-  box-shadow: 0 5px 22px #2b153a20;
+  background: linear-gradient(115deg, #2f1d44, #4b2868 60%, #5a3184);
+  box-shadow: 0 6px 24px rgb(43 21 58 / 25%);
   color: white;
 }
 
@@ -19,10 +14,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 22px;
-  width: min(100%, 1440px);
-  min-height: 82px;
+  width: min(100%, 1720px);
+  min-height: 72px;
   margin: auto;
-  padding: 12px 28px;
+  padding: 10px 24px;
 }
 
 .top-nav button {
@@ -31,7 +26,7 @@
   color: white;
 }
 
-.top-nav .nav-brand {
+.nav-brand {
   display: flex;
   align-items: center;
   gap: 11px;
@@ -42,169 +37,118 @@
 }
 
 .nav-brand img {
-  display: block;
-  width: 46px;
-  height: 46px;
-  object-fit: contain;
-  background: #ffffff12;
+  width: 42px;
+  height: 42px;
   border-radius: 12px;
-  padding: 3px;
-  box-sizing: border-box;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 25%);
 }
 
-.nav-brand > span {
+.nav-brand span {
   display: grid;
-  gap: 4px;
+  gap: 1px;
 }
 
 .nav-brand strong {
-  color: white;
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
+  font-size: 15.5px;
+  font-weight: 900;
+  letter-spacing: -0.2px;
 }
 
 .nav-brand small {
-  color: #f2e7fb;
-  font-size: 10px;
-  letter-spacing: 0.3px;
+  font-size: 11px;
+  color: rgb(255 255 255 / 70%);
 }
 
-.nav-links {
-  display: flex;
-  gap: 5px;
-  padding: 5px;
-  border: 1px solid #ffffff25;
-  border-radius: 13px;
-  background: #ffffff09;
+.nav-steps {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 14px;
+  background: rgb(0 0 0 / 18%);
 }
 
-.top-nav .nav-links button {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-height: 40px;
-  padding: 9px 14px;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  color: white;
-  background: transparent;
-  font-size: 12px;
-  font-weight: 600;
-  transition:
-    background 0.18s,
-    border-color 0.18s;
-}
-
-.top-nav .nav-links button:hover {
-  color: white;
-  background: #ffffff15;
-}
-
-.top-nav .nav-links button.active {
-  border-color: #d1a3ee77;
-  color: white;
-  background: #8e59b2;
-  box-shadow: 0 3px 12px #1d0e2925;
-}
-
-.nav-number {
-  display: grid;
-  place-items: center;
-  width: 23px;
-  height: 23px;
-  border-radius: 7px;
-  color: white;
-  background: #ffffff16;
-  font-size: 10px;
-}
-
-.nav-links button.active .nav-number {
-  color: white;
-  background: #ffffff24;
-}
-
-.top-nav .nav-home {
+.nav-steps button {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px 13px;
-  border: 1px solid #ffffff35;
+  gap: 8px;
+  height: 40px;
+  padding: 0 14px 0 8px;
+  border: 0;
   border-radius: 10px;
+  background: transparent;
+  color: rgb(255 255 255 / 70%);
+  font-size: 13px;
+  font-weight: 800;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nav-steps button:hover:not(:disabled) {
   color: white;
-  background: #ffffff0c;
-  font-size: 12px;
+  background: rgb(255 255 255 / 8%);
 }
 
-.top-nav .nav-home:hover {
-  background: #ffffff20;
+.nav-steps button.active {
+  background: white;
+  color: #4b2868;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 18%);
 }
 
-.nav-home > span {
-  font-size: 19px;
+.nav-steps button.done {
+  color: white;
 }
 
-.top-nav button:focus-visible {
-  outline: 3px solid #e7c4ff;
-  outline-offset: 3px;
+.nav-steps button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
-@media (max-width: 900px) {
-  .top-nav-inner {
-    gap: 12px;
-    padding: 12px 18px;
-  }
-
-  .nav-brand small {
-    display: none;
-  }
-
-  .nav-brand strong {
-    font-size: 14px;
-  }
-
-  .top-nav .nav-links button {
-    padding: 8px 10px;
-    gap: 6px;
-  }
-
-  .top-nav .nav-home {
-    display: none;
-  }
+.step-number {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 16%);
+  font-size: 11px;
+  font-weight: 900;
 }
 
-@media (max-width: 650px) {
+.nav-steps button.active .step-number {
+  background: #4b2868;
+  color: white;
+}
+
+.nav-steps button.done .step-number {
+  background: #2f9d78;
+}
+
+.nav-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 11px;
+  background: rgb(255 255 255 / 8%);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+@media (max-width: 760px) {
   .top-nav-inner {
     flex-wrap: wrap;
-    justify-content: center;
     gap: 10px;
     padding: 10px 14px;
   }
 
-  .top-nav .nav-brand {
-    margin-right: auto;
+  .nav-brand small,
+  .step-label {
+    display: none;
   }
 
-  .nav-brand img {
-    width: 33px;
-    height: 33px;
-  }
-
-  .nav-links {
-    width: 100%;
-  }
-
-  .top-nav .nav-links button {
-    flex: 1;
-    justify-content: center;
-    padding: 8px 5px;
-    font-size: 11px;
-  }
-
-  .nav-number {
-    width: 20px;
-    height: 20px;
-    font-size: 9px;
+  .nav-home {
+    margin-left: auto;
   }
 }

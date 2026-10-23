@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Map as MapIcon, Users, FlaskConical, Home, Lock } from "lucide-svelte";
   import "../styles/top-nav.css";
 
   let {
@@ -10,17 +11,15 @@
   }: {
     current: "setup" | "passengers" | "simulation";
     onHome: () => void;
-    onNavigate: (
-      screen: "setup" | "passengers" | "simulation"
-    ) => void;
+    onNavigate: (screen: "setup" | "passengers" | "simulation") => void;
     canPassengers?: boolean;
     canSimulation?: boolean;
   } = $props();
 
   const items = [
-    { id: "setup", label: "Recorrido", number: "01" },
-    { id: "passengers", label: "Pasajeros", number: "02" },
-    { id: "simulation", label: "Simulación", number: "03" }
+    { id: "setup", label: "Recorrido", number: 1, icon: MapIcon },
+    { id: "passengers", label: "Tren", number: 2, icon: Users },
+    { id: "simulation", label: "Certificación", number: 3, icon: FlaskConical }
   ] as const;
 
   function locked(id: string) {
@@ -32,84 +31,35 @@
 
 <header class="top-nav">
   <div class="top-nav-inner">
-    <button
-      class="nav-brand"
-      type="button"
-      onclick={onHome}
-      aria-label="Volver al inicio"
-    >
-    <img
-      src="/android-chrome-512x512.png"
-      alt=""
-    />
-
+    <button class="nav-brand" type="button" onclick={onHome} aria-label="Volver al inicio">
+      <img src="/android-chrome-512x512.png" alt="" />
       <span>
         <strong>Coaster-Certifier</strong>
-        <small>Tu laboratorio sobre rieles</small>
+        <small>Certificador de montañas rusas</small>
       </span>
     </button>
 
-    <nav class="nav-links" aria-label="Pasos del recorrido">
-      {#each items as item}
+    <nav class="nav-steps" aria-label="Pasos">
+      {#each items as item, index}
         <button
           type="button"
           class:active={current === item.id}
+          class:done={items.findIndex(step => step.id === current) > index}
           disabled={locked(item.id)}
-          aria-current={current === item.id ? "page" : undefined}
-          title={locked(item.id)
-            ? "Completá el paso anterior para continuar"
-            : item.label}
+          aria-current={current === item.id ? "step" : undefined}
+          title={locked(item.id) ? "Completá el paso anterior para continuar" : item.label}
           onclick={() => {
-            if (!locked(item.id)) {
-              onNavigate(item.id);
-            }
+            if (!locked(item.id)) onNavigate(item.id);
           }}
         >
-          <span class="nav-number">{item.number}</span>
-          <span>{item.label}</span>
-
-          {#if locked(item.id)}
-            <svg
-              class="nav-lock"
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.6"
-              aria-hidden="true"
-            >
-              <rect
-                x="5"
-                y="9"
-                width="10"
-                height="8"
-                rx="2"
-              />
-              <path d="M7 9V6a3 3 0 0 1 6 0v3" />
-            </svg>
-          {/if}
+          <span class="step-number">{item.number}</span>
+          <item.icon size={15} />
+          <span class="step-label">{item.label}</span>
+          {#if locked(item.id)}<Lock size={12} class="step-lock" />{/if}
         </button>
       {/each}
     </nav>
 
-    <button class="nav-home" type="button" onclick={onHome}>
-      <span aria-hidden="true">⌂</span>
-      Inicio
-    </button>
+    <button class="nav-home" type="button" onclick={onHome}><Home size={15} /> Inicio</button>
   </div>
 </header>
-
-<style>
-  .nav-lock {
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-  }
-
-  .top-nav .nav-links button:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    background: transparent;
-    border-color: transparent;
-    box-shadow: none;
-  }
-</style>

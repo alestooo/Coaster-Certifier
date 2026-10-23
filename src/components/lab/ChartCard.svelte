@@ -1,20 +1,22 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { Download } from "lucide-svelte";
   import { CHART_KINDS, createPhysicsChart, updatePhysicsChart, destroyPhysicsChart, chartImageUrl } from "../../ui/charts/index.js";
   import { downloadDataUrl, stampedName } from "../../ui/export";
   import type { SimulationConfig, SimulationState, Track, Verdict } from "../../lib/types";
 
   let {
-    kind = $bindable("speed"),
+    kind,
     xAxis,
     showMarkers,
     showSections,
     history,
     config,
     track,
-    events
+    events,
+    height = 240
   }: {
-    kind?: string;
+    kind: string;
     xAxis: "time" | "distance";
     showMarkers: boolean;
     showSections: boolean;
@@ -22,10 +24,13 @@
     config: SimulationConfig;
     track: Track;
     events: Verdict["violations"];
+    height?: number;
   } = $props();
 
   let canvas: HTMLCanvasElement;
   let chart: ReturnType<typeof createPhysicsChart> | undefined;
+
+  let definition = $derived(CHART_KINDS.find(item => item.id === kind) ?? CHART_KINDS[0]);
 
   onMount(() => {
     chart = createPhysicsChart(canvas, kind);
@@ -58,18 +63,13 @@
 </script>
 
 <div class="chart-card">
-  <div class="chart-tools">
-    <select aria-label="Magnitud graficada" bind:value={kind}>
-      {#each CHART_KINDS as option}
-        <option value={option.id}>{option.label} ({option.unit})</option>
-      {/each}
-    </select>
-
-    <button type="button" onclick={download} title="Descargar la gráfica como imagen PNG">⤓ PNG</button>
+  <div class="chart-head">
+    <strong>{definition.label} <small>({definition.unit})</small></strong>
+    <button type="button" onclick={download} title="Descargar como PNG" aria-label="Descargar gráfica como PNG"><Download size={14} /></button>
   </div>
 
-  <div class="chart-area">
-    <canvas bind:this={canvas} aria-label="Gráfica en tiempo real"></canvas>
+  <div class="chart-area" style:height={`${height}px`}>
+    <canvas bind:this={canvas} aria-label={`Gráfica de ${definition.label}`}></canvas>
   </div>
 </div>
 
@@ -77,25 +77,41 @@
   .chart-card {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     min-width: 0;
-    min-height: 0;
   }
 
-  .chart-tools {
+  .chart-head {
     display: flex;
-    gap: 6px;
+    justify-content: space-between;
     align-items: center;
+    gap: 8px;
   }
 
-  .chart-tools select {
-    flex: 1;
-    min-width: 0;
+  .chart-head strong {
+    font-size: 12.5px;
+    color: var(--text-soft);
+  }
+
+  .chart-head small {
+    font-weight: 600;
+    color: var(--muted);
+  }
+
+  .chart-head button {
+    display: inline-grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
   }
 
   .chart-area {
     position: relative;
-    flex: 1;
-    min-height: 230px;
+    width: 100%;
   }
 </style>

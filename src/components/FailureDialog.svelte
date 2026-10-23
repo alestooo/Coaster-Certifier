@@ -301,15 +301,13 @@
   onclick={open}
   aria-haspopup="dialog"
 >
-  <span class="failure-symbol" aria-hidden="true">!</span>
+  <span class="failure-symbol" aria-hidden="true">💡</span>
 
   <span>
-    <strong>{detail.title}</strong>
+    <strong>Ver diagnóstico y alternativas verificadas</strong>
 
     <small>
-      {failedState.time.toFixed(3)} s ·
-      {failedState.section} ·
-      tocá para ver causas y pruebas
+      El motor explica la causa y calcula hasta tres correcciones que aprueban · tocá para ver causas y pruebas
     </small>
   </span>
 
@@ -500,10 +498,10 @@
     gap: 12px;
     width: 100%;
     padding: 11px 14px;
-    border: 1px solid #efcfda;
+    border: 1px solid #efd29a;
     border-radius: 12px;
-    background: #fff5f8;
-    color: #a64f69;
+    background: var(--accent-soft, #fff1d6);
+    color: #8a5a12;
     cursor: pointer;
     text-align: left;
     font: inherit;
@@ -520,22 +518,22 @@
   }
 
   .failure-banner small {
-    font-size: 10px;
-    color: #b48092;
+    font-size: 10.5px;
+    color: #a4772a;
   }
 
   .failure-symbol {
     display: grid;
     place-items: center;
-    width: 25px;
-    height: 25px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
-    background: #f5dce5;
-    font-weight: 800;
+    background: #ffe3a8;
+    font-size: 14px;
   }
 
   .failure-banner:hover {
-    background: #ffeaf1;
+    background: #ffe9c2;
   }
 
   .failure-dialog {

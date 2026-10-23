@@ -26,119 +26,93 @@
   }
 </script>
 
-<label class="field-control" class:has-error={error}>
-  <span class="field-head">
+<div class="field" class:has-error={error} title={field.help}>
+  <div class="field-row">
     <span class="field-symbol">{field.symbol}</span>
-    <span class="field-label">{field.label}</span>
-    {#if field.unit}
-      <span class="field-unit">{field.unit}</span>
-    {/if}
-  </span>
+    <label class="field-label" for={`field-${field.key}`}>{field.label}</label>
+    <span class="field-value">
+      <input id={`field-${field.key}`} type="number" {min} {max} step="any" required {value} onchange={emit} />
+      {#if field.unit}<span class="field-unit">{field.unit}</span>{/if}
+    </span>
+  </div>
 
-  <span class="field-inputs">
-    <input
-      type="range"
-      {min}
-      {max}
-      step={field.step}
-      {value}
-      aria-label={`${field.label} (deslizador)`}
-      oninput={emit}
-    />
-
-    <input
-      type="number"
-      {min}
-      {max}
-      step="any"
-      required
-      {value}
-      aria-label={field.label}
-      onchange={emit}
-    />
-  </span>
-
-  <small class="field-help">{field.help} <span class="field-range">({min}–{max}{field.unit ? ` ${field.unit}` : ""})</span></small>
-</label>
+  <input class="field-slider" type="range" {min} {max} step={field.step} {value} aria-label={`${field.label} (deslizador)`} oninput={emit} />
+</div>
 
 <style>
-  .field-control {
+  .field {
     display: grid;
-    gap: 5px;
-    margin-bottom: 12px;
-    font-size: 12px;
+    gap: 4px;
+    padding: 8px 0;
   }
 
-  .field-head {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
+  .field-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
   }
 
   .field-symbol {
-    min-width: 34px;
-    padding: 2px 6px;
-    border-radius: 6px;
-    background: #efe6f8;
-    color: #6d4a8c;
+    min-width: 38px;
+    padding: 3px 6px;
+    border-radius: 7px;
+    background: var(--primary-soft);
+    color: var(--primary-strong);
     font-size: 10.5px;
-    font-weight: 750;
+    font-weight: 900;
     text-align: center;
     font-variant-numeric: tabular-nums;
   }
 
   .field-label {
-    flex: 1;
-    font-weight: 600;
-    color: #4e3a63;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--text-soft);
+    cursor: help;
   }
 
-  .field-unit {
-    color: #9b84ab;
-    font-size: 11px;
-  }
-
-  .field-inputs {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 86px;
-    gap: 8px;
+  .field-value {
+    display: inline-flex;
     align-items: center;
+    gap: 5px;
   }
 
-  .field-inputs input[type="range"] {
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    accent-color: #8c63aa;
-  }
-
-  .field-inputs input[type="number"] {
-    width: 100%;
-    min-width: 0;
-    padding: 7px 8px;
-    border: 1px solid #dfd0ea;
-    border-radius: 8px;
-    background: #fcfaff;
-    color: #624b75;
+  .field-value input {
+    width: 76px;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface);
+    color: var(--text);
     font: inherit;
-    font-size: 12px;
+    font-size: 12.5px;
+    font-weight: 800;
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
 
-  .has-error .field-inputs input[type="number"] {
-    border-color: #d46b7f;
-    background: #fff5f7;
+  .field-value input:focus-visible {
+    outline: 3px solid var(--primary-soft);
+    border-color: var(--primary);
   }
 
-  .field-help {
-    color: #9d84af;
-    font-size: 10.5px;
-    line-height: 1.45;
+  .has-error .field-value input {
+    border-color: var(--danger);
+    background: var(--danger-soft);
   }
 
-  .field-range {
-    white-space: nowrap;
-    color: #b7a4c4;
+  .field-unit {
+    min-width: 28px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+
+  .field-slider {
+    width: 100%;
+    margin: 0;
+    accent-color: var(--primary);
   }
 </style>

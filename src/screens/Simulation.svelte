@@ -1,19 +1,23 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import { PencilRuler, Map as MapIcon, Users, BookOpen } from "lucide-svelte";
 
   import Guide from "../components/Guide.svelte";
   import TrackEditor from "../components/TrackEditor.svelte";
+  import Inspector from "../components/lab/Inspector.svelte";
   import SettingsPanel from "../components/lab/SettingsPanel.svelte";
+  import TrainPanel from "../components/lab/TrainPanel.svelte";
   import StagePanel from "../components/lab/StagePanel.svelte";
-  import MetricsPanel from "../components/lab/MetricsPanel.svelte";
+  import InstrumentCluster from "../components/lab/InstrumentCluster.svelte";
   import VerdictPanel from "../components/lab/VerdictPanel.svelte";
-  import ChartsPanel from "../components/lab/ChartsPanel.svelte";
+  import ChartsDock from "../components/lab/ChartsDock.svelte";
   import ReportDialog from "../components/lab/ReportDialog.svelte";
 
   import { SimulationRunner } from "../lib/simulation-runner.svelte";
   import { scenarioConfig, type ScenarioId } from "../game/scenarios";
   import { mapName } from "../game/maps";
-  import { resolveConfig, buildTrack, ConfigError } from "../physics/index.js";
+  import { resolveConfig, buildTrack, ConfigError, toCsv } from "../physics/index.js";
+  import { downloadText, downloadJson, stampedName } from "../ui/export";
   import type { ConfigInput, SimulationConfig, TrackPoint } from "../lib/types";
 
   import {
@@ -44,16 +48,6 @@
   const people = untrack(() => passengers.map(passenger => ({ ...passenger })));
   const cartCount = calculateCartCount(people);
 
-  const STATUS_LABELS: Record<string, string> = {
-    running: "Listo / pausado",
-    finished: "Detenido en la estación",
-    stopped: "En reposo en la estación",
-    stalled: "Detenido antes del frenado",
-    rejected: "Límite excedido",
-    "lost-contact": "Pérdida de contacto",
-    timeout: "Fin del tiempo de observación"
-  };
-
   let cartMass = $state(CART_MASS);
   let masses = $state(people.map(passenger => passenger.mass));
   let applied = $state({ cartMass: CART_MASS, masses: people.map(passenger => passenger.mass) });
@@ -64,15 +58,45 @@
   let designConfirmed = $state(untrack(() => config.mapId !== "custom"));
   let errorField = $state("");
   let errorMessage = $state("");
+  let tab = $state<"design" | "train" | "verdict">("design");
 
   let signature = $state(untrack(() => fingerprint()));
   let dirty = $derived(fingerprint() !== signature);
-  let started = $derived(runner.history.length > 1);
+  let enabled = $derived(designConfirmed && !dirty);
 
-  let people2 = $derived(people.map((passenger, index) => ({ ...passenger, mass: masses[index] ?? passenger.mass })));
+  let peopleWithMass = $derived(people.map((passenger, index) => ({ ...passenger, mass: masses[index] ?? passenger.mass })));
+
+  let maxSpeedSeen = $derived.by(() => {
+    let best = 0;
+    for (const state of runner.history) if (state.speed > best) best = state.speed;
+    return best;
+  });
+
+  let pendingMessage = $derived(
+    !designConfirmed ? "Aplicá tu diseño de pista para empezar" : dirty ? "Hay cambios sin aplicar en el panel Diseño" : ""
+  );
 
   let editorDialog: HTMLDialogElement;
   let report: ReportDialog;
+  let guide: Guide;
+
+  let wasFinished = false;
+
+  $effect(() => {
+    const finished = runner.isFinished;
+
+    if (finished && !wasFinished && runner.history.length > 1) {
+      tab = "verdict";
+    }
+
+    wasFinished = finished;
+  });
+
+  $effect(() => {
+    if (untrack(() => config.mapId) === "custom") {
+      editorDialog.showModal();
+    }
+  });
 
   function copyConfig(source: SimulationConfig): SimulationConfig {
     return { ...source, customPoints: source.customPoints.map(point => ({ ...point })) };
@@ -136,10 +160,10 @@
 
   function loadScenario(id: ScenarioId) {
     runner.pause();
-    // Cada escenario parte de los valores por defecto: no hereda campos del borrador anterior.
     draft = copyConfig(resolveConfig(scenarioConfig(id)));
     cartMass = CART_MASS;
     masses = people.map(() => DEFAULT_PASSENGER_MASS);
+    tab = "design";
     apply();
   }
 
@@ -153,97 +177,93 @@
     patch({ customPoints: points });
   }
 
-  $effect(() => {
-    if (untrack(() => config.mapId) === "custom") {
-      editorDialog.showModal();
-    }
-  });
+  function exportCsv() {
+    downloadText(stampedName(`coaster-${runner.config.mapId}`, "csv"), toCsv(runner.history), "text/csv");
+  }
+
+  function exportJson() {
+    downloadJson(stampedName(`dictamen-${runner.config.mapId}`, "json"), {
+      generatedAt: new Date().toISOString(),
+      map: mapName(runner.config.mapId),
+      config: runner.config,
+      verdict: runner.verdict
+    });
+  }
 </script>
 
-<main class="physics-lab">
-  <header class="lab-heading">
-    <div>
-      <span class="lab-eyebrow">LABORATORIO DE CERTIFICACIÓN</span>
+<main class="lab">
+  <header class="lab-bar">
+    <div class="lab-title">
+      <span class="eyebrow">Laboratorio de certificación</span>
       <h1>{mapName(runner.config.mapId)}</h1>
     </div>
 
-    <div class="physics-toolbar">
-      <span class="mode-badge">
-        Límites {runner.config.minLoad} g a +{runner.config.maxLoad} g ·
-        contacto {runner.config.contactModel === "strict" ? "estricto" : "ruedas de seguridad"} ·
-        {runner.config.brakeMode === "station" ? "frenos" : "resorte"}
-      </span>
-
+    <nav class="lab-actions" aria-label="Acciones del laboratorio">
       {#if draft.mapId === "custom"}
-        <button class="edit-track-button" type="button" onclick={() => { runner.pause(); editorDialog.showModal(); }}>
-          ✎ Editar pista
+        <button type="button" class="accent" onclick={() => { runner.pause(); editorDialog.showModal(); }}>
+          <PencilRuler size={15} /> Editar pista
         </button>
       {/if}
-
-      <button type="button" onclick={onChangeMap}>Cambiar recorrido</button>
-      <button type="button" onclick={onEditPassengers}>Pasajeros</button>
-      <Guide onPreset={loadScenario} />
-    </div>
+      <button type="button" onclick={onChangeMap}><MapIcon size={15} /> Recorrido</button>
+      <button type="button" onclick={onEditPassengers}><Users size={15} /> Pasajeros</button>
+      <button type="button" onclick={() => guide.open()}><BookOpen size={15} /> Guía</button>
+    </nav>
   </header>
 
-  <div class="physics-layout">
-    <aside class="physics-card settings">
-      <SettingsPanel
-        {draft}
-        {cartMass}
-        {masses}
-        {cartCount}
-        {dirty}
-        {errorField}
-        {errorMessage}
-        onPatch={patch}
-        onCartMass={value => { runner.pause(); cartMass = value; }}
-        onPassengerMass={(index, value) => { runner.pause(); masses = masses.map((mass, position) => (position === index ? value : mass)); }}
-        onApply={apply}
-        onDiscard={discard}
-      />
-    </aside>
-
-    <section class="physics-results" aria-label="Simulación y resultados">
-      <div class="physics-card stage-card">
-        <StagePanel
-          {runner}
-          passengers={people2}
-          designConfirmed={designConfirmed && !dirty}
-          statusLabel={STATUS_LABELS[runner.state.status] ?? runner.state.status}
-        />
+  <div class="lab-grid">
+    <section class="lab-main" aria-label="Simulación">
+      <div class="card stage-card">
+        <StagePanel {runner} passengers={peopleWithMass} {enabled} verdict={runner.verdict} {pendingMessage} />
       </div>
 
-      <div class="physics-bottom">
-        <div class="physics-card verdict-card">
-          <VerdictPanel
-            verdict={runner.verdict}
-            running={runner.running}
-            {started}
-            state={runner.state}
-            config={runner.config}
-            onApplyRecommendation={applyRecommendation}
-            onOpenReport={() => report.open()}
-          />
-        </div>
-
-        <div class="physics-card metrics-card">
-          <h2>Magnitudes en el instante observado</h2>
-          <MetricsPanel state={runner.viewState} config={runner.config} />
-        </div>
+      <div class="card">
+        <InstrumentCluster state={runner.viewState} config={runner.config} maxSpeed={maxSpeedSeen} />
       </div>
 
-      <div class="physics-card chart-card">
-        <ChartsPanel
-          history={runner.history}
-          config={runner.config}
-          track={runner.track}
-          events={runner.state.events}
-        />
+      <div class="card">
+        <ChartsDock history={runner.history} config={runner.config} track={runner.track} events={runner.state.events} />
       </div>
     </section>
+
+    <Inspector bind:active={tab} attention={dirty ? "design" : runner.isFinished && runner.history.length > 1 ? "verdict" : null}>
+      {#snippet design()}
+        <SettingsPanel {draft} {dirty} {errorField} {errorMessage} onPatch={patch} onApply={apply} onDiscard={discard} onScenarios={() => guide.open()} />
+      {/snippet}
+
+      {#snippet train()}
+        <TrainPanel
+          passengers={people}
+          {cartMass}
+          {masses}
+          {cartCount}
+          onCartMass={value => { runner.pause(); cartMass = value; }}
+          onPassengerMass={(index, value) => { runner.pause(); masses = masses.map((mass, position) => (position === index ? value : mass)); }}
+          {onEditPassengers}
+        />
+        {#if dirty}
+          <div class="train-apply">
+            <button type="button" class="primary" onclick={apply}>Aplicar masas</button>
+          </div>
+        {/if}
+      {/snippet}
+
+      {#snippet verdict()}
+        <VerdictPanel
+          verdict={runner.verdict}
+          running={runner.running}
+          state={runner.state}
+          config={runner.config}
+          onApplyRecommendation={applyRecommendation}
+          onOpenReport={() => report.open()}
+          onExportCsv={exportCsv}
+          onExportJson={exportJson}
+        />
+      {/snippet}
+    </Inspector>
   </div>
 </main>
+
+<Guide bind:this={guide} onPreset={loadScenario} />
 
 <ReportDialog
   bind:this={report}
@@ -251,29 +271,23 @@
   config={runner.config}
   track={runner.track}
   history={runner.history}
-  passengers={people2}
+  passengers={peopleWithMass}
   mapName={mapName(runner.config.mapId)}
 />
 
-<dialog bind:this={editorDialog} class="editor-modal" aria-labelledby="editor-title">
+<dialog bind:this={editorDialog} class="editor-modal" aria-label="Editor de pista personalizada">
   <div class="editor-modal-heading">
-    <h2 id="editor-title">Pista personalizada</h2>
-    <button type="button" aria-label="Cerrar editor" onclick={() => editorDialog.close()}>✕</button>
+    <button type="button" class="close" aria-label="Cerrar editor" onclick={() => editorDialog.close()}>✕</button>
   </div>
 
-  <TrackEditor points={draft.customPoints} onChange={updatePoints} />
+  <TrackEditor config={draft} onChange={updatePoints} onPatch={patch} />
 
   {#if errorMessage}
-    <p role="alert" class="physics-error">{errorMessage}</p>
+    <p role="alert" class="editor-error">{errorMessage}</p>
   {/if}
 
-  <button
-    class="primary"
-    type="button"
-    onclick={() => {
-      if (apply()) editorDialog.close();
-    }}
-  >
-    Aplicar diseño
-  </button>
+  <div class="editor-actions">
+    <button type="button" class="secondary" onclick={() => editorDialog.close()}>Cerrar</button>
+    <button type="button" class="primary" onclick={() => { if (apply()) editorDialog.close(); }}>Aplicar diseño y volver</button>
+  </div>
 </dialog>
