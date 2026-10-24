@@ -35,7 +35,7 @@ Proyecto de Simulación · Física I (FUN-18) · Universidad CENFOTEC · 2026-C3
 | Compilar para producción | `npm run build` |
 | Verificación de tipos (Svelte + JSDoc) | `npm run check` |
 
-Requiere Node.js ≥ 18.17. No usa ningún motor físico de terceros: toda la física está en `src/physics/`. Las únicas librerías externas de la interfaz son Svelte (interfaz) y Chart.js (gráficas).
+Requiere Node.js ≥ 18.17. No usa ningún motor físico de terceros: toda la física está en `src/physics/`. La interfaz utiliza Svelte y Chart.js, además de lucide-svelte para iconografía. Ninguna de ellas se emplea como motor físico.
 
 ## 2. Estructura del repositorio
 
@@ -80,11 +80,11 @@ N       = m·(g·cos θ + κ·v²)                                              
 | Resorte de frenado | `F = −k·x`, `E_e = ½·k·x²`; amortiguador opcional `F = −c·v` | `springForce`, `damperForce`, `elasticEnergy` |
 | Energías | `E_c = ½·m·v²`, `E_p = m·g·y`, `E_m = E_c + E_p + E_e`, `E_m(t) + E_dis(t) = E_m(0)` | `calculateEnergies` |
 | Energía disipada | `dE_dis/dt = |f·v| + |F_freno·v| + |F_amort·v|` integrada junto con el movimiento | `step` |
-| Contacto en la cima del loop | `N ≥ 0 ⇔ v_C² ≥ g·R` | `loopTopMinimumSpeed`, `evaluateState` |
+| Contacto en la cima del loop | `N > 0 ⇔ v_C² > g·R` | `loopTopMinimumSpeed`, `evaluateState` |
 
 **Geometría del trazado**
 
-- Tramos entre nodos: polinomios cúbicos de **Hermite** y(x) con pendiente final nula (valles y crestas suaves, curvatura continua). La coordenada `s` se obtiene de una tabla de longitud de arco de 400 muestras por tramo.
+- Tramos entre nodos: polinomios cúbicos de **Hermite** y(x) con pendientes ajustadas para conectar tramos; existe continuidad de posición y tangente, pero no se garantiza continuidad de curvatura entre segmentos. La coordenada `s` se obtiene de una tabla de longitud de arco de 400 muestras por tramo.
 - **Loop en lágrima**: familia con radio de curvatura `ρ(θ) = R_ref·(1 + c·cos θ)`. El usuario fija la altura `h_L` y el radio en la cima `R` (como en el anexo): `R_ref = h_L/2`, `c = 1 − 2R/h_L`, radio en la base `R_B = h_L − R`, longitud `2π·R_ref`, salida desplazada `π·c·R_ref`. Con `R = h_L/2` el loop es circular. Debe cumplirse `h_L ≥ 2R`.
 - **Colina** de altura `h_c` y radio de curvatura en la cresta `ρ_c`: dos tramos de Hermite de semiancho `w = √(6·h_c·ρ_c)`, de modo que `ρ_c = w²/(6·h_c)` exactamente.
 - **Plano inclinado**: recta de A al suelo (caso con solución cerrada, usado en las pruebas).
@@ -116,6 +116,27 @@ Un trazado se **aprueba** únicamente si el tren termina detenido dentro de la e
 ## 4. API pública de la librería (`src/physics/index.js`)
 
 Todas las funciones reciben y devuelven unidades del SI. Los objetos de entrada nunca se modifican.
+
+### Inventario de exportaciones públicas adicionales
+
+El punto de entrada `src/physics/index.js` también exporta los siguientes símbolos. Se incluyen para que la documentación abarque la superficie pública real de la librería (además de las funciones explicadas en las tablas siguientes):
+
+| Exportación | Entrada | Resultado / unidad |
+| --- | --- | --- |
+| `CUSTOM_LIMITS` | No aplica | Límites de cantidad y separación de nodos personalizados (separación relativa sin unidad) |
+| `MAP_IDS`, `BRAKE_MODES`, `CONTACT_MODELS` | No aplica | Listas de identificadores de trazados, modos de frenado y modelos de contacto (texto) |
+| `ConfigError` | Mensaje y campo, según el uso interno | Tipo de error usado por la validación; expone datos de diagnóstico, no una magnitud física |
+| `segmentPoint(segment, s)` | Segmento de vía y distancia local `s` (m) | Geometría evaluada en el segmento (posición m, inclinación rad, curvatura 1/m) |
+| `loopExtent(loop)` | Objeto geométrico de loop | Extremos espaciales de la geometría (m) |
+| `layoutNodes(config)` | Configuración de trazado | Nodos geométricos y disposición del recorrido (coordenadas m) |
+| `makeState(...)` | Valores de estado procesados por el integrador | Objeto de estado de simulación (tiempo s, distancia m, rapidez m/s y magnitudes derivadas SI) |
+| `CRITERIA` | No aplica | Catálogo de criterios y códigos de incumplimiento (identificadores) |
+| `CSV_COLUMNS` | No aplica | Descriptores de columnas de exportación y unidades asociadas |
+| `candidateList(config, ...)` | Configuración y datos para generar candidatos | Lista de configuraciones propuestas para reevaluación (parámetros SI) |
+| `changesBetween(a, b)` | Dos configuraciones | Diferencias de parámetros entre configuraciones y sus valores |
+| `RECOMMENDATION_FIELDS` | No aplica | Metadatos de parámetros susceptibles de ajuste |
+
+**Nota de rigor:** Los nombres y exportaciones anteriores fueron cotejados con `src/physics/index.js`. Para firmas auxiliares con argumentos opcionales, prevalece el código fuente; el punto de entrada es la referencia para identificar la API efectivamente pública.
 
 ### Configuración
 
@@ -219,7 +240,7 @@ Parámetros (`SimulationConfig`): `mass` (kg), `gravity` (m/s²), `initialHeight
 
 Además, `npm run e2e` recorre la aplicación compilada en Chrome (menú → recorrido → tren → laboratorio → dictamen e informe, loop circular rechazado con alternativas, editor de pista personalizada y pantalla de pasajeros). Y en la librería: pureza (el estado de entrada congelado no se modifica), determinismo (dos ejecuciones idénticas), geometría (longitud `2π·R_ref`, altura `h_L`, radios en cima y base, continuidad de posición y ángulo en cada unión, `ρ_c = w²/(6h_c)`), validación de configuración (todos los rangos, enumerados, forma del loop, puntos personalizados), criterios (cada código de incumplimiento con su registro completo), dictamen, CSV, recomendaciones y los 12 escenarios de referencia con su dictamen esperado.
 
-Cobertura de `src/physics/` con `npm run test:coverage`: ≈ 87 % de líneas.
+La cobertura puede medirse mediante `npm run test:coverage`; su porcentaje debe tomarse del informe generado en la versión del código que se entregue.
 
 ## 6. Ejecución headless y CSV
 
@@ -249,3 +270,16 @@ Partícula sin longitud ni rotación propia; vía rígida sin peralte; gravedad 
 ## 9. Licencia
 
 MIT.
+
+## 10. Verificación antes de entregar
+
+Desde la raíz del repositorio, con dependencias instaladas, ejecutar en este orden:
+
+```bash
+npm install
+npm test
+npm run headless
+npm run build
+```
+
+Comprobar que `npm test` finaliza sin fallos, que el script headless produce `output/certification.csv` y `output/certification.summary.json`, que el build compila y que los enlaces públicos abren. Si se actualizan los archivos de física o de pruebas, repetir las verificaciones y consignar el resultado real, sin reutilizar conteos anteriores.
