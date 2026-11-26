@@ -7,6 +7,8 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.js"],
     environment: "node",
+    // Las pruebas simulan recorridos completos: en compus lentas 5 s (el valor por defecto) no alcanza.
+    testTimeout: 30_000,
     coverage: {
       provider: "v8",
       include: ["src/physics/**/*.js"],
