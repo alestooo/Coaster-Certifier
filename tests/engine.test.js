@@ -18,6 +18,15 @@ import {
 } from "../src/physics/index.js";
 import { IDEAL, simulate, deepFreeze } from "./helpers.js";
 
+/**
+ * Límites de tiempo de las pruebas que simulan muchos recorridos. Acá tardan
+ * 1–18 s, pero en una compu varias veces más lenta (o con otras pruebas en
+ * paralelo) superaban los 5 s por defecto o quedaban justo en el límite.
+ */
+const SEARCH_TIMEOUT_MS = 60_000;
+const SCENARIO_SEARCH_TIMEOUT_MS = 120_000;
+const LONG_RUN_TIMEOUT_MS = 30_000;
+
 describe("Pureza y determinismo", () => {
   it("el mismo estado y el mismo dt producen siempre el mismo resultado", () => {
     const config = { ...IDEAL, mapId: "loop", initialHeight: 32, loopHeight: 20, loopTopRadius: 5, friction: 0.015 };
@@ -222,7 +231,7 @@ describe("Recomendaciones", () => {
       expect(runSimulation(option.config).verdict.approved).toBe(true);
       expect(option.changes.length).toBeGreaterThan(0);
     }
-  });
+  }, SEARCH_TIMEOUT_MS);
 
   it.each(["circular-loop", "loop-contact", "stall", "brake-short", "spring-ideal"])(
     "el escenario que falla «%s» recibe al menos una corrección verificada",
@@ -238,7 +247,7 @@ describe("Recomendaciones", () => {
         expect(runSimulation(option.config).verdict.approved).toBe(true);
       }
     },
-    60_000
+    SCENARIO_SEARCH_TIMEOUT_MS
   );
 
   it("explica la pérdida de contacto en el loop", () => {
@@ -271,7 +280,7 @@ describe("Robustez (hallazgos de revisión)", () => {
     expect(run.history.length).toBeGreaterThan(150000);
     expect(Number.isFinite(run.verdict.summary.braking.maxCompression)).toBe(true);
     expect(Number.isFinite(run.verdict.summary.maxSpeed.value)).toBe(true);
-  });
+  }, LONG_RUN_TIMEOUT_MS);
 
   it("registra una sola causa cuando el tren se detiene por rapidez insuficiente", () => {
     const run = simulate({ mapId: "valley", initialHeight: 10, trackWidth: 260, hillHeight: 14, hillCrestRadius: 30, friction: 0.02 });
