@@ -14,7 +14,11 @@ const MAX_ENTRIES = 3;
 const trackIds = new WeakMap();
 let nextTrackId = 1;
 
-/** @type {Map<string, {canvas: any, width: number, height: number}>} */
+/**
+ * @typedef {{canvas: any, width: number, height: number, baseKey: string}} WorldLayer
+ */
+
+/** @type {Map<string, WorldLayer>} */
 const cache = new Map();
 
 /**
@@ -38,12 +42,12 @@ function createCanvas(width, height) {
 }
 
 /**
- * Clave de caché de la capa estática.
+ * Clave de caché de la capa estática sin la escala: trazado, densidad y opciones.
  * @param {import("./index.js").Frame} frame
  * @param {number} ratio
  */
-function layerKey(frame, ratio) {
-  const { scene, camera, options } = frame;
+function baseKeyOf(frame, ratio) {
+  const { scene, options } = frame;
   let id = trackIds.get(scene.track);
 
   if (!id) {
@@ -53,7 +57,6 @@ function layerKey(frame, ratio) {
 
   return [
     id,
-    camera.scale.toFixed(4),
     ratio,
     scene.config.brakeMode,
     scene.config.brakingLength,
@@ -69,20 +72,22 @@ function layerKey(frame, ratio) {
 /**
  * Devuelve la capa estática (creándola si hace falta) o `null` cuando
  * no se puede cachear; en ese caso el llamador dibuja directamente.
- * Con `options.cacheWorld` en falso (la escala cambia en cada cuadro, como
- * en una animación de zoom) solo se reusa una capa que ya existe: crear una
- * por cuadro costaría más que dibujar directo y vaciaría la caché.
+ * Con `options.cacheWorld` en falso (la escala cambia en cada cuadro: una
+ * animación de zoom, un pellizco o un gesto de rueda) no se crea ninguna:
+ * se reusa la última del mismo trazado, escalada, y la capa a la escala
+ * nueva se crea cuando el gesto termina.
  *
  * @param {import("./index.js").Frame} frame
  * @param {number} ratio Densidad de píxeles.
  * @param {(frame: import("./index.js").Frame) => void} drawWorld
  */
 export function getWorldLayer(frame, ratio, drawWorld) {
-  const key = layerKey(frame, ratio);
+  const baseKey = baseKeyOf(frame, ratio);
+  const key = `${baseKey}|${frame.camera.scale.toFixed(4)}`;
   const cached = cache.get(key);
 
   if (cached) return cached;
-  if (frame.options.cacheWorld === false) return null;
+  if (frame.options.cacheWorld === false) return latestFor(baseKey);
 
   const { camera } = frame;
   const width = (camera.world.maxX - camera.world.minX) * camera.scale;
@@ -101,7 +106,7 @@ export function getWorldLayer(frame, ratio, drawWorld) {
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
   drawWorld({ ...frame, ctx, camera: layerCamera(camera) });
 
-  const entry = { canvas, width, height };
+  const entry = { canvas, width, height, baseKey };
 
   if (cache.size >= MAX_ENTRIES) {
     const oldest = cache.keys().next().value;
@@ -113,11 +118,22 @@ export function getWorldLayer(frame, ratio, drawWorld) {
 }
 
 /**
+ * Última capa creada para el mismo trazado y opciones (a cualquier escala).
+ * @param {string} baseKey
+ * @returns {WorldLayer | null}
+ */
+function latestFor(baseKey) {
+  const matches = [...cache.values()].filter(entry => entry.baseKey === baseKey);
+  return matches.at(-1) ?? null;
+}
+
+/**
  * Copia la capa estática al lienzo principal en la posición de la cámara.
  * @param {import("./index.js").Frame} frame
  * @param {{canvas: any, width: number, height: number}} layer
  */
 export function blitWorldLayer({ ctx, camera }, layer) {
+  // Al tamaño de la escala actual: una capa de otra escala (durante un gesto) se estira.
   ctx.drawImage(
     layer.canvas,
     0,
@@ -126,7 +142,7 @@ export function blitWorldLayer({ ctx, camera }, layer) {
     layer.canvas.height,
     camera.toX(camera.world.minX),
     camera.toY(camera.world.maxY),
-    layer.width,
-    layer.height
+    (camera.world.maxX - camera.world.minX) * camera.scale,
+    (camera.world.maxY - camera.world.minY) * camera.scale
   );
 }

@@ -12,6 +12,16 @@ const SPINE_OFFSET_M = 0.75;
 const TIE_SPACING_M = 1.5;
 const SUPPORT_SPACING_M = 10;
 const SUPPORT_MIN_HEIGHT_M = 1.6;
+/** Por debajo de esta escala (px/m) las etiquetas de tramo no entran: se ocultan. */
+const SECTION_LABEL_MIN_SCALE = 3;
+/** Zapatas de la vía a nivel: separación y ancho (m). */
+const FOOTING_SPACING_M = 3;
+const FOOTING_WIDTH_M = 0.6;
+/**
+ * Piso de grosor de rieles y larguero (px): son lo único que dibuja la vía en
+ * el teléfono; sin él, a escala real, desaparece. Todo lo demás va en metros.
+ */
+const TRACK_HAIRLINE_PX = 1;
 const BRACE_SPACING_M = 3;
 const BRAKE_FIN_SPACING_M = 1.2;
 const MARKER_LIFT_M = 2.6;
@@ -20,6 +30,10 @@ const EVENT_CROSS_PX = 8;
 /** Franja de fuerza g: por debajo del larguero, con grosor fijo en pantalla. */
 const RIBBON_OFFSET_M = -1.25;
 const RIBBON_WIDTH_PX = 5;
+/** En vistas lejanas (teléfono) la franja se adelgaza hasta este ancho para no tapar el loop. */
+const RIBBON_MIN_WIDTH_PX = 2;
+/** Ancho de la franja en metros mientras quepa entre el mínimo y el máximo. */
+const RIBBON_WIDTH_M = 1;
 /** Un tramo excedido nunca se dibuja más chico que este punto: puede medir menos de un píxel. */
 const OVER_MARK_RADIUS_PX = 5;
 const GHOST_WIDTH_PX = 3;
@@ -97,15 +111,18 @@ export function drawSectionBands({ ctx, camera, scene }) {
     const last = points[points.length - 1];
     const pixelLength = Math.hypot(camera.toX(last.x) - camera.toX(first.x), camera.toY(last.y) - camera.toY(first.y));
 
-    if (pixelLength < 70 || section.kind === "loop") continue;
+    if (pixelLength < 70 || section.kind === "loop" || camera.scale < SECTION_LABEL_MIN_SCALE) continue;
 
     const middle = points[Math.floor(points.length / 2)];
+    // Del lado libre: sobre la vía si va elevada (debajo hay soportes y árboles); bajo ella, sobre el césped, si va a nivel.
+    const above = middle.y >= SUPPORT_MIN_HEIGHT_M;
+    const gap = Math.max(12, m(1.6));
 
     ctx.fillStyle = PALETTE.muted;
     ctx.font = `600 ${Math.max(8, Math.min(11, m(0.6)))}px Nunito, system-ui, sans-serif`;
     ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    ctx.fillText(section.name, camera.toX(middle.x), camera.toY(middle.y) + Math.max(12, m(1.6)));
+    ctx.textBaseline = above ? "bottom" : "top";
+    ctx.fillText(section.name, camera.toX(middle.x), camera.toY(middle.y) + (above ? -gap : gap));
   }
 }
 
@@ -117,14 +134,22 @@ export function drawSupports({ ctx, camera, scene }) {
   const { track } = scene;
   const m = (/** @type {number} */ v) => v * camera.scale;
   const groundY = camera.groundY;
-  const lineWidth = Math.max(1, m(0.12));
+  const lineWidth = m(0.12);
 
   ctx.lineCap = "butt";
   ctx.lineJoin = "round";
 
   let nextX = -Infinity;
+  let nextFooting = -Infinity;
 
   for (const point of track.points) {
+    // Vía baja: apoya en zapatas de hormigón hasta el suelo dibujado.
+    if (point.kind !== "loop" && point.y < SUPPORT_MIN_HEIGHT_M && point.x >= nextFooting) {
+      nextFooting = point.x + FOOTING_SPACING_M;
+      const spine = offsetPoint(camera, point, -SPINE_OFFSET_M);
+      box(ctx, spine.x - m(FOOTING_WIDTH_M) / 2, spine.y, m(FOOTING_WIDTH_M), Math.max(0, groundY - spine.y), PALETTE.footing, m(0.05));
+    }
+
     if (point.x < nextX || point.kind === "loop" || point.y < SUPPORT_MIN_HEIGHT_M) continue;
 
     nextX = point.x + SUPPORT_SPACING_M;
@@ -168,14 +193,14 @@ export function drawSupports({ ctx, camera, scene }) {
     const sideX = loop.x + loop.reference * (1 + loop.shape * (Math.PI / 4)) + SPINE_OFFSET_M;
     const sideY = loop.y + loop.reference * (1 + loop.shape / 2);
     const columnX = sideX + 2.2;
-    const columnWidth = Math.max(2, m(0.55));
+    const columnWidth = m(0.55);
 
     // Columna exterior al loop con riostras hacia la cima y el costado.
     box(ctx, camera.toX(columnX) - columnWidth / 2, camera.toY(topY + 0.6), columnWidth, groundY - camera.toY(topY + 0.6), PALETTE.supportDark, 1);
     box(ctx, camera.toX(columnX) - columnWidth * 1.4, groundY - m(0.35), columnWidth * 2.8, m(0.4), PALETTE.footing, 1);
 
     ctx.strokeStyle = PALETTE.supportDark;
-    ctx.lineWidth = Math.max(1, m(0.18));
+    ctx.lineWidth = m(0.18);
     ctx.beginPath();
     ctx.moveTo(camera.toX(columnX), camera.toY(topY + 0.6));
     ctx.lineTo(camera.toX(topX), camera.toY(topY));
@@ -210,12 +235,12 @@ export function drawRails(ctx, camera, points, colors = {}) {
   ctx.lineCap = "round";
 
   ctx.strokeStyle = colors.spine ?? PALETTE.spine;
-  ctx.lineWidth = Math.max(2.2, m(0.32));
+  ctx.lineWidth = Math.max(TRACK_HAIRLINE_PX, m(0.32));
   tracePolyline(ctx, points.map(point => offsetPoint(camera, point, -SPINE_OFFSET_M)));
   ctx.stroke();
 
   ctx.strokeStyle = PALETTE.tie;
-  ctx.lineWidth = Math.max(1, m(0.12));
+  ctx.lineWidth = m(0.12);
   ctx.beginPath();
   let nextTie = 0;
 
@@ -233,12 +258,12 @@ export function drawRails(ctx, camera, points, colors = {}) {
 
   for (const offset of [RAIL_OFFSET_M, -RAIL_OFFSET_M]) {
     ctx.strokeStyle = colors.rail ?? PALETTE.rail;
-    ctx.lineWidth = Math.max(1.6, m(0.2));
+    ctx.lineWidth = Math.max(TRACK_HAIRLINE_PX, m(0.2));
     tracePolyline(ctx, points.map(point => offsetPoint(camera, point, offset)));
     ctx.stroke();
 
     ctx.strokeStyle = PALETTE.railLight;
-    ctx.lineWidth = Math.max(0.6, m(0.06));
+    ctx.lineWidth = m(0.06);
     tracePolyline(ctx, points.map(point => offsetPoint(camera, point, offset + 0.05)));
     ctx.stroke();
   }
@@ -251,19 +276,20 @@ export function drawRails(ctx, camera, points, colors = {}) {
 export function drawBrakeHardware({ ctx, camera, scene }) {
   const { track, config } = scene;
   const m = (/** @type {number} */ v) => v * camera.scale;
-  const railY = camera.groundY;
+  // La zona de frenado va a nivel de la vía (y = 0), no del suelo dibujado.
+  const railY = camera.toY(0);
 
   if (config.brakeMode === "spring") {
     const wallX = camera.toX(track.endX);
-    box(ctx, wallX, railY - m(2.2), Math.max(3, m(0.7)), m(2.2), PALETTE.bumper, Math.max(1, m(0.1)));
-    box(ctx, wallX - Math.max(1, m(0.15)), railY - m(1.6), Math.max(2, m(0.2)), m(1.2), PALETTE.bumperFace, 1);
+    box(ctx, wallX, railY - m(2.2), m(0.7), m(2.2), PALETTE.bumper, m(0.1));
+    box(ctx, wallX - m(0.15), railY - m(1.6), m(0.2), m(1.2), PALETTE.bumperFace, m(0.05));
     return;
   }
 
   for (let x = track.brakeX + 0.6; x < track.endX - 0.3; x += BRAKE_FIN_SPACING_M) {
     const px = camera.toX(x);
-    box(ctx, px - m(0.3), railY - m(0.55), Math.max(1.5, m(0.6)), Math.max(1.5, m(0.42)), PALETTE.brakeFin, 1);
-    box(ctx, px - m(0.3), railY - m(0.55), Math.max(1.5, m(0.6)), Math.max(0.8, m(0.1)), PALETTE.brakeFinLight, 0);
+    box(ctx, px - m(0.3), railY - m(0.55), m(0.6), m(0.42), PALETTE.brakeFin, m(0.05));
+    box(ctx, px - m(0.3), railY - m(0.55), m(0.6), m(0.1), PALETTE.brakeFinLight, 0);
   }
 }
 
@@ -277,11 +303,11 @@ export function drawSpring({ ctx, camera, scene }) {
   const compression = Math.min(config.brakingLength, state.springCompression);
   const left = camera.toX(track.brakeX + compression);
   const right = camera.toX(track.endX);
-  const axisY = camera.groundY - m(0.9);
-  const amplitude = Math.max(3, m(0.45));
+  const axisY = camera.toY(0) - m(0.9);
+  const amplitude = m(0.45);
 
   ctx.strokeStyle = PALETTE.spring;
-  ctx.lineWidth = Math.max(1.5, m(0.14));
+  ctx.lineWidth = m(0.14);
   ctx.lineJoin = "round";
   ctx.beginPath();
   ctx.moveTo(left, axisY);
@@ -293,7 +319,7 @@ export function drawSpring({ ctx, camera, scene }) {
   ctx.lineTo(right, axisY);
   ctx.stroke();
 
-  box(ctx, left - Math.max(2, m(0.25)), axisY - amplitude - m(0.2), Math.max(3, m(0.3)), amplitude * 2 + m(0.4), PALETTE.springDark, 1);
+  box(ctx, left - m(0.25), axisY - amplitude - m(0.2), m(0.3), amplitude * 2 + m(0.4), PALETTE.springDark, m(0.05));
 }
 
 /**
@@ -369,7 +395,7 @@ export function drawEventMarker({ ctx, camera, scene }) {
 
   // La etiqueta se aparta del tren: arriba a la derecha de la cruz.
   const labelX = Math.min(camera.width - 120, Math.max(120, x + 90));
-  const labelY = Math.max(24, y - Math.max(46, camera.trainScale * 2.4));
+  const labelY = Math.max(24, y - Math.max(46, camera.scale * 2.4));
 
   ctx.strokeStyle = PALETTE.danger;
   ctx.lineWidth = 1.2;
@@ -459,7 +485,7 @@ export function drawLoadRibbon({ ctx, camera, scene }) {
   if (!runs.length) return;
 
   ctx.save();
-  ctx.lineWidth = RIBBON_WIDTH_PX;
+  ctx.lineWidth = Math.min(RIBBON_WIDTH_PX, Math.max(RIBBON_MIN_WIDTH_PX, RIBBON_WIDTH_M * camera.scale));
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 

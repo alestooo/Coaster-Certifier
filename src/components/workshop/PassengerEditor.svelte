@@ -2,6 +2,10 @@
   import { Shuffle, RotateCcw, User } from "lucide-svelte";
   import Avatar, { type Reaction } from "../Avatar.svelte";
   import ColorPicker from "../ColorPicker.svelte";
+  import NumberField from "../ui/NumberField.svelte";
+  import Segmented from "../ui/Segmented.svelte";
+  import Tabs from "../ui/Tabs.svelte";
+  import Button from "../ui/Button.svelte";
   import {
     MAX_PASSENGERS,
     MIN_PASSENGER_MASS,
@@ -40,11 +44,17 @@
     { id: "accessories", label: "Accesorios" }
   ];
 
-  const REACTIONS: { id: Reaction; label: string; hint: string }[] = [
-    { id: "calm", label: "Tranquilo", hint: "En la estación" },
-    { id: "airtime", label: "0 g", hint: "Cresta de la colina" },
-    { id: "scream", label: "5 g", hint: "Base del loop" }
+  /** Reacción de muestra y dónde se ve en el recorrido (nombre accesible). */
+  const REACTION_OPTIONS: { value: Reaction; label: string; ariaLabel: string }[] = [
+    { value: "calm", label: "Tranquilo", ariaLabel: "Tranquilo: en la estación" },
+    { value: "airtime", label: "0 g", ariaLabel: "0 g: cresta de la colina" },
+    { value: "scream", label: "5 g", ariaLabel: "5 g: base del loop" }
   ];
+
+  const COUNT_OPTIONS = Array.from({ length: MAX_PASSENGERS }, (_, position) => {
+    const number = position + 1;
+    return { value: String(number), label: String(number), icon: User, ariaLabel: `${number} ${number === 1 ? "pasajero" : "pasajeros"}` };
+  });
 
   let selected = $state(0);
   let tab = $state<TabId>("face");
@@ -65,45 +75,18 @@
   /** Error de masa del panel; lo anuncia el campo que lo causa. */
   const MASS_ERROR_ID = "passenger-mass-error";
 
-  /**
-   * Número escrito en el campo. Vacío o ilegible no cambia nada: el campo
-   * vuelve a mostrar el valor vigente (si no, quedaría «NaN kg» en el asiento).
-   */
-  function numberFrom(event: Event, current: number): number | null {
-    const input = event.currentTarget as HTMLInputElement;
-    if (Number.isFinite(input.valueAsNumber)) return input.valueAsNumber;
-
-    input.value = String(current);
-    return null;
-  }
-
   function massOutOfRange(mass: number): boolean {
     return mass < MIN_PASSENGER_MASS || mass > MAX_PASSENGER_MASS;
   }
 </script>
 
 <div class="editor">
-  <div class="count" role="group" aria-label="Cantidad de pasajeros">
-    {#each Array.from({ length: MAX_PASSENGERS }, (_, position) => position + 1) as number}
-      <button
-        type="button"
-        class:active={passengers.length === number}
-        aria-pressed={passengers.length === number}
-        aria-label={`${number} ${number === 1 ? "persona" : "personas"}`}
-        onclick={() => changeCount(number)}
-      >
-        {#each Array.from({ length: number }) as _}<User size={11} strokeWidth={2.6} />{/each}
-      </button>
-    {/each}
-  </div>
+  <Segmented label="Cantidad de pasajeros" block value={String(passengers.length)} options={COUNT_OPTIONS} onChange={value => changeCount(Number(value))} />
 
-  <label class="row">
-    <span>Masa de cada carrito vacío</span>
-    <span class="value"><input type="number" min="1" max="10000" step="any" value={cartMass} onchange={event => {
-      const value = numberFrom(event, cartMass);
-      if (value !== null) onCartMass(value);
-    }} /> kg</span>
-  </label>
+  <div class="row">
+    <span>Masa por carrito (vacío)</span>
+    <NumberField value={cartMass} step={1} unit="kg" label="Masa por carrito (vacío)" onCommit={onCartMass} />
+  </div>
 
   <div class="seats" role="group" aria-label="Pasajeros">
     {#each passengers as person, position (person.id)}
@@ -125,53 +108,41 @@
             <span>Nombre</span>
             <input type="text" maxlength="18" value={passenger.name} oninput={event => update({ name: event.currentTarget.value })} />
           </label>
-          <label class="name">
+          <div class="name">
             <span>Masa</span>
             <span class="value">
-              <input
-                type="number"
-                min={MIN_PASSENGER_MASS}
-                max={MAX_PASSENGER_MASS}
-                step="any"
+              <!-- Un campo vacío o ilegible no cambia nada (sin «NaN kg»). -->
+              <NumberField
                 value={passenger.mass}
-                aria-label={`Masa de ${passenger.name}`}
-                aria-invalid={massOutOfRange(passenger.mass)}
-                aria-describedby={error ? MASS_ERROR_ID : undefined}
-                onchange={event => {
-                  const value = numberFrom(event, passenger.mass);
-                  if (value !== null) update({ mass: value });
-                }}
+                step={1}
+                unit="kg"
+                label={`Masa de ${passenger.name}`}
+                invalid={massOutOfRange(passenger.mass)}
+                describedBy={error ? MASS_ERROR_ID : undefined}
+                onCommit={value => update({ mass: value })}
               />
-              kg
             </span>
-          </label>
-          <div class="reactions" role="group" aria-label="Previsualizar reacción">
-            {#each REACTIONS as option (option.id)}
-              <button type="button" class:active={reaction === option.id} aria-pressed={reaction === option.id} title={option.hint} onclick={() => (reaction = option.id)}>
-                {option.label}
-              </button>
-            {/each}
           </div>
+          <Segmented label="Previsualizar reacción" size="sm" block value={reaction} options={REACTION_OPTIONS} onChange={value => (reaction = value)} />
         </div>
       </div>
 
-      <div class="tabs" role="group" aria-label="Personalización">
-        {#each TABS as item (item.id)}
-          <button type="button" class:active={tab === item.id} aria-pressed={tab === item.id} onclick={() => (tab = item.id)}>{item.label}</button>
-        {/each}
-      </div>
-
+      <Tabs label="Personalización" tabs={TABS} active={tab} onChange={id => (tab = id as TabId)}>
+        {#snippet children(current)}
       <div class="options">
-        {#if tab === "face"}
+        {#if current === "face"}
           <ColorPicker label="Tono de piel" value={passenger.skin} presets={SKIN_COLORS} onChange={skin => update({ skin })} />
-          <div class="choices">
-            {#each MOODS as mood (mood.id)}
-              <button type="button" class="choice" class:active={passenger.mood === mood.id} aria-pressed={passenger.mood === mood.id} title={mood.description} onclick={() => update({ mood: mood.id })}>
-                {mood.label}
-              </button>
-            {/each}
-          </div>
-        {:else if tab === "hair"}
+          <fieldset class="mood">
+            <legend>Actitud</legend>
+            <div class="choices">
+              {#each MOODS as mood (mood.id)}
+                <button type="button" class="choice" class:active={passenger.mood === mood.id} aria-pressed={passenger.mood === mood.id} title={mood.description} onclick={() => update({ mood: mood.id })}>
+                  {mood.label}
+                </button>
+              {/each}
+            </div>
+          </fieldset>
+        {:else if current === "hair"}
           <div class="styles">
             {#each HAIR_STYLES as style (style.id)}
               <button type="button" class="style" class:active={passenger.hairStyle === style.id} aria-pressed={passenger.hairStyle === style.id} aria-label={style.label} onclick={() => update({ hairStyle: style.id })}>
@@ -181,7 +152,7 @@
             {/each}
           </div>
           <ColorPicker label="Color del cabello" value={passenger.hair} presets={HAIR_COLORS} onChange={hair => update({ hair })} />
-        {:else if tab === "clothes"}
+        {:else if current === "clothes"}
           <div class="styles three">
             {#each SHIRT_STYLES as style (style.id)}
               <button type="button" class="style" class:active={passenger.shirtStyle === style.id} aria-pressed={passenger.shirtStyle === style.id} aria-label={style.label} onclick={() => update({ shirtStyle: style.id })}>
@@ -208,10 +179,12 @@
           {/if}
         {/if}
       </div>
+        {/snippet}
+      </Tabs>
 
       <div class="actions">
-        <button type="button" onclick={() => update(randomizePassenger(passenger, Date.now() + index))}><Shuffle size={14} /> Sorpréndeme</button>
-        <button type="button" onclick={() => update({ ...createPassenger(passenger.id), mass: passenger.mass })}><RotateCcw size={14} /> Restablecer</button>
+        <Button size="sm" variant="secondary" onclick={() => update(randomizePassenger(passenger, Date.now() + index))}><Shuffle size={14} /> Sorprendeme</Button>
+        <Button size="sm" variant="secondary" onclick={() => update({ ...createPassenger(passenger.id), mass: passenger.mass })}><RotateCcw size={14} /> Restablecer aspecto</Button>
       </div>
     </section>
   {/if}
@@ -223,44 +196,6 @@
   .editor {
     display: grid;
     gap: 12px;
-  }
-
-  .count,
-  .tabs,
-  .reactions {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: 1fr;
-    gap: 4px;
-    padding: 4px;
-    border-radius: 12px;
-    background: var(--surface-muted);
-  }
-
-  .count button,
-  .tabs button,
-  .reactions button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 1px;
-    height: 30px;
-    border: 0;
-    border-radius: 9px;
-    background: transparent;
-    color: var(--text-soft);
-    font: inherit;
-    font-size: 12px;
-    font-weight: 800;
-    cursor: pointer;
-  }
-
-  .count button.active,
-  .tabs button.active,
-  .reactions button.active {
-    background: var(--surface);
-    color: var(--primary-strong);
-    box-shadow: var(--shadow-sm);
   }
 
   .row,
@@ -290,12 +225,6 @@
     font-size: 13px;
     font-weight: 800;
     color: var(--text);
-  }
-
-  input[type="number"] {
-    width: 70px;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
   }
 
   input[type="text"] {
@@ -345,7 +274,7 @@
     padding: 8px 10px;
     border-radius: 10px;
     background: var(--danger-soft);
-    color: #9d2a39;
+    color: var(--danger-text);
     font-size: 12px;
     font-weight: 700;
   }
@@ -374,6 +303,21 @@
   .options {
     display: grid;
     gap: 10px;
+  }
+
+  .mood {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  /* Mismo rótulo que los grupos de color. */
+  .mood legend {
+    margin-bottom: var(--space-2);
+    color: var(--text-soft);
+    font-size: var(--text-12);
+    font-weight: var(--weight-bold);
   }
 
   .choices {
@@ -425,22 +369,6 @@
   .actions {
     display: flex;
     gap: 6px;
-  }
-
-  .actions button {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    height: 30px;
-    padding: 0 10px;
-    border: 1px solid var(--border);
-    border-radius: 9px;
-    background: var(--surface);
-    color: var(--text-soft);
-    font: inherit;
-    font-size: 12px;
-    font-weight: 800;
-    cursor: pointer;
   }
 
   .note {

@@ -1,5 +1,7 @@
 <script lang="ts">
   import { X } from "lucide-svelte";
+  import Button from "./ui/Button.svelte";
+  import IconButton from "./ui/IconButton.svelte";
 
   /** Aviso cuando una parte de la app no se pudo descargar, con un botón para reintentar. */
   interface Props {
@@ -20,9 +22,9 @@
 <div class="load-error" class:floating role="alert">
   <p>{message} {hint}</p>
   <div class="actions">
-    <button type="button" onclick={onRetry}>{actionLabel}</button>
+    <Button size="sm" variant="secondary" onclick={onRetry}>{actionLabel}</Button>
     {#if onDismiss}
-      <button type="button" class="dismiss" aria-label="Cerrar aviso" title="Cerrar" onclick={onDismiss}><X size={14} /></button>
+      <IconButton label="Cerrar aviso" icon={X} size="sm" onclick={onDismiss} />
     {/if}
   </div>
 </div>
@@ -34,7 +36,7 @@
     padding: 10px;
     border-radius: 10px;
     background: var(--danger-soft);
-    color: #9d2a39;
+    color: var(--danger-text);
     font-size: 12.5px;
   }
 
@@ -49,28 +51,7 @@
     gap: 8px;
   }
 
-  .dismiss {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    padding: 0;
-  }
-
   p {
     margin: 0;
-  }
-
-  button {
-    justify-self: start;
-    height: 32px;
-    padding: 0 12px;
-    border: 1px solid #f5c3cc;
-    border-radius: 9px;
-    background: var(--surface);
-    color: #9d2a39;
-    font: inherit;
-    font-weight: 800;
-    cursor: pointer;
   }
 </style>

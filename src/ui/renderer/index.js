@@ -136,8 +136,9 @@ export function renderSimulation(canvas, scene) {
   if (options.showTrail) drawTrail(frame);
   if (scene.config.brakeMode === "spring") drawSpring(frame);
 
-  drawEventMarker(frame);
   drawTrain(frame);
+  // Encima del tren: el tren se detiene justo sobre el incumplimiento y lo taparía.
+  drawEventMarker(frame);
 
   if (options.showForces) drawForces(frame);
   if (options.showGauge) drawGauge(frame);
@@ -146,4 +147,5 @@ export function renderSimulation(canvas, scene) {
   return camera;
 }
 
-export { MIN_ZOOM, MAX_ZOOM, MIN_VIEW_ZOOM, MAX_VIEW_ZOOM, CART_LENGTH_M, MIN_TRAIN_PX, frameView, frameViewAbove, fitBounds } from "./camera.js";
+export { MIN_ZOOM, MAX_ZOOM, MIN_VIEW_ZOOM, MAX_VIEW_ZOOM, CART_LENGTH_M, frameView, frameViewAbove, fitBounds } from "./camera.js";
+export { liftPath, pointOnLift, CHAIN_SPEED_MPS } from "./lift.js";

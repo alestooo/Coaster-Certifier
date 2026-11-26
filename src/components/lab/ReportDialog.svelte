@@ -1,30 +1,31 @@
 <script lang="ts">
-  import { runSimulation, toCsv } from "../../physics/index.js";
-  import type { SimulationConfig, SimulationState, Track, Verdict } from "../../lib/types";
+  import type { SimulationConfig, SimulationState, Verdict } from "../../lib/types";
   import type { Passenger } from "../../game/passengers";
   import { visibleFields } from "../../lib/field-definitions";
-  import { downloadText, downloadJson, stampedName } from "../../ui/export";
-  import { formatNumber, formatSeconds, kmh } from "../../ui/format";
+  import { formatNumber, formatScientific, formatSeconds, kmh } from "../../ui/format";
   import { resultLines } from "../../lib/report-text";
-  import { Download, Printer, X } from "lucide-svelte";
+  import { Printer } from "lucide-svelte";
+  import { designCheckText } from "../../lib/design-checks-text";
+  import Dialog from "../ui/Dialog.svelte";
+  import Button from "../ui/Button.svelte";
+  import CheckMark from "../ui/CheckMark.svelte";
+  import Sym from "../ui/Sym.svelte";
 
   let {
     verdict,
     config,
-    track,
     history,
     passengers,
     mapName
   }: {
     verdict: Verdict | null;
     config: SimulationConfig;
-    track: Track;
     history: SimulationState[];
     passengers: Passenger[];
     mapName: string;
   } = $props();
 
-  let dialog: HTMLDialogElement;
+  let dialog: ReturnType<typeof Dialog>;
 
   export function open() {
     dialog.showModal();
@@ -42,49 +43,25 @@
 
   let summary = $derived(verdict?.summary ?? null);
 
-  /** CSV a resolución completa (cada paso dt), idéntico al del script headless. */
-  function exportCsv() {
-    downloadText(stampedName(`coaster-${config.mapId}`, "csv"), toCsv(runSimulation(config).history), "text/csv");
-  }
-
-  function exportJson() {
-    downloadJson(stampedName(`dictamen-${config.mapId}`, "json"), {
-      generatedAt: generatedAt.toISOString(),
-      map: mapName,
-      config,
-      verdict,
-      track: { sections: track.sections, markers: track.markers }
-    });
-  }
-
   function print() {
     generatedAt = new Date();
     window.print();
   }
 </script>
 
-<dialog bind:this={dialog} class="report-dialog" aria-labelledby="report-title">
-  <div class="report-actions no-print">
-    <div>
-      <span class="eyebrow">REPORTE DE CERTIFICACIÓN</span>
-      <h2 id="report-title">Informe del recorrido</h2>
-    </div>
-
-    <div class="report-buttons">
-      <button type="button" onclick={exportCsv} title="Serie temporal completa en CSV (mismas columnas que el script headless)"><Download size={14} /> CSV</button>
-      <button type="button" onclick={exportJson} title="Configuración y dictamen en JSON"><Download size={14} /> JSON</button>
-      <button type="button" onclick={print}><Printer size={14} /> Imprimir / PDF</button>
-      <button type="button" aria-label="Cerrar reporte" onclick={() => dialog.close()}><X size={15} /></button>
-    </div>
-  </div>
+<Dialog bind:this={dialog} class="report-dialog" title={`Informe de certificación · ${mapName}`} wide>
+  {#snippet actions()}
+    <Button size="sm" variant="secondary" onclick={print}><Printer size={14} /> Imprimir o guardar PDF</Button>
+  {/snippet}
 
   {#if verdict && summary}
     <article class="report-sheet">
       <header class="sheet-head">
         <div>
-          <h1>Coaster-Certifier · Dictamen del trazado</h1>
+          <!-- En pantalla el título lo pone el diálogo; en papel, este. -->
+          <h1 class="print-only">Informe de certificación · {mapName}</h1>
           <p>
-            Recorrido: <strong>{mapName}</strong> · {passengers.length} {passengers.length === 1 ? "pasajero" : "pasajeros"} ·
+            Coaster-Certifier · {passengers.length} {passengers.length === 1 ? "pasajero" : "pasajeros"} ·
             masa total {formatNumber(config.mass, 1)} kg · generado el {generatedAt.toLocaleString("es-CR")}
           </p>
         </div>
@@ -102,6 +79,7 @@
         </ul>
 
         {#if verdict.violations.length}
+          <div class="table-scroll">
           <table>
             <thead>
               <tr><th>Condición evaluada</th><th>Instante</th><th>Tramo</th><th>Posición s</th><th>Valor</th><th>Límite</th></tr>
@@ -119,11 +97,13 @@
               {/each}
             </tbody>
           </table>
+        </div>
         {/if}
       </section>
 
       <section>
         <h2>2. Puntos críticos</h2>
+        <div class="table-scroll">
         <table>
           <thead>
             <tr><th>Punto</th><th>Descripción</th><th>s (m)</th><th>t (s)</th><th>v (m/s)</th><th>v (km/h)</th><th>n (g)</th><th>N (N)</th><th>y (m)</th></tr>
@@ -148,10 +128,12 @@
             {/each}
           </tbody>
         </table>
+        </div>
       </section>
 
       <section>
         <h2>3. Extremos del recorrido</h2>
+        <div class="table-scroll">
         <table>
           <tbody>
             <tr><th>Rapidez máxima</th><td class="num">{formatNumber(summary.maxSpeed.value)} m/s ({formatNumber(kmh(summary.maxSpeed.value), 0)} km/h)</td><td>{summary.maxSpeed.section} · t = {formatNumber(summary.maxSpeed.time)} s</td></tr>
@@ -163,34 +145,38 @@
             <tr><th>Aceleración normal máxima</th><td class="num">{formatNumber(summary.maxNormalAcceleration.value)} m/s²</td><td>{summary.maxNormalAcceleration.section}</td></tr>
             <tr><th>Energía inicial</th><td class="num">{formatNumber(summary.initialEnergy, 0)} J</td><td>m·g·H + ½·m·v₀²</td></tr>
             <tr><th>Energía disipada</th><td class="num">{formatNumber(summary.dissipatedEnergy, 0)} J</td><td>{formatNumber((100 * summary.dissipatedEnergy) / summary.initialEnergy, 1)} % de la inicial</td></tr>
-            <tr><th>Error máximo de balance</th><td class="num">{summary.maxBalanceError.value.toExponential(2)} J</td><td>{((100 * summary.maxBalanceError.value) / summary.initialEnergy).toExponential(2)} % de la inicial</td></tr>
-            <tr><th>Duración</th><td class="num">{formatSeconds(summary.duration)}</td><td>{summary.samples} muestras</td></tr>
+            <tr><th>Error máximo de balance</th><td class="num">{formatScientific(summary.maxBalanceError.value, 2)} J</td><td>{formatScientific((100 * summary.maxBalanceError.value) / summary.initialEnergy, 2)} % de la inicial</td></tr>
+            <tr><th>Duración</th><td class="num">{formatSeconds(summary.duration)}</td><td>{formatNumber(summary.samples, 0)} muestras</td></tr>
           </tbody>
         </table>
+        </div>
       </section>
 
       {#if summary.braking.reached}
         <section>
           <h2>4. Frenado (de E a F)</h2>
+          <div class="table-scroll">
           <table>
             <tbody>
-              <tr><th>Rapidez de entrada v_E</th><td class="num">{formatNumber(summary.braking.entrySpeed)} m/s</td></tr>
-              <tr><th>Distancia de detención</th><td class="num">{summary.braking.stoppingDistance === null ? "no se detuvo" : `${formatNumber(summary.braking.stoppingDistance)} m de ${formatNumber(config.brakingLength)} m`}</td></tr>
+              <tr><th>Rapidez de entrada <Sym symbol="v_E" /></th><td class="num">{formatNumber(summary.braking.entrySpeed)} m/s</td></tr>
+              <tr><th>Distancia de detención</th><td class="num">{summary.braking.stoppingDistance === null ? "no se detuvo dentro de la zona" : `${formatNumber(summary.braking.stoppingDistance)} m de ${formatNumber(config.brakingLength)} m`}</td></tr>
               <tr><th>Tiempo de frenado</th><td class="num">{summary.braking.stoppingTime === null ? "—" : formatSeconds(summary.braking.stoppingTime)}</td></tr>
               <tr><th>Margen restante</th><td class="num">{summary.braking.remainingLength === null ? "—" : `${formatNumber(summary.braking.remainingLength)} m`}</td></tr>
               <tr><th>Fuerza de frenado</th><td class="num">{formatNumber(summary.braking.brakeForce, 0)} N</td></tr>
-              <tr><th>Impulso (m·v_E)</th><td class="num">{formatNumber(summary.braking.impulse, 0)} N·s</td></tr>
-              <tr><th>Energía por disipar (½·m·v_E²)</th><td class="num">{formatNumber(summary.braking.energyToDissipate, 0)} J</td></tr>
+              <tr><th>Impulso (m·v<sub>E</sub>)</th><td class="num">{formatNumber(summary.braking.impulse, 0)} N·s</td></tr>
+              <tr><th>Energía por disipar (½·m·v<sub>E</sub>²)</th><td class="num">{formatNumber(summary.braking.energyToDissipate, 0)} J</td></tr>
               {#if config.brakeMode === "spring"}
                 <tr><th>Compresión máxima</th><td class="num">{formatNumber(summary.braking.maxCompression)} m de {formatNumber(config.maxCompression)} m</td></tr>
               {/if}
             </tbody>
           </table>
+        </div>
         </section>
       {/if}
 
       <section>
         <h2>5. Tramos</h2>
+        <div class="table-scroll">
         <table>
           <thead>
             <tr><th>Tramo</th><th>Inicio (m)</th><th>Longitud (m)</th><th>v entrada</th><th>v salida</th><th>n máx</th><th>n mín</th><th>N mín</th><th>Duración</th><th>Disipada</th></tr>
@@ -216,40 +202,45 @@
             {/each}
           </tbody>
         </table>
+        </div>
       </section>
 
       <section>
-        <h2>6. Condiciones de diseño (conservación de la energía sin fricción)</h2>
+        <h2>6. Condiciones de energía sin fricción</h2>
+        <div class="table-scroll">
         <table>
           <tbody>
             {#each verdict.designChecks as check}
               <tr class={check.ok ? "" : check.severity}>
-                <td>{check.ok ? "✔" : check.severity === "error" ? "✘" : "⚠"}</td>
-                <td>{check.name}</td>
+                <td><CheckMark ok={check.ok} severity={check.severity} /></td>
+                <td>{designCheckText(check).name}</td>
                 <td><code>{check.formula}</code></td>
-                <td>{check.detail}</td>
+                <td>{designCheckText(check).detail}</td>
               </tr>
             {/each}
           </tbody>
         </table>
+        </div>
       </section>
 
       <section>
         <h2>7. Parámetros de la simulación</h2>
+        <div class="table-scroll">
         <table class="parameters">
           <tbody>
-            <tr><th>Trazado</th><td>{mapName} ({config.mapId})</td><th>Frenado</th><td>{config.brakeMode === "station" ? "frenos en la recta final" : "resorte de tope"}</td></tr>
+            <tr><th>Trazado</th><td>{mapName}</td><th>Frenado</th><td>{config.brakeMode === "station" ? "frenos en la recta final" : "resorte de tope"}</td></tr>
             <tr><th>Contacto</th><td>{config.contactModel === "strict" ? "siempre apoyado (N > 0)" : "ruedas anti-levantamiento"}</td><th>m</th><td>{formatNumber(config.mass, 1)} kg</td></tr>
             {#each Array.from({ length: Math.ceil(parameterRows.length / 2) }, (_, index) => parameterRows.slice(index * 2, index * 2 + 2)) as pair}
               <tr>
                 {#each pair as row}
-                  <th>{row.symbol} · {row.label}</th>
+                  <th><Sym symbol={row.symbol} /> · {row.label}</th>
                   <td>{row.value}</td>
                 {/each}
               </tr>
             {/each}
           </tbody>
         </table>
+        </div>
       </section>
 
       <footer class="sheet-foot">
@@ -258,73 +249,11 @@
       </footer>
     </article>
   {:else}
-    <p class="muted">El reporte se genera cuando la simulación se detiene.</p>
+    <p class="muted">El informe aparece cuando termina la auditoría.</p>
   {/if}
-</dialog>
+</Dialog>
 
 <style>
-  .report-dialog {
-    box-sizing: border-box;
-    width: min(1040px, calc(100vw - 30px));
-    max-height: 92dvh;
-    padding: 0;
-    border: 1px solid #e5d6ee;
-    border-radius: 20px;
-    background: white;
-    color: #3d2c4e;
-    box-shadow: 0 25px 90px #31184745;
-    overflow: auto;
-  }
-
-  .report-dialog::backdrop {
-    background: #30213c88;
-    backdrop-filter: blur(4px);
-  }
-
-  .report-actions {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    padding: 16px 24px;
-    border-bottom: 1px solid #eee4f5;
-    background: white;
-  }
-
-  .report-actions h2 {
-    margin: 4px 0 0;
-    font-size: 20px;
-  }
-
-  .eyebrow {
-    font-size: 9px;
-    letter-spacing: 1.6px;
-    color: #a18ab1;
-  }
-
-  .report-buttons {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-
-  .report-buttons button {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 12px;
-    border: 1px solid #dfd0ea;
-    border-radius: 9px;
-    background: #faf6fe;
-    color: #76538f;
-    font: inherit;
-    font-size: 12px;
-    cursor: pointer;
-  }
-
   .report-sheet {
     padding: 20px 28px 28px;
     font-size: 12px;
@@ -337,18 +266,18 @@
     align-items: flex-start;
     gap: 16px;
     padding-bottom: 12px;
-    border-bottom: 2px solid #8050c8;
+    border-bottom: 2px solid var(--primary);
   }
 
   .sheet-head h1 {
     margin: 0 0 4px;
     font-size: 20px;
-    color: #4b2d6a;
+    color: var(--text);
   }
 
   .sheet-head p {
     margin: 0;
-    color: #7a6b89;
+    color: var(--muted);
   }
 
   .sheet-verdict {
@@ -361,13 +290,13 @@
   }
 
   .sheet-verdict.ok {
-    background: #e3f5ec;
-    color: #1f7a57;
+    background: var(--success-soft);
+    color: var(--success-text);
   }
 
   .sheet-verdict.bad {
-    background: #fde6ea;
-    color: #b7303f;
+    background: var(--danger-soft);
+    color: var(--danger-text);
   }
 
   .report-sheet section {
@@ -378,11 +307,18 @@
   .report-sheet h2 {
     margin: 0 0 8px;
     font-size: 14px;
-    color: #603497;
+    color: var(--primary-strong);
+  }
+
+  /* En el teléfono la tabla se desplaza dentro de su caja; la página no se desborda. */
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .report-sheet table {
     width: 100%;
+    min-width: 36rem;
     border-collapse: collapse;
     font-size: 11.5px;
   }
@@ -390,23 +326,26 @@
   .report-sheet th,
   .report-sheet td {
     padding: 5px 7px;
-    border-bottom: 1px solid #efe7f6;
+    border-bottom: 1px solid var(--border);
     text-align: left;
     vertical-align: top;
   }
 
+  /* Sin mayúsculas: los encabezados llevan símbolos (v, n, N, s). */
   .report-sheet thead th {
-    font-size: 10px;
-    color: #a18ab1;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: var(--text-11);
+    color: var(--muted);
   }
 
   .report-sheet tbody th {
     width: 1%;
     white-space: nowrap;
-    color: #5a4470;
+    color: var(--text-soft);
     font-weight: 650;
+  }
+
+  .report-sheet table.parameters {
+    min-width: 0;
   }
 
   .parameters th {
@@ -420,42 +359,48 @@
   }
 
   .muted {
-    color: #a18ab1;
+    color: var(--muted);
   }
 
   tr.error td {
-    color: #9d2a39;
+    color: var(--danger-text);
   }
 
   tr.warning td {
-    color: #8a6420;
+    color: var(--warn-text);
   }
 
   code {
     font-size: 11px;
-    color: #603497;
+    color: var(--primary-strong);
   }
 
   .sheet-foot {
     margin-top: 20px;
     padding-top: 10px;
-    border-top: 1px solid #efe7f6;
+    border-top: 1px solid var(--border);
     font-size: 10.5px;
-    color: #9b84aa;
+    color: var(--muted);
+  }
+
+  .print-only {
+    display: none;
   }
 
   @media print {
-    .report-dialog {
-      position: static;
-      width: auto;
+    .print-only {
+      display: block;
+    }
+
+    :global(.report-dialog),
+    :global(.report-dialog .body),
+    .table-scroll {
       max-height: none;
-      border: 0;
-      box-shadow: none;
       overflow: visible;
     }
 
-    .no-print {
-      display: none !important;
+    .report-sheet table {
+      min-width: 0;
     }
 
     .report-sheet {

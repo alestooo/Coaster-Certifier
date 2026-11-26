@@ -1,8 +1,15 @@
 <script lang="ts">
-  import { CheckCircle2, XCircle, LoaderCircle, FileText, Download, Printer, AlertTriangle, ChevronRight, Play, Wrench } from "lucide-svelte";
+  import { CheckCircle2, XCircle, LoaderCircle, FileText, Download, Printer, AlertTriangle, Play } from "lucide-svelte";
   import type { AuditResult, AuditStatus } from "../../lib/live-audit.svelte";
+  import CheckMark from "../ui/CheckMark.svelte";
+  import Disclosure from "../ui/Disclosure.svelte";
+  import Meter from "../ui/Meter.svelte";
+  import Button from "../ui/Button.svelte";
   import type { SimulationConfig } from "../../lib/types";
-  import { formatNumber, formatSeconds, kmh } from "../../ui/format";
+  import { formatNumber, formatSeconds, formatSigned, formatSpeed } from "../../ui/format";
+  import ActionMenu from "../ui/ActionMenu.svelte";
+  import { designCheckText } from "../../lib/design-checks-text";
+  import { brakingCard as brakingCardFor } from "../../lib/braking-card";
 
   let {
     result,
@@ -36,37 +43,18 @@
   let config = $derived(result?.config ?? null);
   let checks = $derived(result?.verdict.designChecks ?? []);
 
-  let brakingCard = $derived.by(() => {
-    if (!report) return null;
-    const braking = report.braking;
+  let brakingCard = $derived(report && result ? brakingCardFor(report.braking, result.final.status) : null);
 
-    switch (braking.outcome) {
-      case "stopped":
-        return {
-          value: `${formatNumber(braking.stoppingDistance, 1)} m`,
-          note: `de ${formatNumber(braking.available, 0)} m disponibles`,
-          fill: (braking.stoppingDistance ?? 0) / braking.available,
-          tone: braking.tone
-        };
-      case "overrun":
-        return {
-          value: "Se pasa",
-          note:
-            braking.requiredDistance === null
-              ? "el resorte no alcanza a detenerlo"
-              : `necesita ${formatNumber(braking.requiredDistance, 0)} m de ${formatNumber(braking.available, 0)} m`,
-          fill: 1,
-          tone: "bad"
-        };
-      case "no-stop":
-        return { value: "No se detiene", note: "rebota sin quedar quieto", fill: 1, tone: "bad" };
-      default:
-        return { value: "No llega", note: "el tren no alcanza la zona de frenado", fill: 0, tone: "info" };
-    }
-  });
+  /** Descargas del dictamen: una sola entrada en lugar de tres botones. */
+  const downloads = [
+    { id: "csv", label: "Datos de cada instante (CSV)", icon: Download, onSelect: () => onExportCsv() },
+    { id: "json", label: "Dictamen (JSON)", icon: Download, onSelect: () => onExportJson() },
+    { id: "print", label: "Imprimir o guardar PDF", icon: Printer, onSelect: () => void printReport() }
+  ];
 
-  function fraction(value: number, limit: number) {
-    return Math.max(0, Math.min(1, limit > 0 ? value / limit : 0));
+  /** Tono del medidor según el del dato (fuera del límite = «over»). */
+  function meterTone(tone: string): "ok" | "warn" | "over" {
+    return tone === "bad" ? "over" : tone === "warn" ? "warn" : "ok";
   }
 </script>
 
@@ -86,28 +74,42 @@
       <li class={report.maxG.tone}>
         <span>Fuerza g máxima</span>
         <strong>{formatNumber(report.maxG.value, 2)} g</strong>
-        <i class="meter"><b style:width={`${100 * fraction(report.maxG.value, report.maxG.limit)}%`}></b></i>
+        <Meter
+          label="Fuerza g máxima respecto del límite"
+          value={report.maxG.value}
+          min={0}
+          max={report.maxG.limit}
+          tone={meterTone(report.maxG.tone)}
+          valueText={`${formatNumber(report.maxG.value, 2)} g de ${formatNumber(report.maxG.limit, 1)} g`}
+        />
         <small>límite {formatNumber(report.maxG.limit, 1)} g · en {report.maxG.section}</small>
       </li>
       <li class={report.minG.tone}>
         <span>Fuerza g mínima</span>
         <strong>{formatNumber(report.minG.value, 2)} g</strong>
         <small>
-          {config.contactModel === "strict" ? "debe ser mayor que 0 g (siempre apoyado)" : `no puede bajar de ${formatNumber(report.minG.limit, 1)} g`}
+          {config.contactModel === "strict" ? "límite > 0 g (siempre apoyado)" : `límite ${formatSigned(report.minG.limit, 1)} g`}
           · en {report.minG.section}
         </small>
       </li>
       <li>
         <span>Rapidez máxima</span>
-        <strong>{formatNumber(kmh(report.maxSpeed.value), 0)} km/h</strong>
-        <small>{formatNumber(report.maxSpeed.value, 1)} m/s · en {report.maxSpeed.section}</small>
+        <strong>{formatSpeed(report.maxSpeed.value).main}</strong>
+        <small>{formatSpeed(report.maxSpeed.value).secondary} · en {report.maxSpeed.section}</small>
       </li>
       {#if brakingCard}
         <li class={brakingCard.tone}>
           <span>Distancia de frenado</span>
           <strong>{brakingCard.value}</strong>
           {#if report.braking.outcome !== "not-reached"}
-            <i class="meter"><b style:width={`${100 * Math.min(1, brakingCard.fill)}%`}></b></i>
+            <Meter
+              label="Zona de frenado usada"
+              value={Math.min(1, brakingCard.fill)}
+              min={0}
+              max={1}
+              tone={meterTone(brakingCard.tone)}
+              valueText={`${formatNumber(100 * Math.min(1, brakingCard.fill), 0)} % de la zona`}
+            />
           {/if}
           <small>{brakingCard.note}</small>
         </li>
@@ -115,7 +117,7 @@
     </ul>
 
     {#if report.issues.length}
-      <ul class="issues">
+      <ul class="issues" aria-label="Incumplimientos">
         {#each report.issues as issue, index}
           {@const violation = result?.verdict.violations[index]}
           <li>
@@ -132,38 +134,34 @@
           </li>
         {/each}
       </ul>
-
-      <button type="button" class="fixes" onclick={() => onShowIssue(0)}>
-        <Wrench size={15} /> Ver dónde falla y cómo corregirlo
-      </button>
     {/if}
 
-    <button type="button" class="watch" onclick={onWatch}><Play size={14} /> Ver el recorrido desde el inicio</button>
+    <Button variant="secondary" onclick={onWatch}><Play size={14} /> Reproducir desde A</Button>
 
-    <details class="checks">
-      <summary><ChevronRight size={14} class="chev" /> Condiciones de diseño por energía · {checks.filter(check => check.ok).length}/{checks.length} cumplidas</summary>
+    <div class="checks">
+      <Disclosure summary={`Condiciones de energía sin fricción · ${checks.filter(check => check.ok).length} de ${checks.length}`}>
       <ul>
         {#each checks as check}
+          {@const text = designCheckText(check)}
           <li class:fail={!check.ok} class:warn={!check.ok && check.severity === "warning"}>
-            <strong>{check.ok ? "✔" : check.severity === "error" ? "✘" : "⚠"} {check.name}</strong>
-            <span><code>{check.formula}</code> · {check.detail}</span>
+            <strong><CheckMark ok={check.ok} severity={check.severity} size={14} /> {text.name}</strong>
+            <span><code>{check.formula}</code> · {text.detail}</span>
           </li>
         {/each}
       </ul>
-    </details>
+      </Disclosure>
+    </div>
 
     <div class="exports">
-      <button type="button" class="primary" onclick={onOpenReport}><FileText size={15} /> Informe completo</button>
-      <button type="button" onclick={onExportCsv} title="Serie temporal del recorrido completo (CSV)"><Download size={14} /> CSV</button>
-      <button type="button" onclick={onExportJson} title="Configuración y dictamen (JSON)"><Download size={14} /> JSON</button>
-      <button type="button" onclick={printReport} title="Imprimir o guardar como PDF"><Printer size={14} /> PDF</button>
+      <Button variant="primary" onclick={onOpenReport}><FileText size={15} /> Ver informe de certificación</Button>
+      <ActionMenu label="Descargar" icon={Download} items={downloads} />
     </div>
   {:else}
     <div class="badge idle">
       <LoaderCircle size={26} class="spin" />
       <div>
         <strong>{status === "error" ? "SIN DICTAMEN" : "AUDITANDO"}</strong>
-        <span>{status === "error" ? "No se pudo simular este diseño. Revisá los valores del panel Diseño." : "Simulando el recorrido completo para emitir el dictamen…"}</span>
+        <span>{status === "error" ? "No se pudo simular este diseño. Revisá los valores marcados en rojo." : "Simulando el recorrido completo para emitir el dictamen…"}</span>
       </div>
     </div>
   {/if}
@@ -172,6 +170,7 @@
 <style>
   .verdict {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 12px;
   }
 
@@ -205,17 +204,17 @@
 
   .badge.ok {
     background: var(--success-soft);
-    color: #1f7a57;
+    color: var(--success-text);
   }
 
   .badge.bad {
     background: var(--danger-soft);
-    color: #b7303f;
+    color: var(--danger-text);
   }
 
   .facts {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
     margin: 0;
     padding: 0;
@@ -232,11 +231,10 @@
     background: var(--surface-soft);
   }
 
+  /* Sin mayúsculas forzadas: «g» es la unidad, «G» sería otra cosa. */
   .facts span {
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.6px;
-    text-transform: uppercase;
+    font-size: var(--text-11);
+    font-weight: var(--weight-bold);
     color: var(--muted);
   }
 
@@ -253,44 +251,20 @@
   }
 
   .facts li.warn {
-    border-color: #f3d9a6;
+    border-color: var(--warn-border);
   }
 
   .facts li.warn strong {
-    color: #8a5a12;
+    color: var(--warn-text);
   }
 
   .facts li.bad {
-    border-color: #f5c3cb;
+    border-color: var(--danger-border);
     background: var(--danger-soft);
   }
 
   .facts li.bad strong {
     color: var(--danger);
-  }
-
-  .meter {
-    display: block;
-    height: 5px;
-    border-radius: 999px;
-    background: var(--surface-muted);
-    overflow: hidden;
-  }
-
-  .meter b {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: var(--success);
-    transition: width 0.35s ease-out;
-  }
-
-  .warn .meter b {
-    background: var(--accent);
-  }
-
-  .bad .meter b {
-    background: var(--danger);
   }
 
   .issues,
@@ -315,14 +289,14 @@
     border: 1px solid transparent;
     border-radius: 10px;
     background: var(--danger-soft);
-    color: #9d2a39;
+    color: var(--danger-text);
     font: inherit;
     text-align: left;
     cursor: pointer;
   }
 
   .issue:hover {
-    border-color: #f5c3cc;
+    border-color: var(--danger-border);
   }
 
   .issue-text {
@@ -341,25 +315,66 @@
 
   .issues small {
     font-size: 10px;
-    color: #b45d69;
+    color: var(--danger-text);
     font-variant-numeric: tabular-nums;
   }
 
-  .watch {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    height: 38px;
-    border: 1px solid var(--border-strong);
+
+  .watch:hover {
+    background: var(--primary-soft);
+  }
+
+  .checks ul {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .issues li {
+    display: block;
+  }
+
+  .issue {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid transparent;
     border-radius: 10px;
-    background: var(--surface);
-    color: var(--primary-strong);
+    background: var(--danger-soft);
+    color: var(--danger-text);
     font: inherit;
-    font-size: 12px;
-    font-weight: 800;
+    text-align: left;
     cursor: pointer;
   }
+
+  .issue:hover {
+    border-color: var(--danger-border);
+  }
+
+  .issue-text {
+    display: grid;
+    gap: 3px;
+  }
+
+  .issues strong {
+    font-size: 12.5px;
+  }
+
+  .issues span {
+    font-size: 11.5px;
+    line-height: 1.45;
+  }
+
+  .issues small {
+    font-size: 10px;
+    color: var(--danger-text);
+    font-variant-numeric: tabular-nums;
+  }
+
 
   .watch:hover {
     background: var(--primary-soft);
@@ -371,10 +386,10 @@
     justify-content: center;
     gap: 7px;
     height: 40px;
-    border: 1px solid #efd29a;
+    border: 1px solid var(--warn-border);
     border-radius: 10px;
     background: var(--accent-soft);
-    color: #8a5a12;
+    color: var(--warn-text);
     font: inherit;
     font-size: 12.5px;
     font-weight: 800;
@@ -382,30 +397,15 @@
   }
 
   .fixes:hover {
-    border-color: #e3b860;
-  }
-
-  .checks summary {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: 800;
-    color: var(--text-soft);
-    cursor: pointer;
-    list-style: none;
-  }
-
-  .checks summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .checks[open] summary :global(.chev) {
-    transform: rotate(90deg);
+    border-color: var(--warn-border);
   }
 
   .checks ul {
-    margin-top: 8px;
+    display: grid;
+    gap: var(--space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
   .checks li {
@@ -414,52 +414,32 @@
     padding: 8px 10px;
     border-radius: 9px;
     background: var(--success-soft);
-    color: #1f7a57;
+    color: var(--success-text);
     font-size: 11px;
   }
 
   .checks li.fail {
     background: var(--danger-soft);
-    color: #9d2a39;
+    color: var(--danger-text);
   }
 
   .checks li.warn {
     background: var(--accent-soft);
-    color: #8a5a12;
+    color: var(--warn-text);
   }
 
   code {
     font-size: 10.5px;
   }
 
+  /* Una acción por fila: el nombre completo del informe entra aun en el panel angosto. */
   .exports {
     display: grid;
-    grid-template-columns: 1fr auto auto auto;
-    gap: 6px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
   }
 
-  .exports button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    height: 38px;
-    padding: 0 10px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface);
-    color: var(--text-soft);
-    font: inherit;
-    font-size: 12px;
-    font-weight: 800;
-    cursor: pointer;
-  }
 
-  .exports .primary {
-    border-color: var(--primary);
-    background: var(--primary);
-    color: white;
-  }
 
   @keyframes badge-in {
     from {

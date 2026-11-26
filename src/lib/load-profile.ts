@@ -5,7 +5,7 @@
  */
 import { geometryAt } from "../physics/index.js";
 import { NEAR_LIMIT_FRACTION, LOW_G_MARGIN } from "./audit";
-import { formatNumber } from "../ui/format";
+import { formatNumber, formatSigned } from "../ui/format";
 import type { SimulationConfig, SimulationState, Track } from "./types";
 
 export interface LoadBin {
@@ -127,7 +127,10 @@ export function ribbonRuns(profile: readonly LoadBin[], track: Track, config: Si
 
 export interface LegendItem {
   tone: LoadTone;
+  /** Qué significa el color. */
   text: string;
+  /** Umbral en g (se muestra como ayuda). */
+  detail: string;
 }
 
 /**
@@ -135,12 +138,13 @@ export interface LegendItem {
  * el motor: «siempre apoyado» rechaza N ≤ 0; las ruedas, n < n_mín.
  */
 export function legendItems(config: SimulationConfig): LegendItem[] {
-  const lower = config.contactModel === "strict" ? "≤ 0 g" : `< ${formatNumber(config.minLoad, 1)} g`;
+  const lower = config.contactModel === "strict" ? "≤ 0 g" : `< ${formatSigned(config.minLoad, 1)} g`;
+  const near = NEAR_LIMIT_FRACTION * config.maxLoad;
 
   return [
-    { tone: "comfort", text: "cómoda" },
-    { tone: "near", text: `≥ ${formatNumber(NEAR_LIMIT_FRACTION * config.maxLoad, 1)} g` },
-    { tone: "over", text: `> ${formatNumber(config.maxLoad, 1)} g o ${lower}` },
-    { tone: "float", text: `< ${formatNumber(LOW_G_MARGIN, 1)} g` }
+    { tone: "comfort", text: "cómoda", detail: `entre ${formatNumber(LOW_G_MARGIN, 1)} g y ${formatNumber(near, 1)} g` },
+    { tone: "near", text: "cerca del límite", detail: `≥ ${formatNumber(near, 1)} g` },
+    { tone: "over", text: "fuera del límite", detail: `> ${formatNumber(config.maxLoad, 1)} g o ${lower}` },
+    { tone: "float", text: "casi sin peso", detail: `< ${formatNumber(LOW_G_MARGIN, 1)} g` }
   ];
 }

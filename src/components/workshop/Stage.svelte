@@ -1,6 +1,8 @@
 <script lang="ts">
+  import { stoppedByViolation } from "../../lib/run-status";
   import { onMount, untrack } from "svelte";
   import { X } from "lucide-svelte";
+  import IconButton from "../ui/IconButton.svelte";
   import HandleLayer from "./HandleLayer.svelte";
   import PlaybackPill from "./PlaybackPill.svelte";
   import ZoomControls from "./ZoomControls.svelte";
@@ -14,7 +16,9 @@
   import { probeAt, probeLines } from "../../lib/probe";
   import type { FixSearch } from "../../lib/fix-search.svelte";
   import { renderSimulation, RENDER_DEFAULT_OPTIONS, MIN_ZOOM, MAX_ZOOM, MIN_VIEW_ZOOM, MAX_VIEW_ZOOM, frameViewAbove, fitBounds } from "../../ui/renderer/index.js";
-  import { createCamera, liftProfile, type Camera, type CameraView } from "../../ui/renderer/camera.js";
+  import { createCamera, type Camera, type CameraView } from "../../ui/renderer/camera.js";
+  import { liftPath } from "../../ui/renderer/lift.js";
+  import { trailUntil } from "../../ui/renderer/trail.js";
   import { createFrameLoop, type FrameLoop } from "../../lib/frame-loop";
   import { wheelZoomFactor, zoomAround, pinchPose, type PinchStart, type Viewport } from "../../lib/camera-gestures";
   import { handlesFor } from "../../lib/handles";
@@ -74,8 +78,6 @@
     onSelectPoint
   }: Props = $props();
 
-  /** Estados con los que el recorrido termina sin aprobar (la simulación se detiene ahí). */
-  const FAILED_STATUSES = new Set(["rejected", "lost-contact", "stalled", "timeout"]);
 
   /** Ancho del popover de correcciones y separación respecto del pin (px). */
   const POPOVER_WIDTH_PX = 340;
@@ -116,6 +118,11 @@
   /** Motivo por el que no se pudo agregar un punto con doble clic. */
   let pointMessage = $state("");
   let pendingSelect: ReturnType<typeof setTimeout> | null = null;
+  /** Gesto de rueda en curso: la escala cambia en cada evento y no se cachea una capa por evento. */
+  let wheeling = $state(false);
+  let wheelTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Tras el último evento de rueda, cuánto se espera para dar el gesto por terminado (ms). */
+  const WHEEL_SETTLE_MS = 200;
 
   /** El destino se recalcula en cada cuadro: si la pista cambia en el medio (otro recorrido), se llega a su encuadre sin saltar. */
   let animation: { from: Pose; target: CameraView; start: number } | null = null;
@@ -146,12 +153,14 @@
   let isCustom = $derived(live.config.mapId === "custom");
   let customHandles = $derived(isCustom ? pointHandles(live.track, live.config) : []);
   let focus = $derived(focusRanges(live.track, selectedArea));
-  // En el personalizado los puntos ya son manijas: las letras de crestas y loops sobrarían.
+  // En el personalizado los puntos ya son manijas: B, C y D se muestran igual (qué es cada punto), sobre el punto.
   let markers = $derived(
-    (isCustom ? [] : live.track.markers).map(marker => {
-      const point = geometryAt(live.track, marker.distance);
-      return { label: marker.label, x: point.x, y: point.y };
-    })
+    live.track.markers
+      .filter(marker => !isCustom || ["B", "C", "D"].includes(marker.label))
+      .map(marker => {
+        const point = geometryAt(live.track, marker.distance);
+        return { label: marker.label, x: point.x, y: point.y, raised: isCustom };
+      })
   );
   let issues = $derived(report?.issues ?? []);
   let shownIssue = $derived(openIssue !== null && auditCurrentOrNull() ? (issues[openIssue] ?? null) : null);
@@ -204,8 +213,8 @@
     if (!hover || !result || !auditCurrent || runner.running || dragging || panning) return null;
 
     const readout = probeAt(result.history, live.track, hover.distance);
-    const stoppedByViolation = FAILED_STATUSES.has(result.final.status) && hover.distance > result.final.distance;
-    return { ...hover, section: readout?.section ?? "", lines: probeLines(readout, { stoppedByViolation }) };
+    const stopped = stoppedByViolation(result.final.status) && hover.distance > result.final.distance;
+    return { ...hover, section: readout?.section ?? "", lines: probeLines(readout, { stoppedByViolation: stopped }) };
   });
 
   let ghostTrack = $derived.by((): Track | undefined => {
@@ -243,6 +252,7 @@
 
     return () => {
       if (pendingSelect) clearTimeout(pendingSelect);
+      if (wheelTimer) clearTimeout(wheelTimer);
       resize.disconnect();
       canvas.removeEventListener("wheel", onWheel);
       loop?.destroy();
@@ -258,10 +268,10 @@
       config: live.config,
       track: live.track,
       passengers,
-      history: runner.history,
+      history: trailUntil(runner.history, runner.scrubIndex),
       camera: view,
       // Mientras la escala cambia en cada cuadro (animación o pellizco), no se cachea una capa por cuadro.
-      options: animating || pinch ? { ...options, cacheWorld: false } : options,
+      options: animating || pinch || wheeling ? { ...options, cacheWorld: false } : options,
       issues,
       focus,
       ribbon,
@@ -300,7 +310,7 @@
   function clampToTrack(next: CameraView): CameraView {
     if (next.mode !== "fit" || next.centerX === undefined || next.centerY === undefined) return next;
 
-    const bounds = fitBounds(live.track, liftProfile(live.track));
+    const bounds = fitBounds(live.track, liftPath(live.track));
     return {
       ...next,
       centerX: Math.min(bounds.maxX, Math.max(bounds.minX, next.centerX)),
@@ -411,6 +421,12 @@
   function onWheel(event: WheelEvent) {
     if (!event.deltaY) return;
     event.preventDefault();
+    wheeling = true;
+    if (wheelTimer) clearTimeout(wheelTimer);
+    wheelTimer = setTimeout(() => {
+      wheeling = false;
+      loop?.invalidate();
+    }, WHEEL_SETTLE_MS);
     const point = localPoint(event);
     zoomAt(wheelZoomFactor(event.deltaY, event.deltaMode, canvas.clientHeight), point.x, point.y);
   }
@@ -610,7 +626,7 @@
     bind:this={canvas}
     class:pointer={hoverTrack && !panning}
     class:grabbing={panning}
-    aria-label="Pista y tren. Clic en la vía para seleccionar una parte; arrastrá el fondo para desplazar y usá la rueda para acercar."
+    aria-label="Pista y tren. Hacé clic en la vía para elegir una parte; arrastrá el fondo para moverte; usá la rueda para acercar."
     onpointerdown={onPointerDown}
     onpointermove={onPointerMove}
     onpointerup={onPointerUp}
@@ -703,19 +719,19 @@
       <p class="hint warn" role="status">{pointMessage}</p>
     {:else if isCustom && showHint && !runner.running}
       <p class="hint">
-        Arrastrá los puntos · doble clic en la vía para agregar uno · tocá un punto para ponerle un loop o elegir una plantilla
-        <button type="button" aria-label="Ocultar ayuda" onclick={() => (showHint = false)}><X size={13} /></button>
+        Arrastrá un punto para moverlo · doble clic en la vía agrega otro · tocá un punto para ver sus opciones
+        <IconButton label="Ocultar ayuda" icon={X} size="sm" onclick={() => (showHint = false)} />
       </p>
     {:else if showHint && !runner.running}
       <p class="hint">
-        Arrastrá los puntos <span class="dot" aria-hidden="true"></span> de la vía para diseñar · clic en un tramo para ver sus valores
-        <button type="button" aria-label="Ocultar ayuda" onclick={() => (showHint = false)}><X size={13} /></button>
+        Arrastrá los círculos <span class="dot" aria-hidden="true"></span> para cambiar la forma · tocá un tramo para editar sus valores
+        <IconButton label="Ocultar ayuda" icon={X} size="sm" onclick={() => (showHint = false)} />
       </p>
     {/if}
   </div>
 
   <div class="overlay top-right">
-    <LoadLegend config={live.config} bind:visible={showRibbon} available={auditCurrent} />
+    <LoadLegend config={live.config} track={live.track} bind:visible={showRibbon} available={auditCurrent} />
   </div>
 
   <div class="overlay bottom-left">
@@ -739,7 +755,7 @@
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    background: #ece5fc;
+    background: var(--surface-muted);
   }
 
   canvas {
@@ -819,7 +835,7 @@
 
   .hint.warn {
     background: var(--accent-soft);
-    color: #8a5a12;
+    color: var(--warn-text);
   }
 
   .hint .dot {
@@ -828,16 +844,6 @@
     border: 2px solid var(--primary);
     border-radius: 50%;
     background: white;
-  }
-
-  .hint button {
-    display: inline-flex;
-    padding: 3px;
-    border: 0;
-    border-radius: 50%;
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
   }
 
   /* En el teléfono la ayuda no entra; los avisos sí, porque responden a lo que se acaba de hacer. */

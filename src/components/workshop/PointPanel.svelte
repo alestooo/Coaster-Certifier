@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { tick, untrack } from "svelte";
+  import { untrack } from "svelte";
+  import NumberField from "../ui/NumberField.svelte";
+  import Button from "../ui/Button.svelte";
+  import Sym from "../ui/Sym.svelte";
   import { movePoint, setPointLoop, templateProblem, CUSTOM_TEMPLATES, type PointEdit } from "../../lib/custom-points";
   import type { SimulationConfig, TrackPoint } from "../../lib/types";
 
@@ -26,31 +29,10 @@
     untrack(() => (reason = ""));
   });
 
-  function numberOf(event: Event): number | null {
-    const value = (event.currentTarget as HTMLInputElement).valueAsNumber;
-    return Number.isFinite(value) ? value : null;
-  }
-
-  /**
-   * Aplica la edición y, ya con el diseño nuevo, muestra en el campo el valor
-   * vigente: si el recortado coincide con el anterior, el campo no se redibuja
-   * solo y quedaría lo escrito.
-   */
-  async function apply(input: HTMLInputElement, edit: PointEdit | null, shown: () => string, note = "") {
+  /** Aplica la edición; el campo vuelve solo a mostrar el valor vigente (aunque el recorte lo deje igual). */
+  function apply(edit: PointEdit | null, note = "") {
     if (edit) onPoints(edit.points);
-    reason = note || (edit?.reason ?? (edit?.limited ? "El valor se ajustó al límite permitido." : ""));
-    await tick();
-    input.value = shown();
-  }
-
-  function field(event: Event, edit: (value: number) => PointEdit | null, shown: () => string, note?: (value: number) => string) {
-    const input = event.currentTarget as HTMLInputElement;
-    const value = numberOf(event);
-    if (value === null) {
-      input.value = shown();
-      return;
-    }
-    void apply(input, edit(value), shown, note?.(value) ?? "");
+    reason = note || (edit?.reason ?? (edit?.limited ? "Se ajustó al límite permitido." : ""));
   }
 
   function useTemplate(template: (typeof CUSTOM_TEMPLATES)[number]) {
@@ -67,53 +49,38 @@
 
 {#if point}
   <div class="rows">
-    <label>
-      <span><i>x</i> Posición horizontal</span>
-      <span class="value">
-        <input type="number" step="any" aria-label="Posición horizontal x" value={x.toFixed(1)} onchange={event =>
-          field(event, value => movePoint(config, index, value, y), () => x.toFixed(1))} />
-        m
-      </span>
-    </label>
-    <label>
-      <span><i>y</i> Altura</span>
-      <span class="value">
-        <input type="number" step="any" aria-label="Altura y" value={y.toFixed(1)} onchange={event =>
-          field(event, value => movePoint(config, index, x, value), () => y.toFixed(1))} />
-        m
-      </span>
-    </label>
+    <div class="row">
+      <span class="name"><Sym symbol="x" /> Posición horizontal</span>
+      <NumberField value={x} step={0.1} unit="m" label="Posición horizontal x" onCommit={value => apply(movePoint(config, index, value, y))} />
+    </div>
+    <div class="row">
+      <span class="name"><Sym symbol="y" /> Altura</span>
+      <NumberField value={y} step={0.1} unit="m" label="Altura y" onCommit={value => apply(movePoint(config, index, x, value))} />
+    </div>
 
     {#if hasLoop}
-      <label>
-        <span><i>h_L</i> Altura del loop</span>
-        <span class="value">
-          <!-- h_L ≤ 0 quitaría el loop sin aviso: eso lo hace «Quitar loop». -->
-          <input type="number" step="any" aria-label="Altura del loop h_L" value={point.loopHeight} onchange={event =>
-            field(
-              event,
-              value => (value > 0 ? setPointLoop(config, index, value, point.loopTopRadius) : null),
-              () => String(config.customPoints[index]?.loopHeight ?? ""),
-              value => (value > 0 ? "" : REMOVE_LOOP_HINT)
-            )} />
-          m
-        </span>
-      </label>
-      <label>
-        <span><i>R</i> Radio en la cima</span>
-        <span class="value">
-          <input type="number" step="any" aria-label="Radio en la cima R" value={point.loopTopRadius} onchange={event =>
-            field(event, value => setPointLoop(config, index, point.loopHeight, value), () => String(config.customPoints[index]?.loopTopRadius ?? ""))} />
-          m
-        </span>
-      </label>
+      <div class="row">
+        <span class="name"><Sym symbol="h_L" /> Altura del loop</span>
+        <!-- h_L ≤ 0 quitaría el loop sin aviso: eso lo hace «Quitar loop». -->
+        <NumberField
+          value={point.loopHeight}
+          step={0.5}
+          unit="m"
+          label="Altura del loop"
+          onCommit={value => (value > 0 ? apply(setPointLoop(config, index, value, point.loopTopRadius)) : apply(null, REMOVE_LOOP_HINT))}
+        />
+      </div>
+      <div class="row">
+        <span class="name"><Sym symbol="R" /> Radio en la cima</span>
+        <NumberField value={point.loopTopRadius} step={0.25} unit="m" label="Radio en la cima" onCommit={value => apply(setPointLoop(config, index, point.loopHeight, value))} />
+      </div>
     {/if}
   </div>
 
   {#if reason}<p class="reason" role="status">{reason}</p>{/if}
 
 {#if !hasLoop}
-    <p class="tip">Para ponerle un loop o borrarlo, usá la barra que aparece sobre el punto en la pista.</p>
+    <p class="tip">El loop y el borrado del punto están en la barra que aparece sobre él, en la pista.</p>
   {/if}
 {/if}
 
@@ -121,7 +88,7 @@
   <h3>Empezar de una plantilla</h3>
   <div>
     {#each CUSTOM_TEMPLATES as template (template.id)}
-      <button type="button" onclick={() => useTemplate(template)}>{template.label}</button>
+      <Button size="sm" variant="secondary" onclick={() => useTemplate(template)}>{template.label}</Button>
     {/each}
   </div>
 </section>
@@ -131,47 +98,30 @@
     display: grid;
   }
 
-  label {
+  .row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    padding: 9px 0;
-    border-bottom: 1px dashed var(--border);
-    font-size: 13px;
-    font-weight: 800;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--border);
   }
 
-  i {
-    margin-right: 6px;
-    padding: 2px 6px;
-    border-radius: 6px;
+  .name {
+    font-size: var(--text-13);
+    font-weight: var(--weight-bold);
+  }
+
+  .name :global(.sym) {
+    display: inline-block;
+    min-width: 1.6em;
+    margin-right: var(--space-1);
+    padding: 1px 5px;
+    border-radius: var(--radius-sm);
     background: var(--primary-soft);
     color: var(--primary-strong);
-    font-size: 11.5px;
-    font-weight: 900;
-  }
-
-  .value {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11.5px;
-    color: var(--muted);
-  }
-
-  input {
-    width: 76px;
-    height: 32px;
-    padding: 0 8px;
-    border: 1px solid var(--border-strong);
-    border-radius: 8px;
-    font: inherit;
-    font-size: 13px;
-    font-weight: 800;
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-    color: var(--text);
+    font-size: var(--text-12);
+    text-align: center;
   }
 
   .reason {
@@ -179,7 +129,7 @@
     padding: 8px 10px;
     border-radius: 10px;
     background: var(--accent-soft);
-    color: #8a5a12;
+    color: var(--warn-text);
     font-size: 12px;
     line-height: 1.45;
   }
@@ -189,27 +139,6 @@
     font-size: 11.5px;
     line-height: 1.45;
     color: var(--muted);
-  }
-
-  button {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 34px;
-    padding: 0 12px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface);
-    color: var(--text-soft);
-    font: inherit;
-    font-size: 12.5px;
-    font-weight: 800;
-    cursor: pointer;
-  }
-
-  button:hover {
-    background: var(--primary-soft);
-    color: var(--primary-strong);
   }
 
   .templates {

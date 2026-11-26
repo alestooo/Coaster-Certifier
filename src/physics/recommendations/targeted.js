@@ -159,9 +159,12 @@ export function targetedPatches(config, run) {
 
     case CRITERIA.TIMEOUT: {
       if (config.brakeMode === "spring") {
+        // Por debajo del crítico el resorte lo devuelve y puede quedar antes de E (fuera de la zona):
+        // el amortiguamiento crítico lo detiene sin rebote dentro de la zona.
         const critical = 2 * Math.sqrt(config.springConstant * config.mass);
         patches.push({ springDamping: round(critical * 0.3, 0) });
         patches.push({ springDamping: round(critical * 0.6, 0) });
+        patches.push({ springDamping: round(critical, 0) });
       }
       break;
     }

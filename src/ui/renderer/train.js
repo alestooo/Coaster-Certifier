@@ -2,6 +2,7 @@ import { geometryAt } from "../../physics/track/geometry.js";
 import { PALETTE } from "./palette.js";
 import { box, circle, ellipse } from "./draw.js";
 import { CART_LENGTH_M, CART_GAP_M } from "./camera.js";
+import { pointOnLift } from "./lift.js";
 import { drawPassenger } from "./passengers.js";
 
 /** Asientos por carrito (coincide con SEATS_PER_CART del juego). */
@@ -27,6 +28,12 @@ export const CART = Object.freeze({
 
 /** Altura (m) por debajo de la cual se proyecta sombra en el suelo. */
 const SHADOW_HEIGHT_M = 4;
+
+/** Por debajo de este largo en pantalla (px), el tren lleva un marcador para encontrarlo. */
+const MIN_VISIBLE_TRAIN_PX = 12;
+/** Radio del halo del marcador y largo de su flecha (px, espacio de pantalla). */
+const MARKER_HALO_PX = 11;
+const MARKER_ARROW_PX = 9;
 
 /**
  * Cantidad de carritos necesarios para los pasajeros.
@@ -147,10 +154,12 @@ function drawCart(ctx, passengers, motion, index, count) {
  * @param {number} count
  */
 export function cartPlacements(camera, track, state, count) {
-  const spacing = (CART_LENGTH_M + CART_GAP_M) * (camera.trainScale / camera.scale);
+  const spacing = CART_LENGTH_M + CART_GAP_M;
 
   return Array.from({ length: count }, (_, index) => {
-    const geometry = geometryAt(track, state.distance - index * spacing);
+    const distance = state.distance - index * spacing;
+    // Detrás de A el carro va sobre la subida, no sobre una prolongación de la caída.
+    const geometry = distance < 0 ? { ...pointOnLift(camera.lift, -distance), kind: "lift" } : geometryAt(track, distance);
 
     return {
       x: camera.toX(geometry.x),
@@ -160,6 +169,32 @@ export function cartPlacements(camera, track, state, count) {
       kind: geometry.kind
     };
   });
+}
+
+/**
+ * Halo y flecha en espacio de pantalla cuando el tren mide pocos píxeles:
+ * se lo encuentra sin agrandar su geometría.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{x: number, y: number}} lead
+ */
+function drawTrainMarker(ctx, lead) {
+  ctx.save();
+  ctx.strokeStyle = PALETTE.marker;
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  ctx.arc(lead.x, lead.y, MARKER_HALO_PX, 0, Math.PI * 2);
+  ctx.stroke();
+
+  const tipY = lead.y - MARKER_HALO_PX - 2;
+  ctx.fillStyle = PALETTE.marker;
+  ctx.beginPath();
+  ctx.moveTo(lead.x, tipY);
+  ctx.lineTo(lead.x - MARKER_ARROW_PX / 2, tipY - MARKER_ARROW_PX);
+  ctx.lineTo(lead.x + MARKER_ARROW_PX / 2, tipY - MARKER_ARROW_PX);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
 /**
@@ -187,18 +222,18 @@ export function drawTrain({ ctx, camera, scene }) {
   const passengers = scene.passengers ?? [];
   const count = cartCountFor(passengers);
   const carts = cartPlacements(camera, scene.track, scene.state, count);
-  const unit = camera.trainScale / DESIGN_PX_PER_METRE;
+  const unit = camera.scale / DESIGN_PX_PER_METRE;
 
   for (const cart of carts) {
     if (cart.height > SHADOW_HEIGHT_M) continue;
     const alpha = 1 - cart.height / SHADOW_HEIGHT_M;
     ctx.globalAlpha = alpha;
-    ellipse(ctx, cart.x, camera.groundY + 2, CART.halfLength * unit * 0.9, Math.max(2, 4 * unit), PALETTE.shadow);
+    ellipse(ctx, cart.x, camera.groundY, CART.halfLength * unit * 0.9, 4 * unit, PALETTE.shadow);
     ctx.globalAlpha = 1;
   }
 
   ctx.strokeStyle = PALETTE.coupling;
-  ctx.lineWidth = Math.max(2, 4 * unit);
+  ctx.lineWidth = 4 * unit;
   ctx.lineCap = "round";
 
   for (let index = 1; index < carts.length; index++) {
@@ -236,4 +271,6 @@ export function drawTrain({ ctx, camera, scene }) {
 
     ctx.restore();
   }
+
+  if (CART_LENGTH_M * count * camera.scale < MIN_VISIBLE_TRAIN_PX && carts[0]) drawTrainMarker(ctx, carts[0]);
 }

@@ -2,6 +2,8 @@ import { PALETTE } from "./palette.js";
 import { box, circle, hash } from "./draw.js";
 import { drawPerson } from "./scenery.js";
 import { drawRails } from "./track.js";
+import { liftHeightAt, liftLength, pointFromBase, CHAIN_SPEED_MPS, LIFT_LEAD_IN_M } from "./lift.js";
+import { stationSpan } from "./camera.js";
 
 /**
  * Estación con andén, techo sobre cerchas, letrero, banderines y gente
@@ -15,13 +17,15 @@ const STATION = Object.freeze({
   roofThickness: 0.55,
   columnWidth: 0.3,
   signHeight: 1.5,
-  overhangLeft: 4,
-  overhangRight: 6,
   columnCount: 4,
   waiting: 3
 });
 
-const LIFT = Object.freeze({ supportSpacing: 6, dogSpacing: 2.2, linkSpacing: 1.1, chainSpeed: 1.4 });
+/** Subida: separación de soportes, trinquetes y eslabones, y separación de la cadena bajo el riel (m). */
+/** Tamaño mínimo para escribir en el cartel (px); más chico, el texto sería una mancha. */
+const MIN_SIGN_TEXT_PX = 5;
+
+const LIFT = Object.freeze({ supportSpacing: 6, dogSpacing: 2.2, linkSpacing: 1.1, chainOffset: 0.25, motorFromTop: 4, footingSpacing: 3, footingWidth: 0.6 });
 
 /**
  * @param {import("./index.js").Frame} frame
@@ -31,8 +35,7 @@ function stationBox({ camera, scene }) {
   const { track } = scene;
 
   return {
-    left: track.brakeX - STATION.overhangLeft,
-    right: track.endX + STATION.overhangRight,
+    ...stationSpan(track),
     scale: camera.scale,
     groundY: camera.groundY
   };
@@ -55,12 +58,12 @@ export function drawStation(frame) {
   // Pared de fondo y andén.
   box(ctx, toX(left), roofBottom, width, groundY - roofBottom, PALETTE.stationWall, 0);
   box(ctx, toX(left), platformTop - m(0.1), width, m(STATION.platformHeight) + m(0.1), PALETTE.stationPlatform, 0);
-  box(ctx, toX(left), platformTop - m(0.1), width, Math.max(1.5, m(0.18)), PALETTE.stationEdge, 0);
+  box(ctx, toX(left), platformTop - m(0.1), width, m(0.18), PALETTE.stationEdge, 0);
 
   // Cerca de la fila con postes.
   const fenceTop = platformTop - m(STATION.fenceHeight);
   ctx.strokeStyle = PALETTE.stationFence;
-  ctx.lineWidth = Math.max(1, m(0.06));
+  ctx.lineWidth = m(0.06);
   ctx.beginPath();
   ctx.moveTo(toX(left + 0.5), fenceTop);
   ctx.lineTo(toX(right - 0.5), fenceTop);
@@ -69,7 +72,7 @@ export function drawStation(frame) {
   ctx.stroke();
 
   for (let x = left + 0.5; x <= right - 0.5; x += 1.6) {
-    box(ctx, toX(x) - m(0.05), fenceTop - m(0.05), Math.max(1.2, m(0.1)), m(STATION.fenceHeight) + m(0.05), PALETTE.stationFence, 1);
+    box(ctx, toX(x) - m(0.05), fenceTop - m(0.05), m(0.1), m(STATION.fenceHeight) + m(0.05), PALETTE.stationFence, 1);
   }
 
   // Gente esperando.
@@ -81,11 +84,11 @@ export function drawStation(frame) {
   // Columnas y cerchas.
   for (let index = 0; index < STATION.columnCount; index++) {
     const x = left + 0.9 + ((right - left - 1.8) * index) / (STATION.columnCount - 1);
-    box(ctx, toX(x) - m(STATION.columnWidth) / 2, roofBottom, Math.max(1.5, m(STATION.columnWidth)), platformTop - roofBottom, PALETTE.truss, 1);
+    box(ctx, toX(x) - m(STATION.columnWidth) / 2, roofBottom, m(STATION.columnWidth), platformTop - roofBottom, PALETTE.truss, 1);
   }
 
   ctx.strokeStyle = PALETTE.truss;
-  ctx.lineWidth = Math.max(1, m(0.07));
+  ctx.lineWidth = m(0.07);
   ctx.beginPath();
   const trussTop = roofBottom - m(0.02);
   const trussBottom = roofBottom + m(0.8);
@@ -101,7 +104,7 @@ export function drawStation(frame) {
   ctx.stroke();
 
   // Techo con sombra y letrero.
-  box(ctx, toX(left - 0.6), roofTop, width + m(1.2), m(STATION.roofThickness), PALETTE.stationRoof, Math.max(2, m(0.15)));
+  box(ctx, toX(left - 0.6), roofTop, width + m(1.2), m(STATION.roofThickness), PALETTE.stationRoof, m(0.15));
   box(ctx, toX(left - 0.6), roofBottom - m(0.12), width + m(1.2), m(0.12), PALETTE.stationRoofDark, 0);
 
   const subtitle =
@@ -113,16 +116,23 @@ export function drawStation(frame) {
   const signTop = roofTop - signHeight + m(0.1);
   const signCenter = toX((left + right) / 2);
 
-  box(ctx, signCenter - signWidth / 2, signTop, signWidth, signHeight, PALETTE.stationSign, Math.max(2, m(0.2)));
-  box(ctx, signCenter - signWidth / 2, signTop, signWidth, Math.max(1, m(0.12)), PALETTE.stationEdge, 0);
-  ctx.fillStyle = PALETTE.stationSignText;
-  ctx.font = `800 ${Math.max(8, m(0.8))}px Nunito, 'Segoe UI', system-ui, sans-serif`;
+  box(ctx, signCenter - signWidth / 2, signTop, signWidth, signHeight, PALETTE.stationSign, m(0.2));
+  box(ctx, signCenter - signWidth / 2, signTop, signWidth, m(0.12), PALETTE.stationEdge, 0);
+  // Letras en metros, como el cartel: si quedan ilegibles (< MIN_SIGN_TEXT_PX) no se escriben.
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("ESTACIÓN", signCenter, signTop + signHeight * 0.36);
-  ctx.font = `600 ${Math.max(6, m(0.42))}px Nunito, 'Segoe UI', system-ui, sans-serif`;
-  ctx.fillStyle = scene.config.brakeMode === "spring" ? PALETTE.springDark : PALETTE.brake;
-  ctx.fillText(subtitle, signCenter, signTop + signHeight * 0.75);
+
+  if (m(0.8) >= MIN_SIGN_TEXT_PX) {
+    ctx.fillStyle = PALETTE.stationSignText;
+    ctx.font = `800 ${m(0.8)}px Nunito, 'Segoe UI', system-ui, sans-serif`;
+    ctx.fillText("ESTACIÓN", signCenter, signTop + signHeight * 0.36);
+  }
+
+  if (m(0.42) >= MIN_SIGN_TEXT_PX) {
+    ctx.font = `600 ${m(0.42)}px Nunito, 'Segoe UI', system-ui, sans-serif`;
+    ctx.fillStyle = scene.config.brakeMode === "spring" ? PALETTE.springDark : PALETTE.brake;
+    ctx.fillText(subtitle, signCenter, signTop + signHeight * 0.75);
+  }
 
   // Banderines colgando del techo.
   const flagCount = Math.max(4, Math.round((right - left) / 1.1));
@@ -152,7 +162,7 @@ export function drawStation(frame) {
 }
 
 /**
- * Puntos con ángulo y distancia a lo largo de la rampa de la cadena.
+ * Puntos con ángulo y distancia a lo largo de la subida (cada metro y en cada vértice).
  * @param {{x: number, y: number}[]} lift
  */
 function liftPoints(lift) {
@@ -166,7 +176,7 @@ function liftPoints(lift) {
     const angle = Math.atan2(to.y - from.y, to.x - from.x);
     const steps = Math.max(1, Math.ceil(length));
 
-    for (let step = 0; step <= steps; step++) {
+    for (let step = index === 0 ? 0 : 1; step <= steps; step++) {
       const t = step / steps;
       points.push({ x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t, angle, distance: distance + length * t });
     }
@@ -178,26 +188,50 @@ function liftPoints(lift) {
 }
 
 /**
- * Estructura fija de la subida por cadena.
+ * Punto de la cadena (en pantalla) a `distance` m de la base: bajo el riel, sobre la normal.
+ * @param {import("./camera.js").Camera} camera
+ * @param {number} distance
+ * @param {number} [below] Separación bajo el eje de la vía (m).
+ */
+function chainPoint(camera, distance, below = LIFT.chainOffset) {
+  const point = pointFromBase(camera.lift, distance);
+  const nx = Math.sin(point.angle);
+  const ny = -Math.cos(point.angle);
+  return {
+    x: camera.toX(point.x + nx * below),
+    y: camera.toY(point.y + ny * below),
+    angle: point.angle
+  };
+}
+
+/**
+ * Estructura fija de la subida por cadena: soportes, rieles, cadena,
+ * trinquetes, casa de máquinas y zapata. Todo sigue la misma polilínea.
  * @param {import("./index.js").Frame} frame
  */
 export function drawChainLift({ ctx, camera }) {
   const { scale, groundY, lift } = camera;
   const m = (/** @type {number} */ v) => v * scale;
-  const points = lift.map(point => ({ x: camera.toX(point.x), y: camera.toY(point.y) }));
-  const [base, , crest] = points;
-  const length = Math.hypot(crest.x - base.x, crest.y - base.y);
-  const nx = (crest.y - base.y) / length;
-  const ny = -(crest.x - base.x) / length;
+  const length = liftLength(lift);
+  if (length <= 0) return;
+  // La cadena va solo por la rampa: del pie (tras el tramo de embarque) hasta A.
+  const chainStart = LIFT_LEAD_IN_M;
 
-  // Soportes en celosía bajo la rampa.
+  // Zapatas bajo el tramo de embarque, como la vía a nivel.
+  for (let x = lift.base.x + 1; x < lift.foot.x; x += LIFT.footingSpacing) {
+    const sx = camera.toX(x);
+    const top = camera.toY(-0.75);
+    box(ctx, sx - m(LIFT.footingWidth) / 2, top, m(LIFT.footingWidth), Math.max(0, groundY - top), PALETTE.footing, m(0.05));
+  }
+
+  // Soportes en celosía, del suelo al eje de la subida.
   ctx.strokeStyle = PALETTE.liftStructure;
-  ctx.lineWidth = Math.max(1, m(0.1));
+  ctx.lineWidth = m(0.1);
   ctx.beginPath();
 
-  for (let x = lift[0].x + 3; x < lift[2].x; x += LIFT.supportSpacing) {
-    const t = (x - lift[0].x) / (lift[2].x - lift[0].x);
-    const y = lift[0].y + (lift[2].y - lift[0].y) * t;
+  for (let x = lift.foot.x + 3; x < lift.crest.x; x += LIFT.supportSpacing) {
+    const y = liftHeightAt(lift, x) - 0.5;
+    if (y <= 0) continue;
     const sx = camera.toX(x);
     const sy = camera.toY(y);
 
@@ -214,72 +248,74 @@ export function drawChainLift({ ctx, camera }) {
 
   ctx.stroke();
 
-  // Rieles de la rampa, con el mismo estilo que la vía.
-  drawRails(ctx, camera, liftPoints(lift), { spine: PALETTE.lift, rail: PALETTE.liftStructure });
+  // Rieles de la subida, con el mismo estilo que la vía.
+  drawRails(ctx, camera, liftPoints(lift.points), { spine: PALETTE.lift, rail: PALETTE.liftStructure });
 
-  // Cadena estática y trinquetes.
+  // Cadena estática bajo el riel.
   ctx.strokeStyle = PALETTE.chain;
-  ctx.lineWidth = Math.max(1, m(0.09));
+  ctx.lineWidth = m(0.09);
   ctx.beginPath();
-  ctx.moveTo(base.x + nx * m(0.25), base.y + ny * m(0.25));
-  ctx.lineTo(crest.x + nx * m(0.25), crest.y + ny * m(0.25));
-  ctx.stroke();
 
-  const dogs = Math.floor(length / m(LIFT.dogSpacing));
-  ctx.fillStyle = PALETTE.chain;
-
-  for (let index = 1; index < dogs; index++) {
-    const t = index / dogs;
-    const x = base.x + (crest.x - base.x) * t;
-    const y = base.y + (crest.y - base.y) * t;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + nx * m(0.45) - m(0.2), y + ny * m(0.45));
-    ctx.lineTo(x + m(0.25), y);
-    ctx.closePath();
-    ctx.fill();
+  for (let distance = chainStart; distance <= length; distance += 1) {
+    const point = chainPoint(camera, distance);
+    if (distance === chainStart) ctx.moveTo(point.x, point.y);
+    else ctx.lineTo(point.x, point.y);
   }
 
-  // Casa de máquinas colgada bajo la rampa, cerca de la cresta.
+  const top = chainPoint(camera, length);
+  ctx.lineTo(top.x, top.y);
+  ctx.stroke();
+
+  // Trinquetes (anti-retroceso) a lo largo de la cadena.
+  ctx.fillStyle = PALETTE.chain;
+
+  for (let distance = chainStart + LIFT.dogSpacing; distance < length; distance += LIFT.dogSpacing) {
+    const point = chainPoint(camera, distance, 0);
+    ctx.save();
+    ctx.translate(point.x, point.y);
+    ctx.rotate(-point.angle);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-m(0.2), m(0.45));
+    ctx.lineTo(m(0.25), 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Casa de máquinas bajo la subida, cerca de A.
+  const motor = chainPoint(camera, Math.max(chainStart + (length - chainStart) * 0.55, length - LIFT.motorFromTop), 0.9);
   const houseWidth = m(2.4);
   const houseHeight = m(1.7);
-  const t = Math.max(0.55, 1 - m(4) / Math.max(1, length));
-  const houseCenterX = base.x + (crest.x - base.x) * t;
-  const houseTop = base.y + (crest.y - base.y) * t + m(0.9);
 
-  box(ctx, houseCenterX - houseWidth / 2, houseTop, houseWidth, houseHeight, PALETTE.motorHouse, Math.max(2, m(0.15)));
-  box(ctx, houseCenterX - houseWidth / 2 - m(0.15), houseTop - m(0.12), houseWidth + m(0.3), m(0.3), PALETTE.motorRoof, Math.max(1, m(0.08)));
-  circle(ctx, houseCenterX, houseTop + houseHeight / 2, Math.max(2, m(0.42)), PALETTE.chainLink);
-  circle(ctx, houseCenterX, houseTop + houseHeight / 2, Math.max(1, m(0.16)), PALETTE.motorRoof);
+  box(ctx, motor.x - houseWidth / 2, motor.y, houseWidth, houseHeight, PALETTE.motorHouse, m(0.15));
+  box(ctx, motor.x - houseWidth / 2 - m(0.15), motor.y - m(0.12), houseWidth + m(0.3), m(0.3), PALETTE.motorRoof, m(0.08));
+  circle(ctx, motor.x, motor.y + houseHeight / 2, m(0.42), PALETTE.chainLink);
+  circle(ctx, motor.x, motor.y + houseHeight / 2, m(0.16), PALETTE.motorRoof);
 
-  box(ctx, base.x - m(0.9), groundY - m(0.6), m(1.8), m(0.6), PALETTE.footing, 1);
+  // Zapata bajo el pie de la rampa, del nivel de la vía al suelo dibujado.
+  const footX = camera.toX(lift.foot.x);
+  const footY = camera.toY(lift.foot.y);
+  box(ctx, footX - m(0.9), footY, m(1.8), Math.max(m(0.3), groundY - footY), PALETTE.footing, m(0.1));
 }
 
 /**
- * Eslabones de la cadena en movimiento (capa dinámica).
+ * Eslabones de la cadena en movimiento (capa dinámica), a la rapidez de la cadena.
  * @param {import("./index.js").Frame} frame
  */
 export function drawChainLinks({ ctx, camera, scene }) {
   const { scale, lift } = camera;
-  const m = (/** @type {number} */ v) => v * scale;
-  const points = lift.map(point => ({ x: camera.toX(point.x), y: camera.toY(point.y) }));
-  const [base, , crest] = points;
-  const length = Math.hypot(crest.x - base.x, crest.y - base.y);
-
-  if (length < 20) return;
-
-  const nx = (crest.y - base.y) / length;
-  const ny = -(crest.x - base.x) / length;
-  const spacing = m(LIFT.linkSpacing);
-  const offset = ((scene.state.time * LIFT.chainSpeed * scale) % spacing + spacing) % spacing;
-  const radius = Math.max(1, m(0.12));
+  const length = liftLength(lift);
+  if (length <= 0) return;
+  const offset = ((scene.state.time * CHAIN_SPEED_MPS) % LIFT.linkSpacing + LIFT.linkSpacing) % LIFT.linkSpacing;
+  const radius = 0.12 * scale;
 
   ctx.fillStyle = PALETTE.chainLink;
 
-  for (let d = offset; d < length; d += spacing) {
-    const t = d / length;
+  for (let distance = LIFT_LEAD_IN_M + offset; distance < length; distance += LIFT.linkSpacing) {
+    const point = chainPoint(camera, distance);
     ctx.beginPath();
-    ctx.arc(base.x + (crest.x - base.x) * t + nx * m(0.25), base.y + (crest.y - base.y) * t + ny * m(0.25), radius, 0, Math.PI * 2);
+    ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
     ctx.fill();
   }
 }

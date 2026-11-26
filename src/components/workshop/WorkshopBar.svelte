@@ -28,17 +28,17 @@
   let { mapId, passengerSummary, canUndo, canRedo, report, status, invalid, panel, onHome, onTemplate, onScenario, onPanel, onGuide, onUndo, onRedo }: Props = $props();
 
   let verdict = $derived.by(() => {
-    if (invalid) return { kind: "warn", icon: TriangleAlert, short: "Valor inválido", text: "Hay un valor inválido: se audita el último diseño válido" };
+    if (invalid) return { kind: "warn", icon: TriangleAlert, short: "Valor inválido", text: "Valor fuera de rango: el dictamen es del último diseño válido" };
     if (status === "error") return { kind: "warn", icon: TriangleAlert, short: "Sin dictamen", text: "No se pudo auditar el diseño" };
     if (!report || status === "working") return { kind: "idle", icon: LoaderCircle, short: "Auditando…", text: "Auditando…" };
     return report.approved
-      ? { kind: "ok", icon: ShieldCheck, short: "Aprueba", text: "Aprueba la certificación" }
-      : { kind: "bad", icon: ShieldAlert, short: "No aprueba", text: report.title };
+      ? { kind: "ok", icon: ShieldCheck, short: "Aprobado", text: "Aprobado" }
+      : { kind: "bad", icon: ShieldAlert, short: "Rechazado", text: report.title };
   });
 </script>
 
 <header class="bar">
-  <button type="button" class="home" aria-label="Volver al inicio" title="Inicio" onclick={onHome}>
+  <button type="button" class="home" aria-label="Volver al menú" title="Volver al menú" onclick={onHome}>
     <RollerCoaster size={20} />
   </button>
 
@@ -49,7 +49,7 @@
     class="chip"
     class:active={panel === "passengers"}
     aria-pressed={panel === "passengers"}
-    aria-label={`Tren y pasajeros: ${passengerSummary}`}
+    aria-label={`Tren y pasajeros: ${passengerSummary.replace(" · ", ", ")} en total`}
     title="Tren y pasajeros"
     onclick={() => onPanel("passengers")}
   >
@@ -67,7 +67,7 @@
     <SlidersHorizontal size={16} /> <span>Reglas</span>
   </button>
 
-  <button type="button" class="icon guide" aria-label="Guía y escenarios" title="Guía y escenarios" onclick={onGuide}><BookOpen size={16} /></button>
+  <button type="button" class="icon guide" aria-label="Guía" title="Guía: escenarios, criterios y modelo" onclick={onGuide}><BookOpen size={16} /></button>
 
   <button
     type="button"
@@ -173,21 +173,21 @@
   }
 
   .verdict.ok {
-    border-color: #bfe5d3;
+    border-color: var(--success-border);
     background: var(--success-soft);
-    color: #1f7a57;
+    color: var(--success-text);
   }
 
   .verdict.bad {
-    border-color: #f5c3cc;
+    border-color: var(--danger-border);
     background: var(--danger-soft);
-    color: #b7303f;
+    color: var(--danger-text);
   }
 
   .verdict.warn {
-    border-color: #efd29a;
+    border-color: var(--warn-border);
     background: var(--accent-soft);
-    color: #8a5a12;
+    color: var(--warn-text);
   }
 
   .verdict.active {

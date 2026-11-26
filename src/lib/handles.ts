@@ -7,8 +7,7 @@
  * a píxeles con la cámara.
  */
 import { buildTrack, resolveConfig, geometryAt, hillHalfWidth, APPROACH_LENGTH, ConfigError } from "../physics/index.js";
-import { MAX_LOOP_SHAPE } from "../physics/config.js";
-import { fieldByKey, friendlyConfigMessage, limitsOf, type NumericKey } from "./field-definitions";
+import { fieldByKey, fieldLimits, friendlyConfigMessage, MIN_TOP_RADIUS_FRACTION, type NumericKey } from "./field-definitions";
 import { formatNumber } from "../ui/format";
 import type { AreaId } from "./audit";
 import type { SimulationConfig, Track } from "./types";
@@ -68,7 +67,7 @@ const MIN_DRAG_HILL_HEIGHT = 0.5;
 /** Ancho mínimo de media colina al arrastrar su pie (m). */
 const MIN_HILL_HALF_WIDTH = 0.1;
 /** Relación mínima R/h_L que admite la familia de loops en lágrima. */
-export const MIN_TOP_RADIUS_FRACTION = (1 - MAX_LOOP_SHAPE) / 2;
+export { MIN_TOP_RADIUS_FRACTION };
 const BISECTION_STEPS = 12;
 const EPSILON = 1e-9;
 
@@ -91,7 +90,7 @@ export function handlesFor(track: Track, config: SimulationConfig): Handle[] {
       x: start.x,
       y: start.y,
       value: config.initialHeight,
-      name: "Cima inicial A: altura H",
+      name: "Cima de la subida A: altura inicial",
       primary: true,
       letter: "A"
     },
@@ -103,7 +102,7 @@ export function handlesFor(track: Track, config: SimulationConfig): Handle[] {
       x: arrowBase.x + direction.x * arrowLength,
       y: arrowBase.y + direction.y * arrowLength,
       value: config.initialSpeed,
-      name: "Rapidez al soltar la cadena v₀",
+      name: "Rapidez inicial en A",
       primary: false,
       anchor: arrowBase,
       direction
@@ -118,7 +117,7 @@ export function handlesFor(track: Track, config: SimulationConfig): Handle[] {
       x: track.brakeX,
       y: 0,
       value: config.trackWidth,
-      name: "Inicio del frenado E: largo horizontal W",
+      name: "Inicio de la zona de frenado E: ancho del trazado",
       primary: true,
       letter: "E"
     },
@@ -130,7 +129,7 @@ export function handlesFor(track: Track, config: SimulationConfig): Handle[] {
       x: track.endX,
       y: 0,
       value: config.brakingLength,
-      name: "Fin de la zona de frenado F: largo d_f",
+      name: "Fin de la zona de frenado F: largo de frenado",
       primary: true,
       letter: "F",
       anchor: { x: track.brakeX, y: 0 }
@@ -158,7 +157,7 @@ function loopHandles(track: Track, config: SimulationConfig): Handle[] {
       x: top.x,
       y: top.y,
       value: config.loopHeight,
-      name: "Cima del loop C: altura h_L",
+      name: "Cima del loop C: altura del loop",
       primary: true,
       letter: "C",
       anchor: { x: top.x, y: loop.y }
@@ -171,7 +170,7 @@ function loopHandles(track: Track, config: SimulationConfig): Handle[] {
       x: top.x + radius,
       y: top.y - radius,
       value: radius,
-      name: "Radio en la cima del loop R",
+      name: "Radio en la cima del loop",
       primary: false,
       anchor: { x: top.x, y: top.y }
     }
@@ -195,7 +194,7 @@ function hillHandles(track: Track, config: SimulationConfig): Handle[] {
       x: crest.x,
       y: crest.y,
       value: config.hillHeight,
-      name: "Cresta de la colina D: altura h_c",
+      name: "Cresta de la colina D: altura de la colina",
       primary: true,
       letter: "D"
     },
@@ -207,7 +206,7 @@ function hillHandles(track: Track, config: SimulationConfig): Handle[] {
       x: crest.x + halfWidth,
       y: 0,
       value: config.hillCrestRadius,
-      name: "Ancho de la colina: radio de la cresta ρ_c",
+      name: "Radio de la cresta",
       primary: false,
       anchor: { x: crest.x, y: 0 }
     }
@@ -245,19 +244,8 @@ function requestedValue(handle: Handle, point: Point, config: SimulationConfig, 
 
 /** Rango admisible del parámetro de la manija, incluida la forma del loop. */
 function rangeOf(handle: Handle, config: SimulationConfig, dragging: boolean): [number, number] {
-  let [min, max] = limitsOf(handle.key);
-
-  if (handle.key === "loopHeight") {
-    min = Math.max(min, 2 * config.loopTopRadius);
-    max = Math.min(max, config.loopTopRadius / MIN_TOP_RADIUS_FRACTION);
-  } else if (handle.key === "loopTopRadius") {
-    min = Math.max(min, MIN_TOP_RADIUS_FRACTION * config.loopHeight);
-    max = Math.min(max, config.loopHeight / 2);
-  } else if (handle.key === "hillHeight" && dragging) {
-    min = Math.max(min, MIN_DRAG_HILL_HEIGHT);
-  }
-
-  return [min, max];
+  const [min, max] = fieldLimits(handle.key, config);
+  return handle.key === "hillHeight" && dragging ? [Math.max(min, MIN_DRAG_HILL_HEIGHT), max] : [min, max];
 }
 
 function decimalsOf(step: number): number {
@@ -339,14 +327,23 @@ export function proposeDrag(handle: Handle, point: Point, config: SimulationConf
 }
 
 /** Texto de la manija: «h_L = 21,5 m» y la consecuencia física del valor. */
-export function handleText(handle: Handle, value: number, config: SimulationConfig): { label: string; detail: string } {
+export interface HandleText {
+  /** Texto hablado («Altura del loop: 21,5 m»): nombre accesible del valor, sin símbolos con guion bajo. */
+  label: string;
+  /** Símbolo («h_L») y valor con unidad («21,5 m») para la etiqueta visible (el símbolo con subíndice). */
+  symbol: string;
+  value: string;
+  /** Consecuencia física del valor (p. ej. «necesita ≥ 5,9 m/s en la cima»). */
+  detail: string;
+}
+
+export function handleText(handle: Handle, value: number, config: SimulationConfig): HandleText {
   const field = fieldByKey(handle.key);
 
-  if (!field) return { label: formatNumber(value), detail: "" };
+  if (!field) return { label: formatNumber(value), symbol: "", value: formatNumber(value), detail: "" };
 
-  const number = formatNumber(value, decimalsOf(field.step));
-  const label = `${field.symbol} = ${number}${field.unit ? ` ${field.unit}` : ""}`;
+  const shown = `${formatNumber(value, decimalsOf(field.step))}${field.unit ? ` ${field.unit}` : ""}`;
   const detail = field.hint ? field.hint({ ...config, [handle.key]: value }) : "";
 
-  return { label, detail };
+  return { label: `${field.label}: ${shown}`, symbol: field.symbol, value: shown, detail };
 }

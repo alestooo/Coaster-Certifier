@@ -3,7 +3,7 @@ body {
   background:
     radial-gradient(
       ellipse at top right,
-      #eee5ff 0,
+      var(--primary-soft) 0,
       transparent 48%
     ),
     var(--page-bg);

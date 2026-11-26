@@ -25,8 +25,90 @@
   --danger: #d9465a;
   --danger-soft: #fde6ea;
 
+  /* Texto de cada estado sobre su fondo suave, y su borde. */
+  --success-text: #1f7a57;
+  --success-border: #bfe5d3;
+  --warn-text: #8a5a12;
+  --warn-soft: #fff4e0;
+  --warn-border: #efd29a;
+  --danger-text: #9d2a39;
+  --danger-border: #f5c3cc;
+
+  /* Escala tipográfica (px) y pesos. */
+  --text-11: 11px;
+  --text-12: 12px;
+  --text-13: 13px;
+  --text-14: 14px;
+  --text-16: 16px;
+  --text-20: 20px;
+  --text-24: 24px;
+  --weight-regular: 600;
+  --weight-bold: 800;
+  --weight-black: 900;
+
+  /* Espaciado. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Radios. */
+  --radius-sm: 6px;
+  --radius-md: 10px;
   --radius: 14px;
   --radius-lg: 20px;
+  --radius-pill: 999px;
+
+  /* Alto de los controles. */
+  --control-sm: 28px;
+  --control-md: 32px;
+  --control-lg: 36px;
+  --control-xl: 40px;
+
+  /* Superficies flotantes. */
+  --tooltip-bg: rgb(45 33 64 / 92%);
+  --tooltip-text: #fff;
+  --backdrop: rgb(45 33 64 / 55%);
+  --overlay-surface: rgb(255 255 255 / 92%);
+
+  /* Texto sobre el color primario y tono de flotación (franja de fuerza g). */
+  --on-primary: #ffffff;
+  --float: #3a7bd5;
+
+  /* Acentos sobre la superficie del tooltip. */
+  --tooltip-accent: #ffd18a;
+  --tooltip-muted: #d9c7f5;
+
+  /* Marca del menú y de los créditos (fondo nocturno del parque). */
+  --menu-night: #171333;
+  --menu-ink: #261d37;
+  --menu-plum: #47305f;
+  --menu-plum-deep: #402165;
+  --menu-violet: #7440ba;
+  --menu-violet-light: #a165ec;
+  --menu-lilac: #dcbaff;
+  --menu-lilac-soft: #e7def5;
+  --menu-mist: #9c84b9;
+  --menu-mist-deep: #8d6aa9;
+  --menu-orchid: #9d77be;
+  --menu-pale: #cfb0ee;
+  --menu-dust: #bfaacb;
+  --menu-snow: #f4eaff;
+  --menu-snow-soft: #f4e9fc;
+  --menu-snow-warm: #efe5fa;
+  --menu-veil: #e4d4ef;
+  --menu-cream: #fff9e9;
+  --menu-cream-soft: #fff7e8;
+  --menu-cream-warm: #fff6df;
+  --menu-gold: #ffd27a;
+
+  /* Foco y manijas. */
+  /* Separador del color de la superficie y anillo primario: 5,75:1, visible también sobre los segmentados. */
+  --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--primary);
+  --handle: #d9822b;
+
   --shadow-sm: 0 2px 8px rgb(60 30 90 / 6%);
   --shadow: 0 10px 30px rgb(60 30 90 / 8%);
   --shadow-lg: 0 24px 60px rgb(40 20 70 / 18%);

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, type Snippet } from "svelte";
   import { X } from "lucide-svelte";
+  import IconButton from "../ui/IconButton.svelte";
 
   interface Props {
     title: string;
@@ -31,7 +32,7 @@
       <h2>{title}</h2>
       {#if subtitle}<p>{subtitle}</p>{/if}
     </div>
-    <button type="button" aria-label="Cerrar panel" title="Cerrar (Esc)" onclick={onClose}><X size={17} /></button>
+    <IconButton label="Cerrar panel" icon={X} title="Cerrar (Esc)" onclick={onClose} />
   </header>
   <div class="body">
     {@render children()}
@@ -70,21 +71,6 @@
     font-size: 12px;
     font-weight: 700;
     color: var(--muted);
-  }
-
-  header button {
-    display: inline-flex;
-    padding: 6px;
-    border: 0;
-    border-radius: 8px;
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-  }
-
-  header button:hover {
-    background: var(--surface-soft);
-    color: var(--text);
   }
 
   .body {

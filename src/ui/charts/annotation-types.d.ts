@@ -37,6 +37,8 @@ export interface CoasterAnnotations {
   markers?: VerticalMarker[];
   events?: VerticalMarker[];
   sections?: SectionBand[];
+  /** Familia tipográfica de las etiquetas (la del sistema de diseño). */
+  fontFamily?: string;
 }
 
 declare module "chart.js" {

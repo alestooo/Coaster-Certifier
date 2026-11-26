@@ -1,6 +1,7 @@
 import { describe, test, expect } from "vitest";
 import { buildTrack, resolveConfig } from "../src/physics/index.js";
-import { createCamera, fitBounds, frameView, frameViewAbove, liftProfile, worldBounds } from "../src/ui/renderer/camera.js";
+import { createCamera, fitBounds, frameView, frameViewAbove, worldBounds } from "../src/ui/renderer/camera.js";
+import { liftPath } from "../src/ui/renderer/lift.js";
 
 const WIDTH = 1200;
 const HEIGHT = 600;
@@ -31,7 +32,7 @@ describe("Cámara del taller", () => {
   test("el encuadre ajustado deja A y F dentro del lienzo y usa más escala que el mundo completo", () => {
     // Arrange
     const scene = sceneFor({ mode: "fit", zoom: 1 });
-    const world = worldBounds(scene.track, liftProfile(scene.track));
+    const world = worldBounds(scene.track, liftPath(scene.track));
     const previousScale = Math.min((WIDTH - 56) / (world.maxX - world.minX), (HEIGHT - 112) / world.maxY);
 
     // Act
@@ -88,18 +89,19 @@ describe("Cámara del taller", () => {
     }
   });
 
-  test("fitBounds va de la cresta de la cadena a F sin el relleno del mundo", () => {
+  test("fitBounds va del pie de la rampa a F sin el relleno del mundo", () => {
     // Arrange
     const { track } = sceneFor({ mode: "fit", zoom: 1 });
-    const world = worldBounds(track, liftProfile(track));
+    const world = worldBounds(track, liftPath(track));
 
     // Act
-    const bounds = fitBounds(track, liftProfile(track));
+    const bounds = fitBounds(track, liftPath(track));
 
     // Assert
     expect(bounds.maxX).toBeLessThan(world.maxX);
     expect(bounds.maxX).toBeGreaterThan(track.endX);
-    expect(bounds.minX).toBeLessThan(0);
+    expect(bounds.minX).toBeLessThan(liftPath(track).foot.x);
+    expect(bounds.minX).toBeGreaterThan(world.minX);
     expect(bounds.maxY).toBeGreaterThan(track.maxHeight);
   });
 
@@ -121,7 +123,7 @@ describe("Cámara del taller", () => {
   test("sin centro pedido, el trazado queda centrado verticalmente entre los márgenes", () => {
     // Arrange: lienzo alto, donde el ancho limita la escala y sobra altura.
     const scene = sceneFor({ mode: "fit", zoom: 1 });
-    const bounds = fitBounds(scene.track, liftProfile(scene.track));
+    const bounds = fitBounds(scene.track, liftPath(scene.track));
 
     // Act
     const camera = createCamera(WIDTH, 900, scene);

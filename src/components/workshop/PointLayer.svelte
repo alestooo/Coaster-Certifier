@@ -331,7 +331,7 @@
 
   .guides circle {
     fill: none;
-    stroke: #d9822b;
+    stroke: var(--handle);
     stroke-width: 1.4;
     stroke-dasharray: 5 4;
   }
@@ -389,7 +389,7 @@
     height: 13px;
     margin: -6.5px 0 0 -6.5px;
     padding: 0;
-    border: 2.5px solid #d9822b;
+    border: 2.5px solid var(--handle);
     border-radius: 3px;
     background: white;
     rotate: 45deg;
@@ -408,7 +408,7 @@
 
   .loop-handle.active,
   .loop-handle:focus-visible {
-    background: #d9822b;
+    background: var(--handle);
     outline: none;
   }
 
@@ -447,7 +447,7 @@
     font-style: normal;
     font-weight: 700;
     line-height: 1.4;
-    color: #8a5a12;
+    color: var(--warn-text);
     white-space: normal;
   }
 
@@ -474,7 +474,7 @@
 
   .toolbar button.danger:hover:not(:disabled) {
     background: var(--danger-soft);
-    color: #b7303f;
+    color: var(--danger-text);
   }
 
   .toolbar button:disabled {
@@ -500,7 +500,7 @@
   .label em {
     font-style: normal;
     font-weight: 800;
-    color: #ffd18a;
+    color: var(--tooltip-accent);
   }
 
   @media (prefers-reduced-motion: reduce) {

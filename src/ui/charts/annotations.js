@@ -15,11 +15,12 @@ export const ANNOTATION_PLUGIN_ID = "coasterAnnotations";
 
 const LINE_DASH = Object.freeze([6, 4]);
 const MARKER_DASH = Object.freeze([4, 4]);
-const LABEL_FONT = "600 10px system-ui, sans-serif";
+const LABEL_FONT = "600 10px";
 const LABEL_PADDING = 3;
 const LABEL_OFFSET = 4;
 const EVENT_LABEL_HEIGHT = 14;
-const SECTION_LABEL_FONT = "500 9px system-ui, sans-serif";
+const SECTION_LABEL_FONT = "500 9px";
+const DEFAULT_FONT_FAMILY = "system-ui, sans-serif";
 const SECTION_TEXT_COLOR = "#9a86ac";
 const DEFAULT_LINE_COLOR = "#ba6d77";
 const DEFAULT_BAND_COLOR = "rgba(57,147,107,0.10)";
@@ -27,6 +28,14 @@ const DEFAULT_MARKER_COLOR = "#8a6ba5";
 const DEFAULT_EVENT_COLOR = "#c9444e";
 const DEFAULT_SECTION_COLOR = "rgba(128,80,200,0.06)";
 const LABEL_BACKGROUND = "rgba(255,255,255,0.85)";
+
+/**
+ * Familia tipográfica de las etiquetas (la del sistema de diseño).
+ * @param {Chart} chart
+ */
+function fontFamilyOf(chart) {
+  return annotationsOf(chart).fontFamily ?? DEFAULT_FONT_FAMILY;
+}
 
 /**
  * @param {Chart} chart
@@ -48,10 +57,11 @@ function annotationsOf(chart) {
  * @param {string} color
  * @param {CanvasTextAlign} align
  * @param {CanvasTextBaseline} baseline
+ * @param {string} fontFamily
  */
-function drawLabel(ctx, text, x, y, color, align, baseline) {
+function drawLabel(ctx, text, x, y, color, align, baseline, fontFamily) {
   ctx.save();
-  ctx.font = LABEL_FONT;
+  ctx.font = `${LABEL_FONT} ${fontFamily}`;
   ctx.textAlign = align;
   ctx.textBaseline = baseline;
 
@@ -94,7 +104,7 @@ function drawSectionBands(chart, ctx) {
     }
 
     ctx.save();
-    ctx.font = SECTION_LABEL_FONT;
+    ctx.font = `${SECTION_LABEL_FONT} ${fontFamilyOf(chart)}`;
     ctx.fillStyle = SECTION_TEXT_COLOR;
     ctx.textAlign = "left";
     ctx.textBaseline = "bottom";
@@ -161,7 +171,7 @@ function drawHorizontalLines(chart, ctx) {
     ctx.stroke();
     ctx.restore();
 
-    drawLabel(ctx, line.label, chartArea.right - LABEL_OFFSET, y - LABEL_OFFSET, color, "right", "bottom");
+    drawLabel(ctx, line.label, chartArea.right - LABEL_OFFSET, y - LABEL_OFFSET, color, "right", "bottom", fontFamilyOf(chart));
   }
 }
 
@@ -199,7 +209,7 @@ function drawVerticalMarkers(chart, ctx, markers, defaultColor, labelAtTop) {
       ? chartArea.top + LABEL_OFFSET
       : chartArea.top + LABEL_OFFSET + EVENT_LABEL_HEIGHT * (1 + (index % 2));
 
-    drawLabel(ctx, marker.label, x, y, color, "center", "top");
+    drawLabel(ctx, marker.label, x, y, color, "center", "top", fontFamilyOf(chart));
   });
 }
 

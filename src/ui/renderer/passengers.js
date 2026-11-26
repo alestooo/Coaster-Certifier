@@ -1,5 +1,5 @@
 import { box, circle, clamp } from "./draw.js";
-import { HEAD, SHOULDER, TORSO } from "./passenger-geometry.js";
+import { HEAD, ART_HEAD, SHOULDER, TORSO } from "./passenger-geometry.js";
 import { expressionFor, drawFace, drawAccessory } from "./faces.js";
 
 export { expressionFor } from "./faces.js";
@@ -10,7 +10,24 @@ export { expressionFor } from "./faces.js";
  * riel y la y crece hacia abajo, así que las alturas son negativas.
  */
 
-const ARM = Object.freeze({ upper: 8, lower: 7, width: 3, hand: 2.1, smoothing: 0.2 });
+const ARM = Object.freeze({ upper: 8, lower: 7, width: 2.6, hand: 1.5, smoothing: 0.2 });
+
+/** Escala del arte de la cabeza a la cabeza real. */
+const HEAD_ART_SCALE = HEAD.radius / ART_HEAD.radius;
+
+/**
+ * Dibuja en las coordenadas del arte de la cabeza, escalado y ubicado en la cabeza real.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {() => void} draw
+ */
+function inHeadSpace(ctx, draw) {
+  ctx.save();
+  ctx.translate(HEAD.x, HEAD.y);
+  ctx.scale(HEAD_ART_SCALE, HEAD_ART_SCALE);
+  ctx.translate(-ART_HEAD.x, -ART_HEAD.y);
+  draw();
+  ctx.restore();
+}
 const ARM_REST = Object.freeze({ left: 2.2, right: 0.95 });
 
 /** Memoria de la posición de los brazos para suavizar la animación. */
@@ -59,12 +76,12 @@ function drawHairBack(ctx, passenger, shift) {
   switch (passenger.hairStyle) {
     case "long":
       ctx.beginPath();
-      ctx.moveTo(-7, HEAD.y - 7);
-      ctx.quadraticCurveTo(-13, HEAD.y + 2, -12 - shift, HEAD.y + 16);
-      ctx.quadraticCurveTo(-10 - shift, HEAD.y + 22, -3 - shift * 0.6, HEAD.y + 22);
-      ctx.lineTo(5 - shift * 0.4, HEAD.y + 22);
-      ctx.quadraticCurveTo(10 - shift * 0.3, HEAD.y + 18, 10, HEAD.y + 4);
-      ctx.quadraticCurveTo(10, HEAD.y - 6, 6, HEAD.y - 8);
+      ctx.moveTo(-7, ART_HEAD.y - 7);
+      ctx.quadraticCurveTo(-13, ART_HEAD.y + 2, -12 - shift, ART_HEAD.y + 16);
+      ctx.quadraticCurveTo(-10 - shift, ART_HEAD.y + 22, -3 - shift * 0.6, ART_HEAD.y + 22);
+      ctx.lineTo(5 - shift * 0.4, ART_HEAD.y + 22);
+      ctx.quadraticCurveTo(10 - shift * 0.3, ART_HEAD.y + 18, 10, ART_HEAD.y + 4);
+      ctx.quadraticCurveTo(10, ART_HEAD.y - 6, 6, ART_HEAD.y - 8);
       ctx.closePath();
       ctx.fill();
       break;
@@ -74,15 +91,15 @@ function drawHairBack(ctx, passenger, shift) {
       ctx.lineWidth = 5;
       ctx.lineCap = "round";
       ctx.beginPath();
-      ctx.moveTo(-6, HEAD.y - 3);
-      ctx.quadraticCurveTo(-14 - shift, HEAD.y - 2, -13 - shift * 1.4, HEAD.y + 12);
+      ctx.moveTo(-6, ART_HEAD.y - 3);
+      ctx.quadraticCurveTo(-14 - shift, ART_HEAD.y - 2, -13 - shift * 1.4, ART_HEAD.y + 12);
       ctx.stroke();
-      circle(ctx, -7, HEAD.y - 3, 3, hair);
+      circle(ctx, -7, ART_HEAD.y - 3, 3, hair);
       break;
 
     case "curly":
       for (const [dx, dy, r] of [[-9, -2, 4.5], [9, -2, 4.5], [-10, 5, 4], [10, 5, 4], [-7, -9, 4.5], [7, -9, 4.5]]) {
-        circle(ctx, HEAD.x + dx - (dy > 0 ? shift * 0.3 : 0), HEAD.y + dy, r, hair);
+        circle(ctx, ART_HEAD.x + dx - (dy > 0 ? shift * 0.3 : 0), ART_HEAD.y + dy, r, hair);
       }
       break;
 
@@ -104,38 +121,38 @@ function drawHairTop(ctx, passenger, shift) {
   switch (passenger.hairStyle) {
     case "shaved":
       ctx.beginPath();
-      ctx.arc(HEAD.x, HEAD.y - 0.5, HEAD.radius + 0.4, Math.PI * 1.05, Math.PI * 1.95);
-      ctx.lineTo(HEAD.x + 6, HEAD.y - 5);
+      ctx.arc(ART_HEAD.x, ART_HEAD.y - 0.5, ART_HEAD.radius + 0.4, Math.PI * 1.05, Math.PI * 1.95);
+      ctx.lineTo(ART_HEAD.x + 6, ART_HEAD.y - 5);
       ctx.closePath();
       ctx.fill();
       break;
 
     case "curly":
       for (const [dx, dy, r] of [[-5, -8, 5], [1, -10, 5.2], [6, -7, 4.6], [-9, -4, 4]]) {
-        circle(ctx, HEAD.x + dx, HEAD.y + dy, r, hair);
+        circle(ctx, ART_HEAD.x + dx, ART_HEAD.y + dy, r, hair);
       }
       break;
 
     case "bun":
       ctx.beginPath();
-      ctx.arc(HEAD.x, HEAD.y - 1, HEAD.radius + 0.6, Math.PI, Math.PI * 2);
+      ctx.arc(ART_HEAD.x, ART_HEAD.y - 1, ART_HEAD.radius + 0.6, Math.PI, Math.PI * 2);
       ctx.closePath();
       ctx.fill();
-      circle(ctx, HEAD.x - 5, HEAD.y - 10, 4.6, hair);
+      circle(ctx, ART_HEAD.x - 5, ART_HEAD.y - 10, 4.6, hair);
       break;
 
     default: {
       ctx.beginPath();
-      ctx.arc(HEAD.x, HEAD.y - 1, HEAD.radius + 0.8, Math.PI, Math.PI * 2);
-      ctx.quadraticCurveTo(HEAD.x + 6, HEAD.y - 3, HEAD.x + 2, HEAD.y - 4 + (passenger.hairStyle === "short" ? 0 : 2));
-      ctx.quadraticCurveTo(HEAD.x - 4, HEAD.y - 2, HEAD.x - HEAD.radius - 0.8, HEAD.y - 1);
+      ctx.arc(ART_HEAD.x, ART_HEAD.y - 1, ART_HEAD.radius + 0.8, Math.PI, Math.PI * 2);
+      ctx.quadraticCurveTo(ART_HEAD.x + 6, ART_HEAD.y - 3, ART_HEAD.x + 2, ART_HEAD.y - 4 + (passenger.hairStyle === "short" ? 0 : 2));
+      ctx.quadraticCurveTo(ART_HEAD.x - 4, ART_HEAD.y - 2, ART_HEAD.x - ART_HEAD.radius - 0.8, ART_HEAD.y - 1);
       ctx.closePath();
       ctx.fill();
 
       if (passenger.hairStyle === "short" && shift > 2) {
         ctx.beginPath();
-        ctx.moveTo(HEAD.x - 6, HEAD.y - 7);
-        ctx.quadraticCurveTo(HEAD.x - 10 - shift * 0.5, HEAD.y - 8, HEAD.x - 9 - shift * 0.4, HEAD.y - 4);
+        ctx.moveTo(ART_HEAD.x - 6, ART_HEAD.y - 7);
+        ctx.quadraticCurveTo(ART_HEAD.x - 10 - shift * 0.5, ART_HEAD.y - 8, ART_HEAD.x - 9 - shift * 0.4, ART_HEAD.y - 4);
         ctx.closePath();
         ctx.fill();
       }
@@ -150,7 +167,7 @@ function drawHairTop(ctx, passenger, shift) {
  * @param {any} passenger
  */
 function drawShirt(ctx, passenger) {
-  box(ctx, -TORSO.halfWidth, TORSO.top, TORSO.halfWidth * 2, TORSO.bottom - TORSO.top, passenger.shirt, 5);
+  box(ctx, -TORSO.halfWidth, TORSO.top, TORSO.halfWidth * 2, TORSO.bottom - TORSO.top, passenger.shirt, 3);
 
   if (passenger.shirtStyle === "stripes") {
     for (const y of [TORSO.top + 6, TORSO.top + 12, TORSO.top + 18]) {
@@ -177,7 +194,8 @@ function drawShirt(ctx, passenger) {
     ctx.stroke();
   }
 
-  circle(ctx, 0, TORSO.top + 1, 3.6, passenger.skin);
+  // Cuello.
+  circle(ctx, 0, TORSO.top + 0.5, 1.6, passenger.skin);
 }
 
 /**
@@ -265,13 +283,15 @@ export function drawPassenger(ctx, passenger, seatX, motion = {}) {
   const shift = hairShift(motion);
   const expression = expressionFor(passenger, motion);
 
-  drawHairBack(ctx, passenger, shift);
+  inHeadSpace(ctx, () => drawHairBack(ctx, passenger, shift));
   drawShirt(ctx, passenger);
   drawArm(ctx, -SHOULDER.halfWidth, arms.left, passenger.skin, passenger.shirt);
   drawArm(ctx, SHOULDER.halfWidth, arms.right, passenger.skin, passenger.shirt);
-  drawFace(ctx, passenger, expression);
-  drawHairTop(ctx, passenger, shift);
-  drawAccessory(ctx, passenger);
+  inHeadSpace(ctx, () => {
+    drawFace(ctx, passenger, expression);
+    drawHairTop(ctx, passenger, shift);
+    drawAccessory(ctx, passenger);
+  });
 
   ctx.restore();
 }

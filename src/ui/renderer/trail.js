@@ -50,6 +50,20 @@ function sampleHistory(history) {
 }
 
 /**
+ * Estados hasta el instante elegido (`index` incluido): con la línea de
+ * tiempo movida, la estela no se adelanta al tren. Sin índice, todo.
+ * @template T
+ * @param {ReadonlyArray<T>} history
+ * @param {number | null} index
+ * @returns {ReadonlyArray<T>}
+ */
+export function trailUntil(history, index) {
+  if (index === null) return history;
+  const last = Math.max(0, Math.min(history.length - 1, Math.round(index)));
+  return history.slice(0, last + 1);
+}
+
+/**
  * Estela coloreada por rapidez a lo largo del historial.
  * @param {import("./index.js").Frame} frame
  */

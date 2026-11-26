@@ -81,6 +81,6 @@
   strong {
     font-size: 11px;
     font-weight: 900;
-    color: #d9c7f5;
+    color: var(--tooltip-muted);
   }
 </style>

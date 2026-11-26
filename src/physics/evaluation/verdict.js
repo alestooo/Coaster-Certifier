@@ -10,7 +10,9 @@ import { summarizeRun } from "./summary.js";
  * @property {boolean} ok
  * @property {"error"|"warning"} severity
  * @property {string} formula Expresión usada.
- * @property {string} detail Valores numéricos.
+ * @property {string} detail Valores numéricos (texto con punto, para el script headless).
+ * @property {number} actual Valor del diseño (la interfaz lo escribe con coma).
+ * @property {number} limit Valor requerido o disponible, en la misma unidad.
  */
 
 /**
@@ -39,7 +41,9 @@ export function checkDesignConditions(input) {
       ok: head >= required,
       severity: "error",
       formula: "H + v₀²/(2g) ≥ h_L + R/2",
-      detail: `${head.toFixed(2)} m frente a ${required.toFixed(2)} m requeridos`
+      detail: `${head.toFixed(2)} m frente a ${required.toFixed(2)} m requeridos`,
+      actual: head,
+      limit: required
     });
   }
 
@@ -54,7 +58,9 @@ export function checkDesignConditions(input) {
         ok: head > crest.y,
         severity: "error",
         formula: "H + v₀²/(2g) > h_c",
-        detail: `${head.toFixed(2)} m frente a ${crest.y.toFixed(2)} m de la cresta`
+        detail: `${head.toFixed(2)} m frente a ${crest.y.toFixed(2)} m de la cresta`,
+        actual: head,
+        limit: crest.y
       });
     });
 
@@ -68,7 +74,9 @@ export function checkDesignConditions(input) {
       ok: idealSpeedSquared <= capacity,
       severity: "warning",
       formula: "v_E² ≤ 2·a_f·d_f",
-      detail: `v_E² ideal = ${idealSpeedSquared.toFixed(1)} m²/s² frente a ${capacity.toFixed(1)} m²/s² disponibles`
+      detail: `v_E² ideal = ${idealSpeedSquared.toFixed(1)} m²/s² frente a ${capacity.toFixed(1)} m²/s² disponibles`,
+      actual: idealSpeedSquared,
+      limit: capacity
     });
 
     checks.push({
@@ -77,7 +85,9 @@ export function checkDesignConditions(input) {
       ok: config.brakeDeceleration <= MAX_BRAKE_DECELERATION,
       severity: "error",
       formula: "a_f ≤ 1 g",
-      detail: `${config.brakeDeceleration.toFixed(2)} m/s² frente a ${MAX_BRAKE_DECELERATION} m/s²`
+      detail: `${config.brakeDeceleration.toFixed(2)} m/s² frente a ${MAX_BRAKE_DECELERATION} m/s²`,
+      actual: config.brakeDeceleration,
+      limit: MAX_BRAKE_DECELERATION
     });
   } else {
     const idealEnergy = config.mass * g * config.initialHeight + 0.5 * config.mass * config.initialSpeed ** 2;
@@ -89,7 +99,9 @@ export function checkDesignConditions(input) {
       ok: compression <= config.maxCompression,
       severity: "warning",
       formula: "√(2·E₀/k) ≤ x_máx",
-      detail: `${compression.toFixed(2)} m frente a ${config.maxCompression.toFixed(2)} m permitidos`
+      detail: `${compression.toFixed(2)} m frente a ${config.maxCompression.toFixed(2)} m permitidos`,
+      actual: compression,
+      limit: config.maxCompression
     });
   }
 
@@ -100,12 +112,18 @@ export function checkDesignConditions(input) {
  * Explica por qué la simulación no terminó detenida en la estación.
  * @param {any} final
  * @param {import("../track/builder.js").Track} track
+ * @param {ReadonlyArray<any>} history
  */
-function completionViolation(final, track) {
+function completionViolation(final, track, history) {
   if (final.status === "stalled") {
+    // Si llegó a la zona y quedó quieto antes de E, fue el rebote (resorte) lo que lo devolvió.
+    const reached = history.some(state => state.distance >= track.brakeStart);
+
     return {
-      code: "incomplete",
-      condition: "Recorrido completo: el tren debe llegar a la zona de frenado",
+      code: reached ? "outside-braking" : "incomplete",
+      condition: reached
+        ? "Recorrido completo: el tren quedó fuera de la zona de frenado tras el rebote"
+        : "Recorrido completo: el tren debe llegar a la zona de frenado",
       time: final.time,
       section: final.section,
       position: final.distance,
@@ -164,7 +182,7 @@ export function evaluateRun(history, input) {
   const summary = summarizeRun(history, config, track);
 
   const violations = [...final.events];
-  const completion = final.events.length === 0 ? completionViolation(final, track) : null;
+  const completion = final.events.length === 0 ? completionViolation(final, track, history) : null;
 
   if (completion) violations.push(completion);
 

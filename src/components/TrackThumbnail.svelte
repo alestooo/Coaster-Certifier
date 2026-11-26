@@ -1,6 +1,7 @@
 <script lang="ts">
   import { trackToSvg, metresGrid } from "../ui/track-svg";
   import type { ConfigInput } from "../lib/types";
+  import { formatNumber } from "../ui/format";
 
   let {
     config,
@@ -51,7 +52,7 @@
     <path d={projection.path} fill="none" stroke="var(--primary, #7a4bc6)" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" />
 
     {#if projection.verticalScale > 1.05}
-      <text x={projection.width - 6} y="12" text-anchor="end" font-size="9" font-weight="800" fill="#9b84b3" font-family="Nunito, system-ui, sans-serif">vertical ×{projection.verticalScale.toFixed(1)}</text>
+      <text x={projection.width - 6} y="12" text-anchor="end" font-size="11" font-weight="800" fill="#9b84b3" font-family="Nunito, system-ui, sans-serif">vertical ×{formatNumber(projection.verticalScale, 1)}</text>
     {/if}
 
     {#if showMarkers}

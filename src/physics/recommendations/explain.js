@@ -6,9 +6,11 @@ import { CRITERIA } from "../evaluation/criteria.js";
  *
  * @param {any} state Estado final de la simulación.
  * @param {Partial<import("../config.js").SimulationConfig>} config
+ * @param {{code: string, condition: string} | undefined} [violation] Incumplimiento del dictamen,
+ *   para los que no son eventos del recorrido (reposo antes de E, rebote fuera de la zona).
  */
-export function explainFailure(state, config) {
-  const event = state.events?.at(-1);
+export function explainFailure(state, config, violation) {
+  const event = state.events?.at(-1) ?? violation;
   const title = event?.condition ?? "El recorrido no terminó";
   const inLoop = typeof state.section === "string" && state.section.startsWith("Loop");
 
@@ -35,7 +37,7 @@ export function explainFailure(state, config) {
     case CRITERIA.MIN_LOAD:
       explanation =
         "La carga bajó del mínimo permitido: en la cresta el tren se vuelve demasiado liviano " +
-        "(airtime excesivo). Aumentá el radio de la cresta o reducí la rapidez con que llega.";
+        "(sensación de flotar excesiva). Aumentá el radio de la cresta o reducí la rapidez con que llega.";
       break;
 
     case CRITERIA.COMPRESSION:
@@ -62,10 +64,17 @@ export function explainFailure(state, config) {
         "sigue rebotando: almacenar energía no equivale a disiparla.";
       break;
 
+    case "outside-braking":
+      explanation =
+        "El tren entró a la zona de frenado, pero el resorte lo devolvió y se detuvo antes de E. " +
+        "Por debajo del amortiguamiento crítico (c = 2·√(k·m)) el resorte devuelve parte de la " +
+        "energía; acercar c a ese valor lo detiene sin rebote dentro de la zona.";
+      break;
+
     default:
       explanation =
         state.status === "stalled"
-          ? "El tren quedó detenido antes de entrar en la estación: la energía disponible no " +
+          ? "El tren quedó detenido antes de llegar a la zona de frenado: la energía disponible no " +
             "bastó para completar el recorrido con las pérdidas por fricción."
           : "El estado calculado no cumple las condiciones de finalización.";
   }

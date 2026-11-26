@@ -1,4 +1,5 @@
 import { CONFIG_LIMITS } from "../physics/index.js";
+import { MAX_LOOP_SHAPE } from "../physics/config.js";
 import type { SimulationConfig } from "./types";
 import type { AreaId } from "./audit";
 import { formatNumber, kmh } from "../ui/format";
@@ -17,6 +18,8 @@ export interface FieldDefinition {
   visible?: (config: SimulationConfig) => boolean;
   /** Lectura calculada que acompaña al valor (equivalencias, umbrales). */
   hint?: (config: SimulationConfig) => string;
+  /** Recorrido del slider: logarítmico para rangos de varios órdenes de magnitud. */
+  scale?: "linear" | "log";
 }
 
 export interface FieldGroup {
@@ -75,7 +78,7 @@ export const FIELD_GROUPS: FieldGroup[] = [
   {
     id: "start",
     title: "Salida",
-    points: "A",
+    points: "Punto A",
     fields: [
       {
         key: "initialHeight",
@@ -89,7 +92,7 @@ export const FIELD_GROUPS: FieldGroup[] = [
       {
         key: "initialSpeed",
         symbol: "v₀",
-        label: "Rapidez al soltar la cadena",
+        label: "Rapidez inicial en A",
         unit: "m/s",
         step: 0.1,
         help: "Rapidez con la que el tren pasa por la cima A. El anexo propone entre 0,5 y 5 m/s.",
@@ -104,7 +107,7 @@ export const FIELD_GROUPS: FieldGroup[] = [
       {
         key: "trackWidth",
         symbol: "W",
-        label: "Largo horizontal del trazado",
+        label: "Ancho del trazado",
         unit: "m",
         step: 5,
         help: "Distancia horizontal desde A hasta la recta de llegada. Más largo = pendientes más suaves."
@@ -124,7 +127,7 @@ export const FIELD_GROUPS: FieldGroup[] = [
   {
     id: "loop",
     title: "Loop",
-    points: "B · C",
+    points: "Puntos B y C",
     visible: hasLoop,
     fields: [
       {
@@ -150,7 +153,7 @@ export const FIELD_GROUPS: FieldGroup[] = [
   {
     id: "hill",
     title: "Colina",
-    points: "D",
+    points: "Punto D",
     visible: hasHill,
     fields: [
       {
@@ -175,12 +178,12 @@ export const FIELD_GROUPS: FieldGroup[] = [
   {
     id: "braking",
     title: "Frenado",
-    points: "E → F",
+    points: "De E a F",
     fields: [
       {
         key: "brakingLength",
         symbol: "d_f",
-        label: "Largo de la zona de frenado",
+        label: "Largo de frenado",
         unit: "m",
         step: 1,
         help: "Recta final entre E y F donde el tren debe quedar detenido."
@@ -188,7 +191,7 @@ export const FIELD_GROUPS: FieldGroup[] = [
       {
         key: "brakeDeceleration",
         symbol: "a_f",
-        label: "Intensidad de los frenos",
+        label: "Desaceleración de frenado",
         unit: "m/s²",
         step: 0.1,
         help: "Desaceleración constante mientras frena. El anexo la limita a 1 g (9,81 m/s²) por comodidad.",
@@ -198,6 +201,7 @@ export const FIELD_GROUPS: FieldGroup[] = [
       },
       {
         key: "springConstant",
+        scale: "log",
         symbol: "k",
         label: "Rigidez del resorte",
         unit: "N/m",
@@ -207,8 +211,9 @@ export const FIELD_GROUPS: FieldGroup[] = [
       },
       {
         key: "springDamping",
+        scale: "log",
         symbol: "c",
-        label: "Amortiguador",
+        label: "Amortiguamiento",
         unit: "N·s/m",
         step: 50,
         help: "Disipa energía con una fuerza −c·v. Con 0 el resorte devuelve toda la energía.",
@@ -263,6 +268,7 @@ export const FIELD_GROUPS: FieldGroup[] = [
     fields: [
       {
         key: "timeStep",
+        scale: "log",
         symbol: "dt",
         label: "Intervalo entre muestras",
         unit: "s",
@@ -271,6 +277,7 @@ export const FIELD_GROUPS: FieldGroup[] = [
       },
       {
         key: "maxSubstep",
+        scale: "log",
         symbol: "Δt",
         label: "Paso máximo de RK4",
         unit: "s",
@@ -305,6 +312,27 @@ export function visibleFields(config: SimulationConfig): FieldDefinition[] {
 /** Rango [mínimo, máximo] de un campo numérico. */
 export function limitsOf(key: NumericKey): readonly [number, number] {
   const [min, max] = CONFIG_LIMITS[key];
+  return [min, max];
+}
+
+/** Radio mínimo en la cima como fracción de la altura del loop (forma máxima de la lágrima). */
+export const MIN_TOP_RADIUS_FRACTION = (1 - MAX_LOOP_SHAPE) / 2;
+
+/**
+ * Límites de un campo para el diseño actual: los de la configuración,
+ * recortados por la forma del loop (2R ≤ h_L ≤ R/fracción mínima).
+ */
+export function fieldLimits(key: NumericKey, config: SimulationConfig): [number, number] {
+  let [min, max] = limitsOf(key);
+
+  if (key === "loopHeight") {
+    min = Math.max(min, 2 * config.loopTopRadius);
+    max = Math.min(max, config.loopTopRadius / MIN_TOP_RADIUS_FRACTION);
+  } else if (key === "loopTopRadius") {
+    min = Math.max(min, MIN_TOP_RADIUS_FRACTION * config.loopHeight);
+    max = Math.min(max, config.loopHeight / 2);
+  }
+
   return [min, max];
 }
 

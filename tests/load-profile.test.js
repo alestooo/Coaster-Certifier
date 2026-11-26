@@ -104,12 +104,21 @@ describe("Leyenda de la franja de fuerza g", () => {
   test("con «siempre apoyado» el límite inferior es N ≤ 0", () => {
     const over = legendItems(resolveConfig({ contactModel: "strict" })).find(item => item.tone === "over");
 
-    expect(over.text).toBe("> 5,0 g o ≤ 0 g");
+    expect(over.text).toBe("fuera del límite");
+    expect(over.detail).toBe("> 5,0 g o ≤ 0 g");
   });
 
   test("con ruedas anti-levantamiento dice «<» como el motor, que rechaza recién por debajo de n_mín", () => {
     const over = legendItems(resolveConfig({ contactModel: "safety-wheels" })).find(item => item.tone === "over");
 
-    expect(over.text).toBe("> 5,0 g o < -1,0 g");
+    expect(over.detail).toBe("> 5,0 g o < −1,0 g");
+  });
+
+  test("cada tono dice qué significa; el umbral queda como detalle", () => {
+    const items = legendItems(resolveConfig({}));
+
+    expect(items.map(item => item.text)).toEqual(["cómoda", "cerca del límite", "fuera del límite", "casi sin peso"]);
+    expect(items.find(item => item.tone === "near").detail).toBe("≥ 4,5 g");
+    expect(items.find(item => item.tone === "float").detail).toBe("< 0,2 g");
   });
 });

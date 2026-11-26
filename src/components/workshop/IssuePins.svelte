@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CircleAlert } from "lucide-svelte";
   import type { Camera } from "../../ui/renderer/camera.js";
   import type { PlainIssue } from "../../lib/audit";
 
@@ -29,7 +30,7 @@
         title={issue.title}
         onclick={() => onOpen(openIssue === index ? null : index)}
       >
-        <span aria-hidden="true">!</span>
+        <CircleAlert size={16} strokeWidth={2.6} aria-hidden="true" />
       </button>
     </div>
   {/each}
@@ -81,7 +82,7 @@
     transition: scale 0.15s;
   }
 
-  .pin span {
+  .pin :global(svg) {
     rotate: 45deg;
   }
 

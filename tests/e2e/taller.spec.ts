@@ -4,13 +4,13 @@ import { test, expect, type Page, type Locator } from "@playwright/test";
 async function openWorkshop(page: Page) {
   await page.goto("/");
   await page.getByRole("button", { name: /Diseñar y certificar/ }).click();
-  await expect(verdict(page)).toContainText(/Aprueba|No aprueba/, { timeout: 15_000 });
+  await expect(verdict(page)).toContainText(/Aprobado|Rechazado/, { timeout: 15_000 });
 }
 
 const verdict = (page: Page) => page.locator(".bar .verdict");
 const handle = (page: Page, name: RegExp) => page.getByRole("slider", { name });
 const brakeEnd = (page: Page) => handle(page, /Fin de la zona de frenado/);
-const brakeEntry = (page: Page) => handle(page, /Inicio del frenado/);
+const brakeEntry = (page: Page) => handle(page, /Inicio de la zona de frenado/);
 
 async function center(locator: Locator) {
   const box = await locator.boundingBox();
@@ -37,8 +37,8 @@ async function selectBraking(page: Page) {
 }
 
 async function chooseInPicker(page: Page, name: RegExp) {
-  await page.getByRole("button", { name: /Recorrido del anexo|Loop|Línea|Valle|Plano|Personalizado/ }).first().click();
-  await page.getByRole("dialog", { name: "Recorridos y casos de prueba" }).getByRole("button", { name }).click();
+  await page.getByRole("button", { name: /Trazado del anexo|Loop|Bajada simple|Valle|Plano|Personalizado/ }).first().click();
+  await page.getByRole("dialog", { name: "Trazados y escenarios" }).getByRole("button", { name }).click();
 }
 
 test.describe("Taller de diseño", () => {
@@ -47,21 +47,21 @@ test.describe("Taller de diseño", () => {
     page.on("pageerror", error => errors.push(error.message));
 
     await openWorkshop(page);
-    await expect(verdict(page)).toContainText("Aprueba la certificación");
-    await expect(page.getByRole("button", { name: /Recorrido del anexo/ })).toBeVisible();
+    await expect(verdict(page)).toContainText("Aprobado");
+    await expect(page.getByRole("button", { name: /Trazado del anexo/ })).toBeVisible();
 
     // La reproducción avanza el tiempo y luego se completa al instante.
     const time = page.locator(".pill .time");
     await page.getByRole("button", { name: "Reproducir" }).click();
     await expect(time).not.toHaveText("t = 0,0 s", { timeout: 5_000 });
     await page.getByRole("button", { name: "Pausar" }).click();
-    await page.getByRole("button", { name: "Ir al final" }).click();
+    await page.getByRole("button", { name: "Saltar al final" }).click();
 
     await verdict(page).click();
     const panel = page.getByRole("complementary", { name: "Dictamen" });
     await expect(panel.locator(".badge", { hasText: "APROBADO" })).toBeVisible();
-    await panel.getByRole("button", { name: /Informe completo/ }).click();
-    await expect(page.getByRole("heading", { name: /Informe del recorrido/ })).toBeVisible();
+    await panel.getByRole("button", { name: "Ver informe de certificación" }).click();
+    await expect(page.getByRole("heading", { name: /Informe de certificación/ })).toBeVisible();
 
     expect(errors).toEqual([]);
   });
@@ -71,12 +71,12 @@ test.describe("Taller de diseño", () => {
 
     await dragBrakeEndTowardsEntry(page);
 
-    await expect(verdict(page)).toContainText(/No aprueba: no se detiene a tiempo/);
+    await expect(verdict(page)).toContainText(/Rechazado: no se detiene a tiempo/);
     await expect(page.getByRole("complementary", { name: "Frenado" })).toContainText(/necesita \d+ m/);
 
     await page.keyboard.press("Control+z");
-    await expect(verdict(page)).toContainText("Aprueba la certificación");
-    await expect(brakeEnd(page)).toHaveAttribute("aria-valuenow", "80");
+    await expect(verdict(page)).toContainText("Aprobado");
+    await expect(brakeEnd(page)).toHaveAttribute("aria-valuenow", "60");
   });
 
   test("con el panel abierto, arrastrar F sigue sobre la vía y rechaza", async ({ page }) => {
@@ -89,7 +89,7 @@ test.describe("Taller de diseño", () => {
     expect(stage && f.x < stage.x + stage.width).toBe(true);
 
     await dragBrakeEndTowardsEntry(page);
-    await expect(verdict(page)).toContainText(/No aprueba/);
+    await expect(verdict(page)).toContainText(/Rechazado/);
   });
 
   test("las flechas sobre la cima del loop suben h_L de a 0,5 m", async ({ page }) => {
@@ -99,8 +99,8 @@ test.describe("Taller de diseño", () => {
     await top.focus();
     for (let index = 0; index < 4; index++) await page.keyboard.press("ArrowUp");
 
-    await expect(top).toHaveAttribute("aria-valuenow", "16");
-    await expect(top).toHaveAttribute("aria-valuetext", "h_L = 16,0 m");
+    await expect(top).toHaveAttribute("aria-valuenow", "23.5");
+    await expect(top).toHaveAttribute("aria-valuetext", "Altura del loop: 23,5 m");
   });
 
   test("un valor escrito fuera de rango muestra el error y mantiene el último diseño válido", async ({ page }) => {
@@ -112,10 +112,10 @@ test.describe("Taller de diseño", () => {
     await length.press("Enter");
 
     await expect(page.getByRole("complementary", { name: "Frenado" }).getByRole("alert")).toHaveText(
-      /Largo de la zona de frenado: debe estar entre 1 y 150 m/
+      /Largo de frenado: debe estar entre 1 y 150 m/
     );
     await expect(verdict(page)).toContainText(/valor inválido/i);
-    await expect(brakeEnd(page)).toHaveAttribute("aria-valuenow", "80");
+    await expect(brakeEnd(page)).toHaveAttribute("aria-valuenow", "60");
   });
 
   test("pointercancel a mitad del arrastre deja un diseño válido", async ({ page }) => {
@@ -130,7 +130,7 @@ test.describe("Taller de diseño", () => {
     await page.mouse.up();
 
     await expect(f).not.toHaveClass(/active/);
-    await expect(verdict(page)).toContainText(/Aprueba|No aprueba/);
+    await expect(verdict(page)).toContainText(/Aprobado|Rechazado/);
     await expect(verdict(page)).not.toContainText(/inválido/i);
     const value = Number(await f.getAttribute("aria-valuenow"));
     expect(value).toBeGreaterThanOrEqual(1);
@@ -139,7 +139,7 @@ test.describe("Taller de diseño", () => {
 
   test("deshacer hasta un recorrido sin la parte encuadrada vuelve al encuadre completo", async ({ page }) => {
     await openWorkshop(page);
-    await chooseInPicker(page, /^Línea ¿/);
+    await chooseInPicker(page, /^Bajada simple ¿/);
     await page.keyboard.press("Control+z");
     const crest = handle(page, /Cresta de la colina/);
     await expect(crest).toBeVisible();
@@ -153,7 +153,7 @@ test.describe("Taller de diseño", () => {
     await page.waitForTimeout(600);
     const zoomed = (await center(brakeEnd(page))).x;
 
-    // Rehacer «Línea»: la colina ya no existe, la selección se descarta y la cámara vuelve al encuadre.
+    // Rehacer «Bajada simple»: la colina ya no existe, la selección se descarta y la cámara vuelve al encuadre.
     await page.keyboard.press("Control+Shift+z");
     await expect(page.getByRole("complementary", { name: "Colina" })).toHaveCount(0);
     await page.waitForTimeout(600);
@@ -206,47 +206,46 @@ test.describe("Taller de diseño", () => {
     expect((await center(brakeEnd(page))).y).toBeLessThan(top);
   });
 
-  test("pasar de un loop seleccionado a «Línea» cierra el panel y quita las manijas del loop", async ({ page }) => {
+  test("pasar de un loop seleccionado a «Bajada simple» cierra el panel y quita las manijas del loop", async ({ page }) => {
     await openWorkshop(page);
 
     await handle(page, /Cima del loop/).click();
     await expect(page.getByRole("complementary", { name: "Loop" })).toBeVisible();
 
-    await chooseInPicker(page, /^Línea ¿/);
+    await chooseInPicker(page, /^Bajada simple ¿/);
 
     await expect(page.getByRole("complementary", { name: "Loop" })).toHaveCount(0);
     await expect(handle(page, /Cima del loop/)).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /^Línea/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Bajada simple/ })).toBeVisible();
   });
 
-  test("el loop circular muestra un pin; su popover ofrece correcciones verificadas, «Ver» previsualiza y «Aplicar» aprueba", async ({ page }) => {
+  test("el loop circular muestra un pin; su popover ofrece correcciones verificadas, «Mostrar en la pista» previsualiza y «Aplicar» aprueba", async ({ page }) => {
     await openWorkshop(page);
     await chooseInPicker(page, /Loop circular/);
-    await expect(verdict(page)).toContainText(/No aprueba: fuerza g demasiado alta/);
+    await expect(verdict(page)).toContainText(/Rechazado: fuerza g demasiado alta/);
 
     // Desde el dictamen se llega al mismo pin.
     await verdict(page).click();
-    await page.getByRole("complementary", { name: "Dictamen" }).getByRole("button", { name: /Ver dónde falla/ }).click();
+    await page.getByRole("complementary", { name: "Dictamen" }).getByRole("list", { name: "Incumplimientos" }).getByRole("button").first().click();
     const popover = page.getByRole("dialog", { name: /Problema: Fuerza g demasiado alta/ });
     await expect(popover).toBeVisible();
-    await popover.getByRole("button", { name: "Cerrar" }).click();
+    await popover.getByRole("button", { name: "Cerrar problema" }).click();
     await expect(popover).toHaveCount(0);
 
     // Y directamente desde el pin sobre la vía.
     await page.getByRole("button", { name: /^Problema: Fuerza g demasiado alta/ }).click();
-    const see = popover.getByRole("button", { name: "Ver" }).first();
+    const see = popover.getByRole("button", { name: "Mostrar en la pista" }).first();
     await expect(see).toBeVisible({ timeout: 30_000 });
-    await expect(popover.getByText("aprueba").first()).toBeVisible();
 
     await see.click();
     await expect(see).toHaveAttribute("aria-pressed", "true");
 
     await popover.getByRole("button", { name: "Aplicar" }).first().click();
-    await expect(verdict(page)).toContainText("Aprueba la certificación");
+    await expect(verdict(page)).toContainText("Aprobado");
     await expect(popover).toHaveCount(0);
 
     await page.keyboard.press("Control+z");
-    await expect(verdict(page)).toContainText(/No aprueba/);
+    await expect(verdict(page)).toContainText(/Rechazado/);
   });
 
   test("todo el popover de correcciones se puede alcanzar, aun con «Por qué pasa» abierto", async ({ page }) => {
@@ -289,7 +288,7 @@ test.describe("Taller de diseño", () => {
     await chooseInPicker(page, /Loop circular/);
 
     await verdict(page).click();
-    await page.getByRole("complementary", { name: "Dictamen" }).getByRole("button", { name: /Ver dónde falla/ }).click();
+    await page.getByRole("complementary", { name: "Dictamen" }).getByRole("list", { name: "Incumplimientos" }).getByRole("button").first().click();
 
     await expect(page.getByRole("complementary", { name: "Dictamen" })).toHaveCount(0);
     await expect(page.getByRole("dialog", { name: /^Problema:/ })).toBeInViewport();
@@ -298,7 +297,7 @@ test.describe("Taller de diseño", () => {
   test("cambiar la masa de un pasajero cierra el popover y su vista previa", async ({ page }) => {
     await openWorkshop(page);
     await chooseInPicker(page, /Loop circular/);
-    await page.getByRole("button", { name: /2 · \d+ kg/ }).click();
+    await page.getByRole("button", { name: /2 pasajeros, \d+ kg/ }).click();
     await page.getByRole("button", { name: /^Problema:/ }).first().click();
     const popover = page.getByRole("dialog", { name: /^Problema:/ });
     await expect(popover).toBeVisible();
@@ -308,7 +307,7 @@ test.describe("Taller de diseño", () => {
     await ana.press("Enter");
 
     // El popover no debe volver cuando llega el dictamen del diseño nuevo.
-    await expect(page.getByRole("button", { name: /2 · \d+ kg/ })).toContainText("590");
+    await expect(page.getByRole("button", { name: /2 pasajeros, \d+ kg/ })).toContainText("590");
     await page.waitForTimeout(1500);
     await expect(popover).toHaveCount(0);
   });
@@ -329,11 +328,11 @@ test.describe("Taller de diseño", () => {
   test("un problema abierto durante la reproducción sigue abierto cuando la reproducción termina", async ({ page }) => {
     await openWorkshop(page);
     await chooseInPicker(page, /Loop circular/);
-    await expect(verdict(page)).toContainText(/No aprueba/);
+    await expect(verdict(page)).toContainText(/Rechazado/);
 
     await page.getByRole("button", { name: "Reproducir" }).click();
     await verdict(page).click();
-    await page.getByRole("complementary", { name: "Dictamen" }).getByRole("button", { name: /Ver dónde falla/ }).click();
+    await page.getByRole("complementary", { name: "Dictamen" }).getByRole("list", { name: "Incumplimientos" }).getByRole("button").first().click();
     const popover = page.getByRole("dialog", { name: /Problema:/ });
     await expect(popover).toBeVisible();
 
@@ -345,14 +344,14 @@ test.describe("Taller de diseño", () => {
   test("deshacer con el teclado quita la lectura de la pista vieja", async ({ page }) => {
     await openWorkshop(page);
     await dragBrakeEndTowardsEntry(page);
-    await expect(verdict(page)).toContainText("No aprueba");
+    await expect(verdict(page)).toContainText("Rechazado");
 
     const e = await center(brakeEntry(page));
     await page.mouse.move(e.x - 60, e.y - 1);
     await expect(page.locator(".probe")).toHaveCount(1);
 
     await page.keyboard.press("Control+z");
-    await expect(verdict(page)).toContainText("Aprueba la certificación");
+    await expect(verdict(page)).toContainText("Aprobado");
     await expect(page.locator(".probe")).toHaveCount(0);
   });
 
@@ -377,7 +376,7 @@ test.describe("Taller de diseño", () => {
 
   test("la leyenda oculta y muestra la franja de fuerza g", async ({ page }) => {
     await openWorkshop(page);
-    const toggle = page.getByRole("button", { name: "Fuerza g" });
+    const toggle = page.getByRole("button", { name: "Fuerza g", exact: true });
     const colors = page.getByRole("list", { name: "Colores de la franja de fuerza g" });
 
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
@@ -392,15 +391,15 @@ test.describe("Taller de diseño", () => {
     await dragBrakeEndTowardsEntry(page, 60);
     const designed = await brakeEnd(page).getAttribute("aria-valuenow");
 
-    await page.getByRole("button", { name: /2 · 582 kg/ }).click();
+    await page.getByRole("button", { name: /2 pasajeros, 582 kg/ }).click();
     const panel = page.getByRole("complementary", { name: "Tren y pasajeros" });
 
-    // Tres personas: dos carritos (2 × 425 kg) más 75 + 82 + 64 kg.
-    await panel.getByRole("button", { name: "3 personas" }).click();
-    await expect(page.getByRole("button", { name: /3 · 1\s?071 kg/ })).toBeVisible();
+    // Tres pasajeros: dos carritos (2 × 425 kg) más 75 + 82 + 64 kg.
+    await panel.getByRole("radio", { name: "3 pasajeros" }).click();
+    await expect(page.getByRole("button", { name: /3 pasajeros, 1\s?071 kg/ })).toBeVisible();
 
     await panel.getByRole("button", { name: /^Luis/ }).click();
-    await panel.getByRole("button", { name: "Cabello" }).click();
+    await panel.getByRole("tab", { name: "Cabello" }).click();
     const long = panel.getByRole("button", { name: "Largo" });
     await long.click();
     await expect(long).toHaveAttribute("aria-pressed", "true");
@@ -408,7 +407,7 @@ test.describe("Taller de diseño", () => {
     const mass = panel.getByLabel("Masa de Luis");
     await mass.fill("90");
     await mass.press("Enter");
-    await expect(page.getByRole("button", { name: /3 · 1\s?079 kg/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /3 pasajeros, 1\s?079 kg/ })).toBeVisible();
 
     // Todo pasó dentro del panel: no hay otra pantalla y el diseño sigue igual.
     await expect(page.getByRole("main")).toHaveCount(1);
@@ -430,7 +429,7 @@ test.describe("Taller de diseño", () => {
     await page.mouse.up();
 
     await expect(point).not.toHaveAccessibleName(/altura 7,0 m/);
-    await expect(verdict(page)).toContainText(/Aprueba|No aprueba/);
+    await expect(verdict(page)).toContainText(/Aprobado|Rechazado/);
     await page.keyboard.press("Control+z");
     await expect(point).toHaveAccessibleName(/altura 7,0 m/);
   });
@@ -521,7 +520,7 @@ test.describe("Taller de diseño", () => {
     const panel = page.getByRole("complementary", { name: "Punto 3" });
 
     // Un valor fuera de rango se recorta y el campo muestra el recortado, no lo escrito.
-    const height = panel.getByRole("spinbutton", { name: "Altura y" });
+    const height = panel.getByRole("textbox", { name: "Altura y" });
     await height.fill("9999");
     await height.press("Enter");
     await expect(height).not.toHaveValue("9999");
@@ -534,7 +533,7 @@ test.describe("Taller de diseño", () => {
     // h_L = 0 no quita el loop: para eso está «Quitar loop».
     await page.getByRole("button", { name: /^Punto 3:/ }).click();
     await page.getByRole("button", { name: "Agregar loop" }).click();
-    const loopHeight = page.getByRole("complementary", { name: "Punto 3" }).getByRole("spinbutton", { name: /Altura del loop/ });
+    const loopHeight = page.getByRole("complementary", { name: "Punto 3" }).getByRole("textbox", { name: /Altura del loop/ });
     await loopHeight.fill("0");
     await loopHeight.press("Enter");
     await expect(handle(page, /Cima del loop del punto 3/)).toBeVisible();
@@ -663,15 +662,15 @@ test.describe("Taller de diseño", () => {
   test("el informe escribe el resultado con coma decimal y sus botones usan íconos, no glifos de texto", async ({ page }) => {
     await openWorkshop(page);
     await verdict(page).click();
-    await page.getByRole("button", { name: /Informe completo/ }).click();
-    const report = page.getByRole("dialog", { name: "Informe del recorrido" });
+    await page.getByRole("button", { name: "Ver informe de certificación" }).click();
+    const report = page.getByRole("dialog", { name: /Informe de certificación/ });
     await expect(report).toBeVisible();
 
     const result = report.locator("section").filter({ hasText: "1. Resultado" }).locator("ul");
     await expect(result).toContainText("quedó detenido a");
     expect(await result.textContent()).not.toMatch(/\d\.\d/);
 
-    for (const name of [/CSV/, /JSON/, /Imprimir/]) {
+    for (const name of [/Imprimir o guardar PDF/]) {
       const button = report.getByRole("button", { name });
       await expect(button.locator("svg")).toHaveCount(1);
       expect(await button.textContent()).not.toMatch(/[⤓🖨✕]/u);
@@ -681,19 +680,19 @@ test.describe("Taller de diseño", () => {
   test("en el teléfono la guía se abre desde el selector de recorridos", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openWorkshop(page);
-    await expect(page.getByRole("button", { name: "Guía y escenarios" })).toBeHidden();
+    await expect(page.getByRole("button", { name: "Guía", exact: true })).toBeHidden();
 
-    await page.getByRole("button", { name: /Recorrido del anexo/ }).first().click();
-    await page.getByRole("dialog", { name: "Recorridos y casos de prueba" }).getByRole("button", { name: /Guía/ }).click();
+    await page.getByRole("button", { name: /Trazado del anexo/ }).first().click();
+    await page.getByRole("dialog", { name: "Trazados y escenarios" }).getByRole("button", { name: /guía/i }).click();
 
-    await expect(page.getByRole("dialog", { name: "Escenarios y criterios" })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Guía" })).toBeVisible();
   });
 
   test("una masa vacía no deja «NaN kg» y una fuera de rango queda marcada en su campo", async ({ page }) => {
     await openWorkshop(page);
     await page.getByRole("button", { name: /Tren y pasajeros/ }).click();
     const panel = page.getByRole("complementary", { name: "Tren y pasajeros" });
-    const mass = panel.getByRole("spinbutton", { name: "Masa de Ana" });
+    const mass = panel.getByRole("textbox", { name: "Masa de Ana" });
     await expect(mass).toBeVisible();
     const before = await mass.inputValue();
 
@@ -721,12 +720,12 @@ test.describe("Taller de diseño", () => {
 
     await page.unroute(/PassengerEditor[^/]*\.js/);
     await panel.getByRole("button", { name: "Reintentar" }).click();
-    await expect(panel.getByRole("button", { name: "3 personas" })).toBeVisible();
+    await expect(panel.getByRole("radio", { name: "3 pasajeros" })).toBeVisible();
   });
 
-  test("si la manija desaparece en pleno arrastre (rehacer a «Línea»), el gesto termina al soltar", async ({ page }) => {
+  test("si la manija desaparece en pleno arrastre (rehacer a «Bajada simple»), el gesto termina al soltar", async ({ page }) => {
     await openWorkshop(page);
-    await chooseInPicker(page, /^Línea ¿/);
+    await chooseInPicker(page, /^Bajada simple ¿/);
     await expect(handle(page, /Cima del loop/)).toHaveCount(0);
     await page.keyboard.press("Control+z");
     const top = handle(page, /Cima del loop/);
@@ -742,7 +741,7 @@ test.describe("Taller de diseño", () => {
     await page.mouse.up();
 
     // Ya sin gesto, la lectura vuelve a aparecer al pasar por la vía.
-    await expect(verdict(page)).toContainText(/Aprueba|No aprueba/);
+    await expect(verdict(page)).toContainText(/Aprobado|Rechazado/);
     await page.waitForTimeout(800);
     const e = await center(brakeEntry(page));
     await page.mouse.move(e.x - 60, e.y - 1);
@@ -759,10 +758,10 @@ test.describe("Taller de diseño", () => {
     await page.waitForTimeout(900);
     await page.mouse.move(from.x - 70, from.y, { steps: 4 });
     await page.mouse.up();
-    await expect(brakeEnd(page)).not.toHaveAttribute("aria-valuenow", "80");
+    await expect(brakeEnd(page)).not.toHaveAttribute("aria-valuenow", "60");
 
     await page.keyboard.press("Control+z");
-    await expect(brakeEnd(page)).toHaveAttribute("aria-valuenow", "80");
+    await expect(brakeEnd(page)).toHaveAttribute("aria-valuenow", "60");
   });
 
   test("soltar una manija y volver a tomarla enseguida no mueve la pista bajo el cursor", async ({ page }) => {
@@ -793,7 +792,7 @@ test.describe("Taller de diseño", () => {
 
     await top.focus();
     await page.keyboard.press("Enter");
-    const input = page.getByRole("spinbutton", { name: /Cima del loop.*escribí el valor/ });
+    const input = page.getByRole("textbox", { name: /Cima del loop.*escribí el valor/ });
     await input.fill("80");
     await input.press("Enter");
 
@@ -801,23 +800,134 @@ test.describe("Taller de diseño", () => {
     await expect(page.locator(".handles .label em")).toBeVisible();
   });
 
-  test("arrastrar la etiqueta de un campo cambia el valor y Ctrl+Z lo deshace", async ({ page }) => {
+  test("el campo del panel tiene un slider: arrastrarlo cambia el valor y un Ctrl+Z lo deshace en un paso", async ({ page }) => {
     await openWorkshop(page);
     await selectBraking(page);
 
     const panel = page.getByRole("complementary", { name: "Frenado" });
-    const label = panel.locator(".scrub-label", { hasText: "Largo de la zona de frenado" });
-    const box = await label.boundingBox();
-    if (!box) throw new Error("Etiqueta sin caja");
-    await page.mouse.move(box.x + 12, box.y + box.height / 2);
+    const slider = panel.getByRole("slider", { name: "Largo de frenado" });
+    const box = await slider.boundingBox();
+    if (!box) throw new Error("Slider sin caja");
+    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height / 2);
     await page.mouse.down();
-    await page.mouse.move(box.x - 68, box.y + box.height / 2, { steps: 8 });
+    await page.mouse.move(box.x + box.width * 0.2, box.y + box.height / 2, { steps: 8 });
+    await page.mouse.move(box.x + box.width * 0.3, box.y + box.height / 2, { steps: 4 });
     await page.mouse.up();
 
     const input = page.locator("#field-brakingLength");
-    await expect(input).not.toHaveValue("80");
+    await expect(input).not.toHaveValue("60");
     await page.keyboard.press("Control+z");
-    await expect(input).toHaveValue("80");
+    await expect(input).toHaveValue("60");
+  });
+
+  test("el selector de magnitud de la telemetría se maneja con el teclado y Esc no cambia nada", async ({ page }) => {
+    await openWorkshop(page);
+    const trigger = page.getByRole("button", { name: /^Magnitud graficada:/ });
+    const before = await trigger.getAttribute("aria-label");
+
+    await trigger.focus();
+    await page.keyboard.press("ArrowDown");
+    const list = page.getByRole("listbox", { name: "Magnitud graficada" });
+    await expect(list).toBeVisible();
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Escape");
+    await expect(list).toBeHidden();
+    await expect(trigger).toHaveAttribute("aria-label", before ?? "");
+
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Home");
+    await page.keyboard.press("Enter");
+    await expect(trigger).toHaveAttribute("aria-label", /Magnitud graficada: Rapidez/);
+  });
+
+  test("un segundo clic sobre un selector o un menú lo cierra", async ({ page }) => {
+    await openWorkshop(page);
+    const trigger = page.getByRole("button", { name: /^Magnitud graficada:/ });
+    const list = page.getByRole("listbox", { name: "Magnitud graficada" });
+
+    await trigger.click();
+    await expect(list).toBeVisible();
+    await trigger.click();
+    await expect(list).toBeHidden();
+
+    await verdict(page).click();
+    const download = page.getByRole("button", { name: "Descargar" });
+    const menu = page.getByRole("menu", { name: "Descargar" });
+    await download.click();
+    await expect(menu).toBeVisible();
+    await download.click();
+    await expect(menu).toBeHidden();
+  });
+
+  test("la guía tiene pestañas accesibles", async ({ page }) => {
+    await openWorkshop(page);
+    await page.getByRole("button", { name: /^Guía/ }).click();
+    const tab = page.getByRole("tab", { name: "Criterios" });
+
+    await tab.click();
+    await expect(tab).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("tab", { name: "Modelo" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("en el teléfono las tablas del informe se desplazan sin cortar texto ni desbordar la página", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openWorkshop(page);
+    await verdict(page).click();
+    await page.getByRole("button", { name: /informe/i }).first().click();
+    const report = page.getByRole("dialog", { name: /Informe/ });
+    await expect(report).toBeVisible();
+
+    const scrollers = report.locator(".table-scroll");
+    expect(await scrollers.count()).toBeGreaterThan(0);
+    const scrolls = await scrollers.first().evaluate(element => element.scrollWidth > element.clientWidth);
+    expect(scrolls).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  });
+
+  test("cada insignia explica su letra", async ({ page }) => {
+    await openWorkshop(page);
+
+    await expect(handle(page, /^Inicio de la zona de frenado E/)).toHaveAttribute("title", /E: Inicio de la zona de frenado/);
+    await expect(page.getByRole("img", { name: "B: Entrada al loop" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Puntos A–F" }).click();
+    const legend = page.getByRole("list", { name: "Puntos críticos A–F" });
+    await expect(legend.getByRole("listitem")).toHaveCount(6);
+    await expect(legend).toContainText("Inicio de la zona de frenado");
+
+    await chooseInPicker(page, /^Bajada simple ¿/);
+    await expect(legend).toContainText("este trazado no tiene loop");
+  });
+
+  test("los campos aceptan coma decimal, la muestran y descartan lo ilegible", async ({ page }) => {
+    await openWorkshop(page);
+    await handle(page, /Cima del loop/).click();
+    const radius = page.locator("#field-loopTopRadius");
+
+    await radius.fill("3,25");
+    await radius.press("Enter");
+    await expect(radius).toHaveValue("3,25");
+    await expect(page.getByRole("complementary", { name: "Loop" }).getByRole("slider", { name: "Radio en la cima" })).toHaveAttribute("aria-valuetext", "3,25 m");
+
+    await radius.fill("abc");
+    await radius.press("Enter");
+    await expect(radius).toHaveValue("3,25");
+  });
+
+  test("el slider del radio sigue el límite dinámico h_L/2", async ({ page }) => {
+    await openWorkshop(page);
+    await handle(page, /Cima del loop/).click();
+    const panel = page.getByRole("complementary", { name: "Loop" });
+
+    const height = page.locator("#field-loopHeight");
+    await height.fill("9");
+    await height.press("Enter");
+    await panel.getByRole("slider", { name: "Radio en la cima" }).focus();
+    await page.keyboard.press("End");
+
+    await expect(page.locator("#field-loopTopRadius")).toHaveValue("4,50");
   });
 
   test("volver al menú y entrar de nuevo conserva el diseño, y el menú no deshace cambios", async ({ page }) => {
@@ -825,7 +935,7 @@ test.describe("Taller de diseño", () => {
     await dragBrakeEndTowardsEntry(page, 60);
     const designed = await brakeEnd(page).getAttribute("aria-valuenow");
 
-    await page.getByRole("button", { name: "Volver al inicio" }).click();
+    await page.getByRole("button", { name: "Volver al menú" }).click();
     await expect(page.getByRole("button", { name: /Diseñar y certificar/ })).toBeVisible();
     await page.keyboard.press("Control+z");
     await page.getByRole("button", { name: /Diseñar y certificar/ }).click();
@@ -908,8 +1018,8 @@ test.describe("Menú", () => {
 const CODE_MARKERS = {
   charts: "Check that a complete date adapter is provided",
   workshop: "Tren y pasajeros",
-  report: "Informe del recorrido",
-  guide: "Escenarios y criterios"
+  report: "Informe de certificación · ",
+  guide: "No aprueban (para comparar)"
 };
 
 /** Demora artificial de la descarga del informe (ms). */
@@ -936,11 +1046,11 @@ test.describe("Carga bajo demanda", () => {
     await page.unroute(broken);
     await page.getByRole("button", { name: "Recargar la página" }).click();
     await page.getByRole("button", { name: /Diseñar y certificar/ }).click();
-    await expect(verdict(page)).toContainText(/Aprueba|No aprueba/, { timeout: 15_000 });
+    await expect(verdict(page)).toContainText(/Aprobado|Rechazado/, { timeout: 15_000 });
     expect(await page.locator(".workshop").evaluate(element => getComputedStyle(element).position)).toBe("fixed");
   });
 
-  test("si el informe no se descarga, «PDF» avisa y no imprime una página vacía", async ({ page }) => {
+  test("si el informe no se descarga, «Imprimir o guardar PDF» avisa y no imprime una página vacía", async ({ page }) => {
     await page.route(/ReportDialog-[^/]*\.(js|css)/, route => route.abort());
     await openWorkshop(page);
     await page.evaluate(() => {
@@ -950,7 +1060,8 @@ test.describe("Carga bajo demanda", () => {
     });
 
     await verdict(page).click();
-    await page.getByRole("button", { name: "PDF" }).click();
+    await page.getByRole("button", { name: "Descargar" }).click();
+    await page.getByRole("menuitem", { name: "Imprimir o guardar PDF" }).click();
 
     await expect(page.getByRole("alert")).toContainText("No se pudo descargar el informe");
     await page.waitForTimeout(800);
@@ -962,12 +1073,12 @@ test.describe("Carga bajo demanda", () => {
     await page.route(broken, route => route.abort());
     await openWorkshop(page);
     await verdict(page).click();
-    await page.getByRole("button", { name: /Informe completo/ }).click();
+    await page.getByRole("button", { name: "Ver informe de certificación" }).click();
     await expect(page.getByRole("alert")).toContainText("No se pudo descargar el informe");
 
     await page.unroute(broken);
     await page.getByRole("button", { name: "Reintentar" }).click();
-    const dialog = page.getByRole("dialog", { name: "Informe del recorrido" });
+    const dialog = page.getByRole("dialog", { name: /Informe de certificación/ });
     await expect(dialog).toBeVisible();
     expect(await dialog.evaluate(element => getComputedStyle(element).borderRadius)).toBe("20px");
   });
@@ -978,12 +1089,12 @@ test.describe("Carga bajo demanda", () => {
     await expect.poll(() => code.has(CODE_MARKERS.guide) && code.has(CODE_MARKERS.report), { timeout: 10_000 }).toBe(true);
 
     await page.context().setOffline(true);
-    await page.getByRole("button", { name: "Guía y escenarios" }).click();
-    await expect(page.getByRole("dialog", { name: "Escenarios y criterios" })).toBeVisible();
+    await page.getByRole("button", { name: "Guía", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Guía" })).toBeVisible();
     await page.keyboard.press("Escape");
     await verdict(page).click();
-    await page.getByRole("button", { name: /Informe completo/ }).click();
-    await expect(page.getByRole("dialog", { name: "Informe del recorrido" })).toBeVisible();
+    await page.getByRole("button", { name: "Ver informe de certificación" }).click();
+    await expect(page.getByRole("dialog", { name: /Informe de certificación/ })).toBeVisible();
   });
 
   test("si falla la precarga en reposo no aparece ningún aviso; aparece recién al pedir la pieza", async ({ page }) => {
@@ -992,7 +1103,7 @@ test.describe("Carga bajo demanda", () => {
     await page.waitForTimeout(3000);
 
     await expect(page.getByRole("alert")).toHaveCount(0);
-    await page.getByRole("button", { name: "Guía y escenarios" }).click();
+    await page.getByRole("button", { name: "Guía", exact: true }).click();
     await expect(page.getByRole("alert").filter({ hasText: "la guía" })).toBeVisible();
     await expect(page.getByRole("alert").filter({ hasText: "el informe" })).toHaveCount(0);
   });
@@ -1001,9 +1112,9 @@ test.describe("Carga bajo demanda", () => {
     await page.route(/(Guide|ReportDialog)-[^/]*\.js/, route => route.abort());
     await openWorkshop(page);
 
-    await page.getByRole("button", { name: "Guía y escenarios" }).click();
+    await page.getByRole("button", { name: "Guía", exact: true }).click();
     await verdict(page).click();
-    await page.getByRole("button", { name: /Informe completo/ }).click();
+    await page.getByRole("button", { name: "Ver informe de certificación" }).click();
     const guide = page.getByRole("alert").filter({ hasText: "la guía" });
     const report = page.getByRole("alert").filter({ hasText: "el informe" });
     await expect(guide).toBeVisible();
@@ -1034,12 +1145,12 @@ test.describe("Carga bajo demanda", () => {
     await openWorkshop(page);
     await expect(page.locator(".telemetry canvas")).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Telemetría" }).click();
+    await page.getByRole("button", { name: "Gráficas de telemetría" }).click();
     await expect(page.locator(".telemetry canvas").first()).toBeVisible();
 
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.getByRole("button", { name: "Guía y escenarios" }).click();
-    await expect(page.getByRole("dialog", { name: "Escenarios y criterios" })).toBeVisible();
+    await page.getByRole("button", { name: "Guía", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Guía" })).toBeVisible();
   });
 
   test("la grilla de telemetría dibuja las siete gráficas sin errores", async ({ page }) => {
@@ -1050,7 +1161,7 @@ test.describe("Carga bajo demanda", () => {
     page.on("pageerror", error => errors.push(error.message));
     await openWorkshop(page);
 
-    await page.getByRole("button", { name: "Ir al final" }).click();
+    await page.getByRole("button", { name: "Saltar al final" }).click();
     await page.getByRole("button", { name: "Todas las gráficas" }).click();
     const canvases = page.locator(".telemetry canvas");
     await expect(canvases).toHaveCount(7);
@@ -1071,7 +1182,7 @@ test.describe("Carga bajo demanda", () => {
     });
     await page.goto("/");
     await page.getByRole("button", { name: /Diseñar y certificar/ }).click();
-    await expect(verdict(page)).toContainText(/Aprueba|No aprueba/, { timeout: 15_000 });
+    await expect(verdict(page)).toContainText(/Aprobado|Rechazado/, { timeout: 15_000 });
     await page.evaluate(() => {
       window.print = () => {
         document.body.dataset.printedWithReport = String(Boolean(document.querySelector("dialog.report-dialog[open]")));
@@ -1079,9 +1190,10 @@ test.describe("Carga bajo demanda", () => {
     });
 
     await verdict(page).click();
-    await page.getByRole("button", { name: "PDF" }).click();
+    await page.getByRole("button", { name: "Descargar" }).click();
+    await page.getByRole("menuitem", { name: "Imprimir o guardar PDF" }).click();
 
     await expect(page.locator("body")).toHaveAttribute("data-printed-with-report", "true");
-    await expect(page.getByRole("dialog", { name: "Informe del recorrido" })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: /Informe de certificación/ })).toBeVisible();
   });
 });

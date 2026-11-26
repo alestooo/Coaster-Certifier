@@ -56,7 +56,7 @@ export const SHIRT_STYLES: { id: ShirtStyle; label: string }[] = [
 ];
 
 export const ACCESSORIES: { id: Accessory; label: string }[] = [
-  { id: "none", label: "Nada" },
+  { id: "none", label: "Ninguno" },
   { id: "cap", label: "Gorra" },
   { id: "helmet", label: "Casco" },
   { id: "glasses", label: "Lentes" },

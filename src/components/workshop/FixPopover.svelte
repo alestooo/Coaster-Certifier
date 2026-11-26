@@ -1,8 +1,12 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { X, TriangleAlert, LoaderCircle, Eye, Check } from "lucide-svelte";
+  import { X, TriangleAlert, LoaderCircle, Eye } from "lucide-svelte";
+  import Disclosure from "../ui/Disclosure.svelte";
+  import Sym from "../ui/Sym.svelte";
+  import IconButton from "../ui/IconButton.svelte";
+  import Button from "../ui/Button.svelte";
   import { explainFailure } from "../../physics/index.js";
-  import { fixTitle, changeText, changeReason, type FixOption } from "../../lib/fix-text";
+  import { fixTitle, changeSymbol, changeLabel, changeValues, changeReason, type FixOption } from "../../lib/fix-text";
   import { formatNumber } from "../../ui/format";
   import type { FixSearch } from "../../lib/fix-search.svelte";
   import type { PlainIssue } from "../../lib/audit";
@@ -37,7 +41,8 @@
 
   let explanation = $derived.by(() => {
     try {
-      return explainFailure(result.final, result.config).explanation as string;
+      const violation = result.verdict.violations.find(candidate => candidate.code === issue.code);
+      return explainFailure(result.final, result.config, violation).explanation as string;
     } catch {
       return "";
     }
@@ -75,16 +80,15 @@
   <header>
     <TriangleAlert size={16} />
     <strong>{issue.title}</strong>
-    <button type="button" class="close" aria-label="Cerrar" onclick={onClose}><X size={15} /></button>
+    <IconButton label="Cerrar problema" icon={X} size="sm" onclick={onClose} />
   </header>
 
   <p class="detail">{issue.detail}</p>
 
   {#if explanation}
-    <details>
-      <summary>Por qué pasa</summary>
-      <p>{explanation}</p>
-    </details>
+    <Disclosure summary="Por qué pasa">
+      <p class="why">{explanation}</p>
+    </Disclosure>
   {/if}
 
   <h3>Correcciones verificadas</h3>
@@ -108,19 +112,16 @@
         >
           <div class="option-head">
             <strong>{fixTitle(option)}</strong>
-            <span class="ok"><Check size={12} /> aprueba</span>
           </div>
           <ul class="changes">
             {#each option.changes as change (change.key)}
-              <li title={changeReason(change)}>{changeText(change)}</li>
+              <li title={changeReason(change)}><Sym symbol={changeSymbol(change)} spoken={changeLabel(change)} />: {changeValues(change)}</li>
             {/each}
           </ul>
-          <small>Fuerza g máx. {formatNumber(option.maxLoad, 2)} g · se detiene a los {formatNumber(option.time, 1)} s</small>
+          <small>Máx. {formatNumber(option.maxLoad, 2)} g · se detiene a los {formatNumber(option.time, 1)} s</small>
           <div class="actions">
-            <button type="button" class="see" aria-pressed={pinned === option} onclick={() => toggle(option)}>
-              <Eye size={13} /> Ver
-            </button>
-            <button type="button" class="apply" onclick={() => onApply(option.config)}>Aplicar</button>
+            <Button size="sm" variant="secondary" class="see" aria-pressed={pinned === option} onclick={() => toggle(option)}><Eye size={13} /> Mostrar en la pista</Button>
+            <Button size="sm" variant="primary" onclick={() => onApply(option.config)}>Aplicar</Button>
           </div>
         </li>
       {/each}
@@ -153,7 +154,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    color: #b7303f;
+    color: var(--danger-text);
   }
 
   header strong {
@@ -162,18 +163,8 @@
     font-weight: 900;
   }
 
-  .close {
-    display: inline-flex;
-    padding: 4px;
-    border: 0;
-    border-radius: 8px;
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-  }
-
   .detail,
-  details p,
+  .why,
   .progress,
   .empty,
   .note {
@@ -183,15 +174,7 @@
     color: var(--text-soft);
   }
 
-  details summary {
-    font-size: 12px;
-    font-weight: 800;
-    color: var(--primary-strong);
-    cursor: pointer;
-  }
-
-  details p {
-    margin-top: 4px;
+  .why {
     color: var(--muted);
   }
 
@@ -234,8 +217,8 @@
 
   ul > li.shown,
   ul > li:hover {
-    border-color: #9fd8c0;
-    background: #f3fbf7;
+    border-color: var(--success-border);
+    background: var(--success-soft);
   }
 
   .option-head {
@@ -247,18 +230,6 @@
 
   .option-head strong {
     font-size: 13px;
-  }
-
-  .ok {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 2px 7px;
-    border-radius: 999px;
-    background: var(--success-soft);
-    color: #1f7a57;
-    font-size: 10.5px;
-    font-weight: 800;
   }
 
   .changes {
@@ -289,38 +260,10 @@
     gap: 6px;
   }
 
-  .actions button {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    height: 30px;
-    padding: 0 12px;
-    border-radius: 8px;
-    font: inherit;
-    font-size: 12px;
-    font-weight: 800;
-    cursor: pointer;
-  }
-
-  .see {
-    border: 1px solid var(--border-strong);
-    background: var(--surface);
-    color: var(--text-soft);
-  }
-
-  .see[aria-pressed="true"] {
-    border-color: #1f8a64;
-    color: #1f7a57;
-  }
-
-  .apply {
-    border: 0;
-    background: var(--primary);
-    color: white;
-  }
-
-  .apply:hover {
-    background: var(--primary-strong);
+  /* «Ver» fijado: la pista corregida está a la vista. */
+  .actions :global(.see[aria-pressed="true"]) {
+    border-color: var(--success);
+    color: var(--success-text);
   }
 
   @keyframes pop {

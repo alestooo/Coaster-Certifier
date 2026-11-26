@@ -1,21 +1,33 @@
 <script lang="ts">
-  import { Eye, EyeOff } from "lucide-svelte";
+  import { Eye, EyeOff, MapPin } from "lucide-svelte";
   import { legendItems } from "../../lib/load-profile";
-  import type { SimulationConfig } from "../../lib/types";
+  import PointLegend from "./PointLegend.svelte";
+  import type { SimulationConfig, Track } from "../../lib/types";
 
   interface Props {
     config: SimulationConfig;
+    /** Trazado que se ve: la sección «Puntos» dice qué letras tiene. */
+    track: Track;
     visible: boolean;
     /** Falso mientras no hay un dictamen vigente para el diseño que se ve. */
     available: boolean;
   }
 
-  let { config, visible = $bindable(), available }: Props = $props();
+  let { config, track, visible = $bindable(), available }: Props = $props();
 
   let items = $derived(legendItems(config));
+  let showPoints = $state(false);
+
+  /** Esc cierra la sección «Puntos» sin cerrar otra cosa. */
+  function closeOnEscape(event: KeyboardEvent) {
+    if (event.key !== "Escape" || !showPoints) return;
+    event.stopPropagation();
+    showPoints = false;
+  }
 </script>
 
-<div class="legend" class:off={!visible} class:stale={!available}>
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="legend" class:off={!visible} class:stale={!available} onkeydown={closeOnEscape}>
   <button type="button" aria-pressed={visible} title={visible ? "Ocultar la franja de fuerza g" : "Mostrar la franja de fuerza g"} onclick={() => (visible = !visible)}>
     {#if visible}<Eye size={14} />{:else}<EyeOff size={14} />{/if}
     <span>Fuerza g</span>
@@ -25,14 +37,24 @@
   {#if visible}
     <ul aria-label="Colores de la franja de fuerza g">
       {#each items as item (item.tone)}
-        <li><i class={item.tone} aria-hidden="true"></i>{item.text}</li>
+        <li title={item.detail}><i class={item.tone} aria-hidden="true"></i>{item.text} <span class="detail">{item.detail}</span></li>
       {/each}
     </ul>
+  {/if}
+  <button type="button" class="points-toggle" aria-label="Puntos A–F" aria-expanded={showPoints} aria-controls="point-legend" title="Qué significa cada letra" onclick={() => (showPoints = !showPoints)}>
+    <MapPin size={14} />
+    <span>Puntos A–F</span>
+  </button>
+  {#if showPoints}
+    <div class="points-card" id="point-legend">
+      <PointLegend {track} />
+    </div>
   {/if}
 </div>
 
 <style>
   .legend {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -70,6 +92,23 @@
     cursor: pointer;
   }
 
+  .points-card {
+    position: absolute;
+    top: calc(100% + var(--space-2));
+    right: 0;
+    width: min(300px, calc(100vw - 32px));
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .points-toggle[aria-expanded="true"] {
+    background: var(--primary-soft);
+    color: var(--primary-strong);
+  }
+
   ul {
     display: flex;
     gap: 10px;
@@ -92,19 +131,19 @@
   }
 
   .comfort {
-    background: #2f9d78;
+    background: var(--success);
   }
 
   .near {
-    background: #f2a93b;
+    background: var(--accent);
   }
 
   .over {
-    background: #d9465a;
+    background: var(--danger);
   }
 
   .float {
-    background: #3a7bd5;
+    background: var(--float);
   }
 
   .swatch {
@@ -112,7 +151,7 @@
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: conic-gradient(#2f9d78 0 25%, #f2a93b 0 50%, #d9465a 0 75%, #3a7bd5 0);
+    background: conic-gradient(var(--success) 0 25%, var(--accent) 0 50%, var(--danger) 0 75%, var(--float) 0);
   }
 
   .off .swatch {
@@ -120,7 +159,8 @@
   }
 
   @media (max-width: 860px) {
-    ul {
+    ul,
+    .points-toggle span {
       display: none;
     }
 
@@ -131,5 +171,15 @@
     .legend {
       padding-right: 4px;
     }
+  }
+
+  /* El umbral se lee en voz alta y aparece al pasar el puntero (title); no ensancha la leyenda. */
+  .detail {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 </style>

@@ -146,7 +146,7 @@ export function drawForces({ ctx, camera, scene }) {
   const unit = ARROW_PX_PER_WEIGHT;
   const cos = Math.cos(state.angle);
   const sin = Math.sin(state.angle);
-  const bodyCentre = (-(CART.bodyTop + CART.bodyBottom) / 2 / DESIGN_PX_PER_METRE) * camera.trainScale;
+  const bodyCentre = (-(CART.bodyTop + CART.bodyBottom) / 2 / DESIGN_PX_PER_METRE) * camera.scale;
 
   const originX = camera.toX(state.position.x) - sin * bodyCentre;
   const originY = camera.toY(state.position.y) - cos * bodyCentre;

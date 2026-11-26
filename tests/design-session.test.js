@@ -78,6 +78,27 @@ describe("Sesión de diseño", () => {
     expect(session.runner.config.mapId).toBe("reference");
   });
 
+  test("el trazado del anexo se carga con los valores del anexo", () => {
+    // Arrange: partir de otro trazado con valores cambiados.
+    session.loadTemplate("loop");
+    session.patch({ initialHeight: 18, brakingLength: 120 });
+
+    // Act
+    session.loadTemplate("reference");
+
+    // Assert
+    expect(session.runner.config).toMatchObject({
+      mapId: "reference",
+      initialHeight: 30,
+      trackWidth: 320,
+      loopHeight: 21.5,
+      loopTopRadius: 5,
+      hillHeight: 10,
+      hillCrestRadius: 55,
+      brakingLength: 60
+    });
+  });
+
   test("la masa total suma carritos y pasajeros", () => {
     expect(session.runner.config.mass).toBe(calculateTotalMass([createPassenger(1), createPassenger(2)]));
   });

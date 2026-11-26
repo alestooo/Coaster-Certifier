@@ -7,6 +7,7 @@
  * se agrupan); un valor inválido nunca reemplaza al último diseño válido.
  */
 import { resolveConfig, buildTrack, ConfigError, DEFAULT_CONFIG } from "../physics/index.js";
+import { mapTemplate } from "../game/maps";
 import { SimulationRunner } from "./simulation-runner.svelte";
 import { LiveAudit } from "./live-audit.svelte";
 import { createHistory, record, undo, redo, canUndo, canRedo, type DesignHistory } from "./design-history";
@@ -163,7 +164,8 @@ export class DesignSession {
   loadTemplate(mapId: MapId): void {
     this.#flushPending();
     this.runner.pause();
-    this.draft = copyConfig(resolveConfig({ ...this.draft, ...geometryDefaults(), mapId }));
+    // Cada trazado carga su propio diseño (el de su miniatura): el del anexo, con los valores del anexo.
+    this.draft = copyConfig(resolveConfig({ ...this.draft, ...geometryDefaults(), ...mapTemplate(mapId), mapId }));
     this.#commitAndRecord();
   }
 

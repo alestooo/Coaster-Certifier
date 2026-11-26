@@ -1,6 +1,7 @@
 <script lang="ts">
-  import ScrubField from "./ScrubField.svelte";
+  import SliderField from "../ui/SliderField.svelte";
   import AreaStatus from "./AreaStatus.svelte";
+  import Segmented from "../ui/Segmented.svelte";
   import { visibleGroups, BRAKE_OPTIONS } from "../../lib/field-definitions";
   import type { AuditReport, AreaId } from "../../lib/audit";
   import type { SimulationConfig } from "../../lib/types";
@@ -19,60 +20,27 @@
 
   let group = $derived(visibleGroups(draft).find(candidate => candidate.id === area) ?? null);
   let brake = $derived(BRAKE_OPTIONS.find(option => option.value === draft.brakeMode));
+  const BRAKE_SEGMENTS = BRAKE_OPTIONS.map(option => ({ value: option.value, label: option.title }));
 </script>
 
 <AreaStatus insight={report?.areas[area]} />
 
 {#if area === "braking"}
-  <div class="segmented" role="radiogroup" aria-label="Sistema de frenado">
-    {#each BRAKE_OPTIONS as option (option.value)}
-      <button
-        type="button"
-        role="radio"
-        aria-checked={draft.brakeMode === option.value}
-        class:active={draft.brakeMode === option.value}
-        onclick={() => onPatch({ brakeMode: option.value })}
-      >
-        {option.title}
-      </button>
-    {/each}
+  <div class="mode">
+    <Segmented label="Sistema de frenado" block value={draft.brakeMode} options={BRAKE_SEGMENTS} onChange={value => onPatch({ brakeMode: value })} />
   </div>
   {#if brake}<p class="explain">{brake.description}</p>{/if}
 {/if}
 
 {#if group}
   {#each group.fields as field (field.key)}
-    <ScrubField {field} config={draft} error={errorField === field.key ? errorMessage : ""} onInput={value => onPatch({ [field.key]: value })} {onGesture} />
+    <SliderField {field} config={draft} error={errorField === field.key ? errorMessage : ""} onInput={value => onPatch({ [field.key]: value })} {onGesture} />
   {/each}
 {/if}
 
 <style>
-  .segmented {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
-    margin-top: 8px;
-    padding: 4px;
-    border-radius: 12px;
-    background: var(--surface-muted);
-  }
-
-  .segmented button {
-    height: 34px;
-    border: 0;
-    border-radius: 9px;
-    background: transparent;
-    color: var(--text-soft);
-    font: inherit;
-    font-size: 12px;
-    font-weight: 800;
-    cursor: pointer;
-  }
-
-  .segmented button.active {
-    background: var(--surface);
-    color: var(--primary-strong);
-    box-shadow: var(--shadow-sm);
+  .mode {
+    margin-top: var(--space-2);
   }
 
   .explain {

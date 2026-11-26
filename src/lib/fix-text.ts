@@ -30,22 +30,54 @@ function labelOf(change: FixChange): string {
   return fieldByKey(change.key)?.label ?? change.label;
 }
 
-/** «Aumentar altura del loop», «Reducir …» o «Combinar ajustes del recorrido». */
+/** Símbolo del parámetro cambiado (h_L, d_f…) o, si no tiene, su nombre. */
+function symbolOf(change: FixChange): string {
+  return fieldByKey(change.key)?.symbol ?? change.label;
+}
+
+/** «a, b y c». */
+function listOf(items: string[]): string {
+  return items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} y ${items.at(-1)}`;
+}
+
+/** «Aumentar altura del loop», «Reducir …» o, con varios cambios, «Cambiar altura del loop y largo de frenado». */
 export function fixTitle(option: Pick<FixOption, "changes">): string {
-  if (option.changes.length > 1) return "Combinar ajustes del recorrido";
+  if (option.changes.length > 1) return `Cambiar ${listOf(option.changes.map(change => lowerFirst(labelOf(change))))}`;
 
   const change = option.changes[0];
 
-  if (!change) return "Ajustar el recorrido";
+  if (!change) return "Ajustar el trazado";
   if (change.key === "customPoints") return "Suavizar las alturas interiores";
 
   const action = Number(change.after) > Number(change.before) ? "Aumentar" : "Reducir";
   return `${action} ${labelOf(change).toLowerCase()}`;
 }
 
+/** Primera letra en minúscula (dentro de una frase). */
+function lowerFirst(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+/** Nombre del parámetro cambiado («Altura del loop»), el que se lee en voz alta. */
+export function changeLabel(change: FixChange): string {
+  return labelOf(change);
+}
+
+/** Símbolo del parámetro cambiado («h_L»), para dibujarlo con subíndice. */
+export function changeSymbol(change: FixChange): string {
+  return symbolOf(change);
+}
+
+/** Valores antes y después con unidad («21,5 → 24 m»). */
+export function changeValues(change: FixChange): string {
+  if (change.before === null || change.after === null) return change.label;
+  const unit = change.unit ? ` ${change.unit}` : "";
+  return `${numbers.format(change.before)} → ${numbers.format(change.after)}${unit}`;
+}
+
 /** «h_L: 21,5 → 24 m». */
 export function changeText(change: FixChange): string {
-  const name = fieldByKey(change.key)?.symbol ?? change.label;
+  const name = symbolOf(change);
 
   if (change.before === null || change.after === null) return change.label;
 
@@ -96,7 +128,7 @@ export function changeReason(change: FixChange): string {
     case "hillCrestRadius":
       return increasing
         ? "Una cresta más abierta reduce la aceleración normal y evita la sensación de ingravidez (n_D = 1 − v²/(g·ρ_c))."
-        : "Una cresta más cerrada aumenta el airtime; el motor comprobó que sigue dentro del límite.";
+        : "Una cresta más cerrada aumenta la sensación de flotar; el motor comprobó que sigue dentro del límite.";
 
     case "brakingLength":
       return increasing
@@ -124,7 +156,7 @@ export function changeReason(change: FixChange): string {
     default:
       return (
         "Suaviza las alturas interiores y modifica las curvas " +
-        "sin cambiar el inicio ni la estación."
+        "sin cambiar el inicio ni la zona de frenado."
       );
   }
 }

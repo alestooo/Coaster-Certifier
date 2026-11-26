@@ -1,7 +1,7 @@
 :root {
   font-family: var(--font-sans);
-  color: #30233f;
-  background: #f6f3fb;
+  color: var(--text);
+  background: var(--page-bg);
   font-synthesis: none;
 }
 
@@ -46,7 +46,7 @@ summary:focus-visible {
 
   /* El póster queda debajo del video y es el fondo con movimiento reducido. */
   background: url("/assets/backgrounds/coaster-menu-fondo-poster.webp") center / cover no-repeat;
-  background-color: #171333;
+  background-color: var(--menu-night);
 }
 
 .menu-video,
@@ -116,14 +116,14 @@ summary:focus-visible {
   min-height: 56px;
   padding: 14px 28px;
 
-  border: 2px solid #dcbaff;
+  border: 2px solid var(--menu-lilac);
   border-radius: 15px;
 
-  color: #fff9e9;
-  background: linear-gradient(180deg, #a165ec, #7440ba);
+  color: var(--menu-cream);
+  background: linear-gradient(180deg, var(--menu-violet-light), var(--menu-violet));
 
   box-shadow:
-    0 5px 0 #402165,
+    0 5px 0 var(--menu-plum-deep),
     0 12px 28px rgb(0 0 0 / 20%);
 
   font-size: 17px;
@@ -144,15 +144,15 @@ summary:focus-visible {
 .game-button:active {
   transform: translateY(3px);
   box-shadow:
-    0 2px 0 #402165,
+    0 2px 0 var(--menu-plum-deep),
     0 6px 16px rgb(0 0 0 / 18%);
 }
 
 .game-button.secondary {
   width: 220px;
   min-height: 48px;
-  border-color: #9c84b9;
-  color: #f4eaff;
+  border-color: var(--menu-mist);
+  color: var(--menu-snow);
   background: rgb(35 27 61 / 94%);
   box-shadow: 0 4px 16px rgb(0 0 0 / 22%);
   font-size: 15px;
@@ -180,7 +180,7 @@ summary:focus-visible {
 
 html {
   scrollbar-width: thin;
-  scrollbar-color: #7440ba #e7def5;
+  scrollbar-color: var(--menu-violet) var(--menu-lilac-soft);
 }
 
 ::-webkit-scrollbar {
@@ -188,17 +188,17 @@ html {
 }
 
 ::-webkit-scrollbar-track {
-  background: #e7def5;
+  background: var(--menu-lilac-soft);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #7440ba;
+  background: var(--menu-violet);
   border-radius: 999px;
-  border: 2px solid #e7def5;
+  border: 2px solid var(--menu-lilac-soft);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #5f329a;
+  background: var(--primary-strong);
 }
 
 .version-badge {
@@ -213,7 +213,7 @@ html {
   border: 1px solid rgb(255 255 255 / 28%);
   border-radius: 999px;
 
-  color: #fff7e8;
+  color: var(--menu-cream-soft);
   background: rgb(31 20 68 / 55%);
   backdrop-filter: blur(8px);
 

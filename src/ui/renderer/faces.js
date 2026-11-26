@@ -1,6 +1,7 @@
 import { PALETTE } from "./palette.js";
 import { box, circle } from "./draw.js";
-import { HEAD } from "./passenger-geometry.js";
+// El arte de la cabeza se dibuja en sus propias coordenadas; passengers.js lo escala a la cabeza real.
+import { ART_HEAD as HEAD } from "./passenger-geometry.js";
 
 /**
  * Cara, expresión y accesorios de la cabeza de un pasajero.

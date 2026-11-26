@@ -1,4 +1,6 @@
 import { PALETTE } from "./palette.js";
+import { liftHeightAt } from "./lift.js";
+import { stationSpan } from "./camera.js";
 import { box, circle, ellipse, hash } from "./draw.js";
 
 /**
@@ -126,7 +128,7 @@ export function drawGroundFill({ ctx, camera }) {
 /**
  * Altura mínima de la vía (o de la rampa de la cadena) cerca de una x (m).
  * @param {any} track
- * @param {{x: number, y: number}[]} lift
+ * @param {import("./lift.js").LiftPath} lift
  * @param {number} x
  */
 function clearanceAt(track, lift, x) {
@@ -136,12 +138,7 @@ function clearanceAt(track, lift, x) {
     if (Math.abs(point.x - x) < 3) lowest = Math.min(lowest, point.y);
   }
 
-  const [base, , crest] = lift;
-
-  if (x >= base.x - 1 && x <= crest.x + 1) {
-    const t = (x - base.x) / Math.max(1e-6, crest.x - base.x);
-    lowest = Math.min(lowest, crest.y * t);
-  }
+  if (x >= lift.base.x - 1 && x <= lift.crest.x + 1) lowest = Math.min(lowest, liftHeightAt(lift, x));
 
   return lowest;
 }
@@ -302,8 +299,9 @@ function drawFairground(ctx, x, groundY, scale) {
 export function drawWorldScenery({ ctx, camera, scene }) {
   const { track } = scene;
   const { scale, world, lift, groundY } = camera;
-  const stationLeft = track.brakeX - 5;
-  const stationRight = track.endX + 7;
+  const station = stationSpan(track);
+  const stationLeft = station.left - 1;
+  const stationRight = station.right + 1;
 
   for (let x = world.minX + 1; x < world.maxX; x += GRASS_SPACING_M) {
     const seed = Math.round(x * 10);
@@ -320,7 +318,7 @@ export function drawWorldScenery({ ctx, camera, scene }) {
     ctx.stroke();
   }
 
-  drawFairground(ctx, camera.toX(track.endX + 24), groundY, scale * 0.8);
+  drawFairground(ctx, camera.toX(track.endX + 24), groundY, scale);
 
   for (let x = world.minX + 4; x < world.maxX - 3; x += TREE_SPACING_M) {
     const seed = Math.round(x * 100);
@@ -335,7 +333,7 @@ export function drawWorldScenery({ ctx, camera, scene }) {
 
   const fenceTop = groundY - 1.0 * scale;
   ctx.strokeStyle = PALETTE.fence;
-  ctx.lineWidth = Math.max(1, 0.08 * scale);
+  ctx.lineWidth = 0.08 * scale;
   ctx.beginPath();
   ctx.moveTo(camera.toX(world.minX), fenceTop);
   ctx.lineTo(camera.toX(world.maxX), fenceTop);
@@ -344,10 +342,10 @@ export function drawWorldScenery({ ctx, camera, scene }) {
   ctx.stroke();
 
   for (let x = world.minX; x < world.maxX; x += FENCE_POST_SPACING_M) {
-    box(ctx, camera.toX(x) - Math.max(0.6, 0.06 * scale), fenceTop - 0.1 * scale, Math.max(1.2, 0.12 * scale), 1.1 * scale, PALETTE.fenceDark, 1);
+    box(ctx, camera.toX(x) - 0.06 * scale, fenceTop - 0.1 * scale, 0.12 * scale, 1.1 * scale, PALETTE.fenceDark, 1);
   }
 
-  drawLamp(ctx, camera.toX(track.brakeX - 9), groundY, scale);
+  drawLamp(ctx, camera.toX(station.left - 5), groundY, scale);
   drawLamp(ctx, camera.toX(track.endX + 10), groundY, scale);
-  drawLamp(ctx, camera.toX(lift[0].x - 5), groundY, scale);
+  drawLamp(ctx, camera.toX(lift.base.x - 5), groundY, scale);
 }

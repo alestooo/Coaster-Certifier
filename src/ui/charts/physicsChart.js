@@ -11,6 +11,7 @@ Chart.register(LineController, LineElement, PointElement, LinearScale, Legend, T
 import { chartDefinition, yAxisRange, CHART_PALETTE } from "./definitions.js";
 import { decimateHistory, DEFAULT_MAX_POINTS } from "./decimate.js";
 import { coasterAnnotationsPlugin } from "./annotations.js";
+import { readChartTheme, resolveColor } from "./chart-theme.js";
 
 /**
  * @typedef {import("../../physics/integration/step.js").SimulationState} SimulationState
@@ -35,9 +36,6 @@ import { coasterAnnotationsPlugin } from "./annotations.js";
 
 const X_AXIS_TITLES = Object.freeze({ time: "Tiempo (s)", distance: "Posición s (m)" });
 const X_AXIS_UNITS = Object.freeze({ time: "s", distance: "m" });
-const GRID_COLOR = "#eee6f5";
-const AXIS_TEXT_COLOR = "#7a6b89";
-const FONT_FAMILY = "system-ui, sans-serif";
 const LINE_WIDTH = 2;
 const MAX_DECIMALS = 2;
 
@@ -60,6 +58,9 @@ export function formatNumber(value) {
  */
 export function createPhysicsChart(canvas, kind = "speed") {
   const definition = chartDefinition(kind);
+  // Fuente y colores de los ejes salen de los tokens: la gráfica sigue al sistema de diseño.
+  const theme = readChartTheme();
+  Chart.defaults.font.family = theme.font;
 
   /** @type {import("chart.js").ChartConfiguration<"line", {x: number, y: number}[]>} */
   const configuration = {
@@ -80,19 +81,19 @@ export function createPhysicsChart(canvas, kind = "speed") {
       scales: {
         x: {
           type: "linear",
-          title: { display: true, text: X_AXIS_TITLES.time, color: AXIS_TEXT_COLOR },
-          grid: { color: GRID_COLOR },
-          ticks: { color: AXIS_TEXT_COLOR, maxTicksLimit: 10, callback: value => formatNumber(Number(value)) }
+          title: { display: true, text: X_AXIS_TITLES.time, color: theme.text },
+          grid: { color: theme.grid },
+          ticks: { color: theme.text, maxTicksLimit: 10, callback: value => formatNumber(Number(value)) }
         },
         y: {
           type: "linear",
-          title: { display: true, text: definition.yTitle, color: AXIS_TEXT_COLOR },
-          grid: { color: GRID_COLOR },
-          ticks: { color: AXIS_TEXT_COLOR, callback: value => formatNumber(Number(value)) }
+          title: { display: true, text: definition.yTitle, color: theme.text },
+          grid: { color: theme.grid },
+          ticks: { color: theme.text, callback: value => formatNumber(Number(value)) }
         }
       },
       plugins: {
-        legend: { position: "bottom", labels: { color: AXIS_TEXT_COLOR, boxWidth: 14, usePointStyle: false } },
+        legend: { display: definition.showLegend, position: "bottom", labels: { color: theme.text, boxWidth: 14, usePointStyle: false } },
         tooltip: {
           callbacks: {
             title: items => {
@@ -107,9 +108,8 @@ export function createPhysicsChart(canvas, kind = "speed") {
               chartDefinition(String(item.chart.canvas.dataset.kind ?? kind)).unit
           }
         },
-        coasterAnnotations: {}
-      },
-      font: { family: FONT_FAMILY }
+        coasterAnnotations: { fontFamily: theme.font }
+      }
     }
   };
 
@@ -167,8 +167,8 @@ function criticalPointMarkers(history, options, xAxis) {
 function eventMarkers(options, xAxis) {
   return (options.events ?? []).map(event => ({
     x: xAxis === "distance" ? event.position : event.time,
-    label: `✘ ${formatNumber(event.value)} ${event.unit}`,
-    color: CHART_PALETTE.marker,
+    label: `${formatNumber(event.value)} ${event.unit}`,
+    color: resolveColor(CHART_PALETTE.marker),
     dashed: false
   }));
 }
@@ -184,7 +184,7 @@ function sectionBands(history, options, xAxis) {
   return options.track.sections.flatMap(section => {
     const from = distanceToX(history, section.start, xAxis);
     const to = distanceToX(history, section.end, xAxis) ?? readX(history[history.length - 1], xAxis);
-    return from === null ? [] : [{ from, to, label: section.name, color: CHART_PALETTE.section }];
+    return from === null ? [] : [{ from, to, label: section.name, color: resolveColor(CHART_PALETTE.section) }];
   });
 }
 
@@ -198,7 +198,7 @@ function brakeMarker(history, options, xAxis) {
   if (!options.track) return [];
 
   const x = distanceToX(history, options.track.brakeStart, xAxis);
-  return x === null ? [] : [{ x, label: "Inicio del frenado (E)", color: CHART_PALETTE.elastic, dashed: true }];
+  return x === null ? [] : [{ x, label: "Inicio del frenado (E)", color: resolveColor(CHART_PALETTE.elastic), dashed: true }];
 }
 
 /**
@@ -217,8 +217,8 @@ export function updatePhysicsChart(chart, history, options) {
 
   chart.data.datasets = definition.series.map(series => ({
     label: series.label,
-    borderColor: series.color,
-    backgroundColor: series.color,
+    borderColor: resolveColor(series.color),
+    backgroundColor: resolveColor(series.color),
     borderDash: series.dashed ? [5, 5] : [],
     borderWidth: series.width ?? LINE_WIDTH,
     data: points.map(state => ({ x: readX(state, xAxis), y: series.read(state) }))
@@ -237,8 +237,11 @@ export function updatePhysicsChart(chart, history, options) {
   }
 
   if (chart.options.plugins) {
+    if (chart.options.plugins.legend) chart.options.plugins.legend.display = definition.showLegend;
+
     chart.options.plugins.coasterAnnotations = {
-      horizontalLines: definition.references(options.config),
+      fontFamily: chart.options.plugins.coasterAnnotations?.fontFamily,
+      horizontalLines: definition.references(options.config).map(line => ({ ...line, color: line.color && resolveColor(line.color) })),
       band: definition.band(options.config),
       markers: [
         ...criticalPointMarkers(history, options, xAxis),

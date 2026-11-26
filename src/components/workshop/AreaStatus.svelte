@@ -33,7 +33,7 @@
 
   .ok {
     background: var(--success-soft);
-    color: #1f6b4e;
+    color: var(--success-text);
   }
 
   .ok i {
@@ -42,7 +42,7 @@
 
   .warn {
     background: var(--accent-soft);
-    color: #8a5a12;
+    color: var(--warn-text);
   }
 
   .warn i {
@@ -51,7 +51,7 @@
 
   .bad {
     background: var(--danger-soft);
-    color: #9d2a39;
+    color: var(--danger-text);
   }
 
   .bad i {

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { Play, Info, PencilRuler, Activity, ShieldCheck } from "lucide-svelte";
+  import { Play, Info } from "lucide-svelte";
 
   let {
     onPlay,
@@ -44,7 +44,7 @@
       Diseñá una montaña rusa, simulá el recorrido con física y dejá que el auditor la certifique o te diga qué ajustar.
     </p>
 
-    <nav class="menu-actions" aria-label="Opciones">
+    <nav class="menu-actions" aria-label="Menú">
       <button type="button" class="game-button" onclick={onPlay}>
         <Play size={20} /> Diseñar y certificar
       </button>
@@ -53,12 +53,6 @@
         <Info size={16} /> Créditos
       </button>
     </nav>
-
-    <ul class="menu-features">
-      <li><PencilRuler size={13} /> <b>Diseñá</b> loops, colinas y frenado a escala real</li>
-      <li><Activity size={13} /> <b>Simulá</b> el recorrido con las leyes de Newton y la energía</li>
-      <li><ShieldCheck size={13} /> <b>Auditá</b> con dictamen en vivo y ajustes verificados</li>
-    </ul>
   </div>
 </section>
 
@@ -80,29 +74,6 @@
     gap: 10px;
   }
 
-  .menu-features {
-    display: grid;
-    gap: 6px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
 
-  .menu-features li {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 7px 12px;
-    border-radius: 999px;
-    background: rgb(31 20 68 / 55%);
-    color: rgb(255 255 255 / 88%);
-    font-size: 12px;
-    font-weight: 700;
-    backdrop-filter: blur(6px);
-  }
 
-  .menu-features b {
-    color: #ffd27a;
-    font-weight: 900;
-  }
 </style>

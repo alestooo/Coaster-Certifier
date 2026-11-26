@@ -1,5 +1,8 @@
 <script lang="ts">
   import { tick } from "svelte";
+  import NumberField from "../ui/NumberField.svelte";
+  import Sym from "../ui/Sym.svelte";
+  import { letterName } from "../../lib/point-legend";
   import { onPointerRelease } from "../../lib/pointer-release";
   import { proposeDrag, proposeValue, handleText, type Handle, type HandleId, type DragProposal, type DragStart } from "../../lib/handles";
   import { fieldByKey, limitsOf } from "../../lib/field-definitions";
@@ -11,6 +14,8 @@
     label: string;
     x: number;
     y: number;
+    /** Sobre la vía en lugar de encima del punto (cuando ahí ya hay una manija). */
+    raised?: boolean;
   }
 
   interface Props {
@@ -133,32 +138,16 @@
     apply(handle.id, proposeValue(handle, handle.value + direction * multiplier * step, config));
   }
 
-  function commitTyped(event: Event, id: HandleId) {
-    const input = event.currentTarget as HTMLInputElement;
+  function commitTyped(id: HandleId, value: number) {
     const handle = fresh(id);
+    if (handle) apply(id, proposeValue(handle, value, config));
+    closeTyped(id);
+  }
 
+  function closeTyped(id: HandleId) {
     if (editing !== id) return;
     editing = null;
-
-    if (handle && Number.isFinite(input.valueAsNumber)) apply(id, proposeValue(handle, input.valueAsNumber, config));
-  }
-
-  function typedKey(event: KeyboardEvent, id: HandleId) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      commitTyped(event, id);
-      refocus(id);
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      editing = null;
-      refocus(id);
-    }
-  }
-
-  function focusOnMount(node: HTMLInputElement) {
-    node.focus();
-    node.select();
+    refocus(id);
   }
 
   /** Guías de las manijas secundarias del área seleccionada (px). */
@@ -193,7 +182,7 @@
   <svg class="guides" aria-hidden="true">
     <defs>
       <marker id="speed-head" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-        <path d="M0 0 L10 5 L0 10 z" fill="#d9822b" />
+        <path d="M0 0 L10 5 L0 10 z" style:fill="var(--handle)" />
       </marker>
     </defs>
     {#if guides.circle}
@@ -212,7 +201,7 @@
   </svg>
 
   {#each badges as marker (marker.label)}
-    <span class="badge" style:transform={at(marker.x, marker.y)} aria-hidden="true">{marker.label}</span>
+    <span class="badge" class:raised={marker.raised} style:transform={at(marker.x, marker.y)} role="img" aria-label={`${marker.label}: ${letterName(marker.label)}`} title={`${marker.label}: ${letterName(marker.label)}`}>{marker.label}</span>
   {/each}
 
   {#each visible as handle (handle.id)}
@@ -233,6 +222,7 @@
       aria-valuenow={handle.value}
       aria-valuetext={label}
       aria-orientation={handle.axis === "y" ? "vertical" : "horizontal"}
+      title={handle.letter ? `${handle.letter}: ${letterName(handle.letter)}` : undefined}
       onpointerdown={event => start(event, handle)}
       onpointermove={event => move(event, handle.id)}
       onpointerup={() => end(handle.id)}
@@ -249,26 +239,26 @@
     </button>
 
     {#if editing === handle.id}
-      <input
-        class="typed"
-        type="number"
-        step="any"
-        value={handle.value}
-        style:transform={at(handle.x, handle.y)}
-        aria-label={`${handle.name}: escribí el valor`}
-        use:focusOnMount
-        onkeydown={event => typedKey(event, handle.id)}
-        onblur={event => commitTyped(event, handle.id)}
-      />
+      <!-- Al salir (Enter, Esc o clic afuera) se cierra y el foco vuelve a la manija. -->
+      <div class="typed" style:transform={at(handle.x, handle.y)} onfocusout={() => closeTyped(handle.id)}>
+        <NumberField
+          value={handle.value}
+          step={fieldByKey(handle.key)?.step ?? 0.1}
+          unit={fieldByKey(handle.key)?.unit ?? ""}
+          label={`${handle.name}: escribí el valor`}
+          autofocus
+          onCommit={value => commitTyped(handle.id, value)}
+        />
+      </div>
     {/if}
   {/each}
 
   {#if labelled && text && editing !== labelled.id}
     <div class="label" style:transform={at(labelled.x, labelled.y)} role="presentation">
-      <strong>{text.label}</strong>
+      <strong>{#if text.symbol}<Sym symbol={text.symbol} spoken={text.label} /><span aria-hidden="true"> = {text.value}</span>{:else}{text.value}{/if}</strong>
       {#if text.detail}<span>{text.detail}</span>{/if}
       {#if proposal?.limited && proposal.id === labelled.id}
-        <em>{proposal.reason ?? "Llegaste al límite permitido"}</em>
+        <em>{proposal.reason ?? "Se ajustó al límite permitido."}</em>
       {/if}
     </div>
   {/if}
@@ -292,7 +282,7 @@
 
   .guide {
     fill: none;
-    stroke: #d9822b;
+    stroke: var(--handle);
     stroke-width: 1.6;
     stroke-dasharray: 5 4;
   }
@@ -302,11 +292,11 @@
   }
 
   .guide-dot {
-    fill: #d9822b;
+    fill: var(--handle);
   }
 
   .arrow {
-    stroke: #d9822b;
+    stroke: var(--handle);
     stroke-width: 3;
     stroke-linecap: round;
   }
@@ -321,6 +311,8 @@
   }
 
   .badge {
+    pointer-events: auto;
+    cursor: help;
     display: grid;
     place-items: center;
     width: 20px;
@@ -328,7 +320,7 @@
     margin: -10px 0 0 -10px;
     border: 2px solid white;
     border-radius: 50%;
-    background: #5f329a;
+    background: var(--primary-strong);
     color: white;
     font-size: 10px;
     font-weight: 900;
@@ -342,7 +334,7 @@
     height: 14px;
     margin: -7px 0 0 -7px;
     padding: 0;
-    border: 2.5px solid #d9822b;
+    border: 2.5px solid var(--handle);
     border-radius: 3px;
     background: white;
     color: var(--primary-strong);
@@ -411,23 +403,16 @@
   }
 
   .handle:not(.primary).active {
-    background: #d9822b;
+    background: var(--handle);
   }
 
   .typed {
-    width: 86px;
-    height: 30px;
-    margin: -46px 0 0 -43px;
-    padding: 0 8px;
-    border: 2px solid var(--primary);
-    border-radius: 8px;
-    background: white;
-    color: var(--text);
-    font: inherit;
-    font-size: 13px;
-    font-weight: 800;
+    margin: -50px 0 0 -48px;
+    padding: var(--space-1);
+    border-radius: var(--radius-md);
+    background: var(--surface);
     pointer-events: auto;
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-lg);
   }
 
   .label {
@@ -459,12 +444,17 @@
   .label em {
     font-style: normal;
     font-weight: 800;
-    color: #ffd18a;
+    color: var(--tooltip-accent);
   }
 
   @media (prefers-reduced-motion: reduce) {
     .handle {
       transition: none;
     }
+  }
+
+  /* En el personalizado B, C y D caen sobre un punto editable: la letra va arriba, sin taparlo. */
+  .badge.raised {
+    margin-top: -32px;
   }
 </style>

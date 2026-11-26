@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { endedRejected } from "../lib/run-status";
   import { onDestroy, onMount, tick, untrack } from "svelte";
 
   import WorkshopBar from "../components/workshop/WorkshopBar.svelte";
@@ -19,7 +20,7 @@
   import { whenIdle } from "../lib/idle";
   import { FIELD_GROUPS, visibleGroups } from "../lib/field-definitions";
   import type { AreaId } from "../lib/audit";
-  import { mapName, type MapId } from "../game/maps";
+  import { mapName, type MapId, mapTemplate } from "../game/maps";
   import type { Passenger } from "../game/passengers";
   import { buildTrack, runSimulation, toCsv, DEFAULT_CONFIG } from "../physics/index.js";
   import { downloadText, downloadJson, stampedName } from "../ui/export";
@@ -39,8 +40,9 @@
   /** Ancho a partir del cual la telemetría arranca abierta (px). */
   const WIDE_LAYOUT_MIN_PX = 701;
 
+  // Se entra al trazado del anexo con los valores del anexo.
   const session = new DesignSession(
-    { ...DEFAULT_CONFIG, mapId: "reference" },
+    { ...DEFAULT_CONFIG, ...mapTemplate("reference") },
     untrack(() => initialPassengers)
   );
 
@@ -58,8 +60,6 @@
   let pingTimer: ReturnType<typeof setTimeout> | null = null;
 
   const fixes = new FixSearch();
-  /** Estados con los que el recorrido termina sin aprobar. */
-  const FAILED_STATUSES = new Set(["rejected", "lost-contact", "stalled", "timeout"]);
   const PING_MS = 2000;
 
   /** Piezas que viajan aparte (ver `lib/workshop-parts`). */
@@ -140,7 +140,9 @@
   let runner = $derived(session.runner);
   let result = $derived(session.audit.result);
   let report = $derived(result?.report ?? null);
-  let passengerSummary = $derived(`${session.passengers.length} · ${formatNumber(runner.config.mass, 0)} kg`);
+  let passengerSummary = $derived(
+    `${session.passengers.length} ${session.passengers.length === 1 ? "pasajero" : "pasajeros"} · ${formatNumber(runner.config.mass, 0)} kg`
+  );
   let selectionGroup = $derived(FIELD_GROUPS.find(group => group.id === selectedArea));
 
   // Un punto que ya no existe (otro recorrido, punto borrado o deshecho) deja de estar elegido.
@@ -191,7 +193,7 @@
   // Si la reproducción termina en un incumplimiento, el pin avisa dónde.
   $effect(() => {
     const status = runner.state.status;
-    if (!FAILED_STATUSES.has(status)) return;
+    if (!endedRejected(status)) return;
 
     untrack(() => {
       ping = true;
@@ -359,13 +361,16 @@
     downloadText(stampedName(`coaster-${result.config.mapId}`, "csv"), toCsv(run.history), "text/csv");
   }
 
+  /** Dictamen en JSON: configuración, dictamen y la vía (tramos y marcas A–F). */
   function exportJson() {
     if (!result) return;
+    const track = buildTrack(result.config);
     downloadJson(stampedName(`dictamen-${result.config.mapId}`, "json"), {
       generatedAt: new Date().toISOString(),
       map: mapName(result.config.mapId),
       config: result.config,
-      verdict: result.verdict
+      verdict: result.verdict,
+      track: { sections: track.sections, markers: track.markers }
     });
   }
 </script>
@@ -435,7 +440,7 @@
   {#if panel}
     <div class="panel-area">
       {#if panel === "selection" && selectedPoint !== null}
-        <SidePanel onSheet={height => (sheetHeight = height)} title={`Punto ${selectedPoint + 1}`} subtitle={`de ${session.draft.customPoints.length} · trazado personalizado`} onClose={closePanel}>
+        <SidePanel onSheet={height => (sheetHeight = height)} title={`Punto ${selectedPoint + 1} de ${session.draft.customPoints.length}`} onClose={closePanel}>
           <PointPanel
             index={selectedPoint}
             config={session.draft}
@@ -444,7 +449,7 @@
           />
         </SidePanel>
       {:else if panel === "selection" && selectedArea}
-        <SidePanel onSheet={height => (sheetHeight = height)} title={selectionGroup?.title ?? PANEL_TITLES.selection} subtitle={selectionGroup?.points ? `Puntos ${selectionGroup.points}` : ""} onClose={closePanel}>
+        <SidePanel onSheet={height => (sheetHeight = height)} title={selectionGroup?.title ?? PANEL_TITLES.selection} subtitle={selectionGroup?.points ?? ""} onClose={closePanel}>
           <SelectionPanel
             area={selectedArea}
             draft={session.draft}
@@ -471,7 +476,7 @@
           />
         </SidePanel>
       {:else if panel === "rules"}
-        <SidePanel onSheet={height => (sheetHeight = height)} title={PANEL_TITLES.rules} subtitle="Qué exige la certificación y cómo se calcula" onClose={closePanel}>
+        <SidePanel onSheet={height => (sheetHeight = height)} title={PANEL_TITLES.rules} subtitle="Qué se exige y con qué precisión se simula" onClose={closePanel}>
           <RulesPanel
             draft={session.draft}
             errorField={session.errorField}
@@ -521,7 +526,6 @@
       bind:this={reportDialog}
       verdict={result.verdict}
       config={result.config}
-      track={buildTrack(result.config)}
       history={result.history}
       passengers={session.passengers}
       mapName={mapName(result.config.mapId)}

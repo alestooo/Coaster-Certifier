@@ -2,6 +2,7 @@
   import { Play, Pause, RotateCcw, FastForward } from "lucide-svelte";
   import { PLAYBACK_SPEEDS, type SimulationRunner, type PlaybackSpeed } from "../../lib/simulation-runner.svelte";
   import { formatNumber } from "../../ui/format";
+  import IconButton from "../ui/IconButton.svelte";
 
   let { runner }: { runner: SimulationRunner } = $props();
 
@@ -30,8 +31,8 @@
     {#if runner.running}<Pause size={18} />{:else}<Play size={18} />{/if}
   </button>
 
-  <button type="button" aria-label="Volver al punto A" title="Volver al punto A" onclick={() => runner.reset()}><RotateCcw size={15} /></button>
-  <button type="button" aria-label="Ir al final" title="Simular al instante el resto del recorrido" disabled={runner.isFinished} onclick={() => runner.runToEnd()}><FastForward size={15} /></button>
+  <IconButton label="Volver al punto A" icon={RotateCcw} onclick={() => runner.reset()} />
+  <IconButton label="Saltar al final" icon={FastForward} disabled={runner.isFinished} onclick={() => runner.runToEnd()} />
 
   <label class="timeline">
     <span class="visually-hidden">Línea de tiempo del recorrido</span>
@@ -48,7 +49,7 @@
 
   <span class="time" title={view.section}>t = {formatNumber(view.time, 1)} s</span>
 
-  <button type="button" class="speed" aria-label="Velocidad de reproducción" title="Velocidad de reproducción" onclick={cycleSpeed}>
+  <button type="button" class="speed" aria-label={`Velocidad de reproducción: ${SPEED_LABELS[runner.playbackSpeed]}`} title="Velocidad de reproducción" onclick={cycleSpeed}>
     {SPEED_LABELS[runner.playbackSpeed]}
   </button>
 </div>
@@ -86,6 +87,10 @@
   button:disabled {
     opacity: 0.4;
     cursor: default;
+  }
+
+  .pill :global(.icon-button) {
+    border-radius: 50%;
   }
 
   .play {

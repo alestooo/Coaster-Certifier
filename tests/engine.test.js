@@ -14,7 +14,9 @@ import {
   CRITERIA,
   recommendationSearch,
   explainFailure,
-  SCENARIOS
+  SCENARIOS,
+  buildTrack,
+  resolveConfig
 } from "../src/physics/index.js";
 import { IDEAL, simulate, deepFreeze } from "./helpers.js";
 
@@ -233,6 +235,18 @@ describe("Recomendaciones", () => {
     }
   }, SEARCH_TIMEOUT_MS);
 
+  it("un resorte que devuelve al tren fuera de la zona de frenado recibe una corrección verificada", () => {
+    const search = recommendationSearch({ mapId: "slope", initialHeight: 20, trackWidth: 220, friction: 0.01, brakeMode: "spring", springConstant: 6000, springDamping: 2600, maxCompression: 8, brakingLength: 80, maxTime: 120 });
+
+    let result = search.next();
+    while (!result.done) result = search.next();
+
+    expect(result.value.recommendations.length, result.value.reason).toBeGreaterThan(0);
+    for (const option of result.value.recommendations) {
+      expect(runSimulation(option.config).verdict.approved).toBe(true);
+    }
+  }, SCENARIO_SEARCH_TIMEOUT_MS);
+
   it.each(["circular-loop", "loop-contact", "stall", "brake-short", "spring-ideal"])(
     "el escenario que falla «%s» recibe al menos una corrección verificada",
     id => {
@@ -272,6 +286,43 @@ describe("Robustez (hallazgos de revisión)", () => {
     expect(run.verdict.status).toBe("stalled");
     expect(run.final.speed).toBe(0);
     expect(run.final.time).toBeLessThan(60);
+  });
+
+  it("un tren en reposo antes de E se rechaza: no llegó a la zona de frenado", () => {
+    // Caso del relevamiento: se detiene en s = 8,06 m, dentro de la aproximación (E = 13,06 m).
+    const run = runSimulation({ mapId: "incline", initialHeight: 0.8, friction: 0.1, trackWidth: 5 }, { timeStep: 0.02 });
+
+    expect(run.final.distance).toBeCloseTo(8.06, 2);
+    expect(run.final.status).toBe("stalled");
+    expect(run.verdict.approved).toBe(false);
+    expect(run.verdict.violations.map(violation => violation.condition)).toEqual(["Recorrido completo: el tren debe llegar a la zona de frenado"]);
+  });
+
+  it("un tren que el resorte devuelve y queda antes de E se rechaza: quedó fuera de la zona de frenado", () => {
+    // Amortiguador justo: el rebote lo deja en la aproximación, entre E − 8 m y E.
+    const input = { mapId: "slope", initialHeight: 20, trackWidth: 220, friction: 0.01, brakeMode: "spring", springConstant: 6000, springDamping: 2600, maxCompression: 8, brakingLength: 80, maxTime: 120 };
+    const run = runSimulation(input, { timeStep: 0.02 });
+    const { brakeStart } = buildTrack(resolveConfig(input));
+
+    expect(run.final.distance).toBeLessThan(brakeStart);
+    expect(run.final.status).toBe("stalled");
+    expect(run.verdict.approved).toBe(false);
+    expect(run.verdict.violations.map(violation => [violation.code, violation.condition])).toEqual([
+      ["outside-braking", "Recorrido completo: el tren quedó fuera de la zona de frenado tras el rebote"]
+    ]);
+  });
+
+  it("explica el rebote fuera de la zona y el reposo antes de E con el incumplimiento del dictamen", () => {
+    const rebound = runSimulation({ mapId: "slope", initialHeight: 20, trackWidth: 220, friction: 0.01, brakeMode: "spring", springConstant: 6000, springDamping: 2600, maxCompression: 8, brakingLength: 80, maxTime: 120 }, { timeStep: 0.02 });
+    const short = runSimulation({ mapId: "incline", initialHeight: 0.8, friction: 0.1, trackWidth: 5 }, { timeStep: 0.02 });
+
+    const reboundText = explainFailure(rebound.final, rebound.config, rebound.verdict.violations[0]).explanation;
+    const shortText = explainFailure(short.final, short.config, short.verdict.violations[0]).explanation;
+
+    expect(reboundText).toMatch(/resorte lo devolvió/);
+    expect(reboundText).not.toMatch(/estación/);
+    expect(shortText).toMatch(/antes de llegar a la zona de frenado/);
+    expect(shortText).not.toMatch(/estación/);
   });
 
   it("resume historiales de más de 150 000 estados sin desbordar la pila", () => {

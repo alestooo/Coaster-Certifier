@@ -105,7 +105,8 @@ function checked(state, config, track) {
  * @returns {SimulationState["status"]}
  */
 function restingStatus(distance, config, track) {
-  if (distance < track.stationStart) return "stalled";
+  // Quieto antes de E (también en la aproximación) no terminó el recorrido.
+  if (distance < track.brakeStart) return "stalled";
   return config.brakeMode === "station" ? "finished" : "stopped";
 }
 

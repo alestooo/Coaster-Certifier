@@ -28,7 +28,7 @@ export function resultLines(verdict: Verdict, finalDistance: number, config: Sim
     return [
       `El tren completó el recorrido y quedó detenido a ${formatNumber(finalDistance, 2)} m, dentro de la zona de frenado.`,
       `Fuerza g máxima ${formatNumber(maxLoad.value, 2)} g y mínima ${formatNumber(minLoad.value, 2)} g, ${loadRule(config)}.`,
-      `Fuerza normal mínima ${formatNumber(minNormal.value, 1)} N (${minNormal.section}).`
+      `Fuerza normal mínima ${formatNumber(minNormal.value, 0)} N, en ${minNormal.section}.`
     ];
   }
 

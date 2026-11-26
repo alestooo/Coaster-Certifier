@@ -2,6 +2,9 @@
   import { untrack } from "svelte";
   import { Activity, ChevronDown, ChevronUp, LayoutGrid } from "lucide-svelte";
   import LoadError from "../LoadError.svelte";
+  import Select from "../ui/Select.svelte";
+  import Segmented from "../ui/Segmented.svelte";
+  import IconButton from "../ui/IconButton.svelte";
   import { workshopParts } from "../../lib/workshop-parts";
   // Solo las definiciones: Chart.js viaja con ChartCard, que se precarga en reposo o al abrir la telemetría.
   import { CHART_KINDS } from "../../ui/charts/definitions.js";
@@ -17,6 +20,13 @@
 
   const J_PER_KJ = 1000;
   const CHART_HEIGHT_PX = 150;
+
+  /** Opciones del selector: el nombre de la magnitud y su unidad como detalle. */
+  const KIND_OPTIONS = CHART_KINDS.map(item => ({ value: item.id, label: item.label, description: item.unit }));
+  const AXIS_OPTIONS = [
+    { value: "time" as const, label: "Tiempo" },
+    { value: "distance" as const, label: "Posición" }
+  ];
 
   let kind = $state("load");
   let xAxis = $state<"time" | "distance">("time");
@@ -34,7 +44,7 @@
 
 <section class="telemetry" aria-label="Telemetría">
   <header>
-    <button type="button" class="toggle" aria-label="Telemetría" aria-expanded={open} aria-controls="telemetry-body" onclick={() => (open = !open)}>
+    <button type="button" class="toggle" aria-label="Gráficas de telemetría" aria-expanded={open} aria-controls="telemetry-body" onclick={() => (open = !open)}>
       <Activity size={15} />
       <span>Telemetría</span>
       {#if open}<ChevronDown size={15} />{:else}<ChevronUp size={15} />{/if}
@@ -50,21 +60,12 @@
     {#if open}
       <div class="chart-tools">
         {#if !expanded}
-          <select bind:value={kind} aria-label="Magnitud graficada">
-            {#each CHART_KINDS as item (item.id)}
-              <option value={item.id}>{item.label} ({item.unit})</option>
-            {/each}
-          </select>
+          <Select label="Magnitud graficada" value={kind} options={KIND_OPTIONS} onChange={value => (kind = value)} />
         {/if}
 
-        <div class="segmented" role="group" aria-label="Eje horizontal">
-          <button type="button" class:active={xAxis === "time"} aria-pressed={xAxis === "time"} onclick={() => (xAxis = "time")}>Tiempo</button>
-          <button type="button" class:active={xAxis === "distance"} aria-pressed={xAxis === "distance"} onclick={() => (xAxis = "distance")}>Posición</button>
-        </div>
+        <Segmented label="Eje horizontal" size="sm" value={xAxis} options={AXIS_OPTIONS} onChange={value => (xAxis = value)} />
 
-        <button type="button" class="icon" class:active={expanded} aria-pressed={expanded} aria-label="Todas las gráficas" title="Todas las gráficas" onclick={() => (expanded = !expanded)}>
-          <LayoutGrid size={15} />
-        </button>
+        <IconButton label="Todas las gráficas" icon={LayoutGrid} size="sm" variant="secondary" pressed={expanded} onclick={() => (expanded = !expanded)} />
       </div>
     {/if}
   </header>
@@ -178,44 +179,10 @@
     gap: 6px;
   }
 
-  select {
-    height: 30px;
-    max-width: 230px;
-    padding: 0 8px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
-    color: var(--text);
-    font: inherit;
-    font-size: 12px;
-    font-weight: 800;
-  }
 
-  .segmented {
-    display: flex;
-    padding: 2px;
-    border-radius: 9px;
-    background: var(--surface-muted);
-  }
 
-  .segmented button {
-    height: 26px;
-    padding: 0 9px;
-    border: 0;
-    background: transparent;
-  }
 
-  .segmented button.active,
-  .icon.active {
-    background: var(--surface);
-    color: var(--primary-strong);
-    box-shadow: var(--shadow-sm);
-  }
 
-  .icon {
-    justify-content: center;
-    width: 30px;
-  }
 
   .body {
     padding: 0 12px 8px;
@@ -246,9 +213,8 @@
       width: 100%;
     }
 
-    select {
+    .chart-tools > :global(.trigger) {
       flex: 1;
-      max-width: none;
     }
   }
 

@@ -18,7 +18,7 @@
 export const SCENARIOS = Object.freeze([
   {
     id: "certification",
-    title: "Trazado de certificación (anexo)",
+    title: "Trazado del anexo",
     description:
       "Caída, loop en lágrima, colina y frenos en la recta final con los parámetros del anexo. Aprueba con margen.",
     summary: "H 30 m · v₀ 2 m/s · h_L 21,5 m · R 5 m · h_c 10 m · ρ_c 55 m · μ 0,01 · a_f 6 m/s² · d_f 60 m",
@@ -97,7 +97,7 @@ export const SCENARIOS = Object.freeze([
   },
   {
     id: "line",
-    title: "Línea: llegar a la estación",
+    title: "Bajada simple: frenar en la recta final",
     description: "Bajada sencilla y detención con frenos en la recta final.",
     summary: "H 20 m · ancho 220 m · μ 0,01 · a_f 5 m/s² · d_f 80 m",
     config: {
@@ -130,7 +130,7 @@ export const SCENARIOS = Object.freeze([
   },
   {
     id: "airtime",
-    title: "Colina con airtime (ruedas anti-levantamiento)",
+    title: "Colina para flotar (ruedas anti-levantamiento)",
     description:
       "Con ruedas anti-levantamiento la fuerza g puede bajar de 0 g hasta −1 g en la cresta sin rechazo.",
     summary: "H 30 m · h_c 6 m · ρ_c 30 m · contacto: ruedas anti-levantamiento",

@@ -7,7 +7,7 @@
  * No contiene ecuaciones de movimiento: solo lee el dictamen.
  */
 import type { SimulationConfig, Verdict } from "./types";
-import { formatNumber, kmh } from "../ui/format";
+import { formatNumber } from "../ui/format";
 
 export type Tone = "ok" | "warn" | "bad" | "info";
 
@@ -32,7 +32,8 @@ export interface LimitGauge {
   tone: Tone;
 }
 
-export type BrakingOutcome = "stopped" | "overrun" | "not-reached" | "no-stop";
+/** «returned»: entró a la zona, el resorte lo devolvió y quedó quieto antes de E. */
+export type BrakingOutcome = "stopped" | "overrun" | "not-reached" | "no-stop" | "returned";
 
 export interface BrakingInsight {
   outcome: BrakingOutcome;
@@ -75,7 +76,10 @@ export const LOW_G_MARGIN = 0.2;
 const BRAKE_USAGE_WARNING = 0.85;
 
 /** Incumplimientos que siempre corresponden al sistema de frenado. */
-const BRAKING_CODES = new Set(["overrun", "compression"]);
+/** Incumplimientos del frenado: se atribuyen a la zona de frenado aunque ocurran en otro tramo. */
+const BRAKING_CODES = new Set(["overrun", "compression", "outside-braking"]);
+/** Los que significan que el tren se pasa de la zona (no el rebote que lo devuelve). */
+const OVERRUN_CODES = new Set(["overrun", "compression"]);
 
 /** Grupo del panel que controla el tramo donde ocurrió algo. */
 export function areaForSection(section: string, code?: string): AreaId {
@@ -143,6 +147,11 @@ function issueText(violation: Violation, config: SimulationConfig): { title: str
       return {
         title: "No completa el recorrido",
         detail: `Se detuvo en ${where}, antes de llegar a la zona de frenado.`
+      };
+    case "outside-braking":
+      return {
+        title: "Queda fuera de la zona de frenado",
+        detail: `Entró a la zona, pero el rebote en el resorte lo devolvió y se detuvo en ${where}, antes de E.`
       };
     case "timeout":
     case "unfinished": {
@@ -252,7 +261,19 @@ function brakingInsight(verdict: Verdict, config: SimulationConfig): BrakingInsi
     };
   }
 
-  const overrun = verdict.violations.some(violation => BRAKING_CODES.has(violation.code));
+  if (verdict.violations.some(violation => violation.code === "outside-braking")) {
+    return {
+      outcome: "returned",
+      entrySpeed,
+      stoppingDistance: null,
+      requiredDistance,
+      available,
+      tone: "bad",
+      text: `${entry}, el resorte lo devuelve y queda quieto antes de E.`
+    };
+  }
+
+  const overrun = verdict.violations.some(violation => OVERRUN_CODES.has(violation.code));
 
   if (overrun) {
     return {
@@ -344,7 +365,7 @@ function buildAreas(
   const areas: Partial<Record<AreaId, AreaInsight>> = {
     start: {
       tone: "ok",
-      text: `Energía para subir hasta ${formatNumber(head, 1)} m · máx. ${formatNumber(kmh(maxSpeed), 0)} km/h`
+      text: `Puede subir hasta ${formatNumber(head, 1)} m · rapidez máx. ${formatNumber(maxSpeed, 1)} m/s`
     },
     layout: {
       tone: "ok",
@@ -371,13 +392,18 @@ export function buildAudit(verdict: Verdict, config: SimulationConfig): AuditRep
   const braking = brakingInsight(verdict, config);
   const maxG = maxGauge(verdict, config);
 
+  // El titular no repite lo que ya dicen las tarjetas (frenado) ni el primer problema (su tarjeta).
+  const first = verdict.violations[0];
+  const count = issues.length;
   const headline = verdict.approved
-    ? `Completa el recorrido sin superar ${num(config.maxLoad)} g. ${braking.text}`
-    : issues[0]?.detail ?? "Se detectó al menos un incumplimiento.";
+    ? `Completa el recorrido sin superar ${num(config.maxLoad)} g.`
+    : count
+      ? `${count} ${count === 1 ? "incumplimiento" : "incumplimientos"}${first ? ` · el primero en ${first.section}` : ""}`
+      : "Se detectó al menos un incumplimiento.";
 
   return {
     approved: verdict.approved,
-    title: verdict.approved ? "Aprueba la certificación" : `No aprueba: ${issues[0]?.title.toLowerCase() ?? "revisá el diseño"}`,
+    title: verdict.approved ? "Aprobado" : `Rechazado: ${issues[0]?.title.toLowerCase() ?? "revisá el diseño"}`,
     headline,
     issues,
     maxG,

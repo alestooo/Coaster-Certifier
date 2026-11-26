@@ -122,10 +122,20 @@ describe("Manijas sobre la pista", () => {
     expect(proposeValue(byId("start"), 20.26, config).value).toBeCloseTo(20.5, 9);
   });
 
-  test("handleText muestra símbolo, coma decimal y unidad", () => {
+  test("handleText da un texto hablado (sin símbolos con guion bajo) y, aparte, el símbolo y el valor para la etiqueta", () => {
     const { config, byId } = setup();
+    const text = handleText(byId("loopTop"), 21.5, config);
 
-    expect(handleText(byId("loopTop"), 21.5, config).label).toBe("h_L = 21,5 m");
+    expect(text.label).toBe("Altura del loop: 21,5 m");
+    expect(text.symbol).toBe("h_L");
+    expect(text.value).toBe("21,5 m");
+  });
+
+  test("los nombres accesibles de las manijas no tienen símbolos con guion bajo", () => {
+    const { handles } = setup();
+
+    expect(handles.length).toBeGreaterThan(0);
+    for (const handle of handles) expect(handle.name, handle.id).not.toMatch(/_|ρ|v₀/);
   });
 
   test("arrastrar el radio con el cursor quieto converge: R = R₀ + desplazamiento desde el inicio del gesto", () => {

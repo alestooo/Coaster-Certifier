@@ -1,5 +1,6 @@
 <script lang="ts">
-  import ScrubField from "./ScrubField.svelte";
+  import SliderField from "../ui/SliderField.svelte";
+  import Disclosure from "../ui/Disclosure.svelte";
   import ChoiceCards from "../lab/ChoiceCards.svelte";
   import { visibleGroups, CONTACT_OPTIONS } from "../../lib/field-definitions";
   import type { SimulationConfig } from "../../lib/types";
@@ -27,17 +28,18 @@
   onChange={contactModel => onPatch({ contactModel })}
 />
 
-<h3>Límites para los pasajeros</h3>
+<h3>Límites de certificación</h3>
 {#each criteria as field (field.key)}
-  <ScrubField {field} config={draft} error={errorField === field.key ? errorMessage : ""} onInput={value => onPatch({ [field.key]: value })} {onGesture} />
+  <SliderField {field} config={draft} error={errorField === field.key ? errorMessage : ""} onInput={value => onPatch({ [field.key]: value })} {onGesture} />
 {/each}
 
-<details>
-  <summary>Precisión numérica</summary>
-  {#each numeric as field (field.key)}
-    <ScrubField {field} config={draft} error={errorField === field.key ? errorMessage : ""} onInput={value => onPatch({ [field.key]: value })} {onGesture} />
-  {/each}
-</details>
+<div class="numeric">
+  <Disclosure summary="Precisión numérica">
+    {#each numeric as field (field.key)}
+      <SliderField {field} config={draft} error={errorField === field.key ? errorMessage : ""} onInput={value => onPatch({ [field.key]: value })} {onGesture} />
+    {/each}
+  </Disclosure>
+</div>
 
 <style>
   h3 {
@@ -49,16 +51,9 @@
     color: var(--muted);
   }
 
-  details {
-    margin-top: 14px;
+  .numeric {
+    margin-top: var(--space-3);
+    padding-top: var(--space-2);
     border-top: 1px solid var(--border);
-    padding-top: 10px;
-  }
-
-  summary {
-    font-size: 13px;
-    font-weight: 800;
-    color: var(--text-soft);
-    cursor: pointer;
   }
 </style>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Plus } from "lucide-svelte";
   let {
     label,
     value,
@@ -20,13 +21,13 @@
   <legend>{label}</legend>
 
   <div class="color-row">
-    {#each presets as color}
+    {#each presets as color, index}
       <button
         type="button"
         class="swatch"
         class:active={value.toLowerCase() === color.toLowerCase()}
         style:background-color={color}
-        aria-label={`${label}: ${color}`}
+        aria-label={`${label} ${index + 1} de ${presets.length}`}
         aria-pressed={value.toLowerCase() === color.toLowerCase()}
         onclick={() => onChange(color)}
       ></button>
@@ -40,7 +41,7 @@
         oninput={event => onChange(event.currentTarget.value)}
       />
       <span class="custom-ring" style:background-color={value}></span>
-      <span class="custom-plus" aria-hidden="true">+</span>
+      <span class="custom-plus" aria-hidden="true"><Plus size={14} strokeWidth={3} /></span>
     </label>
   </div>
 </fieldset>
@@ -138,10 +139,9 @@
 
   .custom-plus {
     position: relative;
+    display: inline-flex;
     color: #ffffff;
-    font-size: 15px;
-    font-weight: 900;
-    text-shadow: 0 1px 2px rgb(0 0 0 / 45%);
+    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 45%));
     pointer-events: none;
   }
 </style>

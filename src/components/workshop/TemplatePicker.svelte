@@ -23,19 +23,19 @@
   }
 </script>
 
-<button type="button" class="trigger" popovertarget={POPOVER_ID} aria-haspopup="dialog" title="Cambiar de recorrido o cargar un caso de prueba">
+<button type="button" class="trigger" popovertarget={POPOVER_ID} aria-haspopup="dialog" title="Elegir trazado o escenario">
   <span class="name">{mapName(mapId)}</span>
   <ChevronDown size={15} />
 </button>
 
-<div id={POPOVER_ID} popover="auto" class="picker" bind:this={popover} role="dialog" aria-label="Recorridos y casos de prueba">
+<div id={POPOVER_ID} popover="auto" class="picker" bind:this={popover} role="dialog" aria-label="Trazados y escenarios">
   <section>
-    <h2>Recorridos</h2>
+    <h2>Trazados</h2>
     <ul class="maps">
       {#each MAPS.filter(map => map.available) as map (map.id)}
         <li>
           <button type="button" class="map" class:current={map.id === mapId} aria-current={map.id === mapId} onclick={() => choose(() => onTemplate(map.id))}>
-            <TrackThumbnail config={map.preview} class="thumb" />
+            <TrackThumbnail config={map.template} class="thumb" />
             <span class="map-name">{map.name}</span>
             <span class="map-tag">{map.tag}</span>
           </button>
@@ -46,8 +46,8 @@
 
   <section>
     <div class="cases-head">
-      <h2>Casos de prueba</h2>
-      <button type="button" class="guide" onclick={() => choose(onGuide)}><BookOpen size={14} /> Guía y criterios</button>
+      <h2>Escenarios</h2>
+      <button type="button" class="guide" onclick={() => choose(onGuide)}><BookOpen size={14} /> Ver en la guía</button>
     </div>
     <ul class="cases">
       {#each SCENARIO_CARDS as card (card.id)}

@@ -42,7 +42,7 @@ describe("Auditoría en lenguaje claro", () => {
 
     // Assert
     expect(audit.approved).toBe(true);
-    expect(audit.title).toMatch(/^Aprueba/);
+    expect(audit.title).toMatch(/^Aprobado/);
     expect(audit.issues).toEqual([]);
     expect(audit.braking.outcome).toBe("stopped");
     expect(audit.braking.stoppingDistance).toBeGreaterThan(0);
@@ -69,7 +69,7 @@ describe("Auditoría en lenguaje claro", () => {
 
     // Assert
     expect(audit.approved).toBe(false);
-    expect(audit.title).toMatch(/^No aprueba/);
+    expect(audit.title).toMatch(/^Rechazado/);
     expect(audit.issues[0].code).toBe("max-load");
     expect(audit.issues[0].area).toBe("loop");
     expect(audit.issues[0].title).toMatch(/Fuerza g/);
@@ -127,6 +127,34 @@ describe("Auditoría en lenguaje claro", () => {
     expect(audit.issues[0].area).toBe("braking");
     expect(audit.issues[0].title).toMatch(/rebota/i);
     expect(audit.areas.loop?.tone).not.toBe("bad");
+  });
+
+  test("un tren que el resorte devuelve antes de E se explica como fuera de la zona de frenado", () => {
+    // Arrange: el amortiguador lo detiene en la aproximación, después de rebotar.
+    const config = resolveConfig({ mapId: "slope", initialHeight: 20, trackWidth: 220, friction: 0.01, brakeMode: "spring", springConstant: 6000, springDamping: 2600, maxCompression: 8, brakingLength: 80, maxTime: 120 });
+    const run = runSimulation(config, { timeStep: 0.02 });
+
+    // Act
+    const audit = buildAudit(run.verdict, config);
+
+    // Assert
+    expect(audit.issues[0].code).toBe("outside-braking");
+    expect(audit.issues[0].area).toBe("braking");
+    expect(audit.issues[0].title).toBe("Queda fuera de la zona de frenado");
+    expect(audit.issues[0].detail).toMatch(/rebot/i);
+    expect(audit.braking.outcome).toBe("returned");
+    expect(audit.braking.text).toMatch(/lo devuelve/);
+    expect(audit.areas.braking?.text).not.toMatch(/no alcanza a detenerlo/);
+  });
+
+  test("un tren que se queda quieto antes de E no llega a la zona de frenado", () => {
+    const config = resolveConfig({ mapId: "incline", initialHeight: 0.8, friction: 0.1, trackWidth: 5 });
+    const run = runSimulation(config, { timeStep: 0.02 });
+
+    const audit = buildAudit(run.verdict, config);
+
+    expect(audit.issues[0].code).toBe("incomplete");
+    expect(audit.braking.outcome).toBe("not-reached");
   });
 
   test("con contacto estricto el límite inferior de fuerza g es 0 g", () => {
