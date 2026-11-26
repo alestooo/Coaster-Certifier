@@ -266,7 +266,7 @@ export function buildTrack(input) {
     y: 0,
     angle: 0,
     length: config.brakingLength,
-    section: config.brakeMode === "spring" ? "Resorte" : "Frenado de estación"
+    section: config.brakeMode === "spring" ? "Resorte de tope" : "Zona de frenado"
   });
 
   markers.push({ label: "E", name: "Inicio del frenado", distance: brakeStart, role: "brake-entry" });

@@ -17,17 +17,32 @@ const BRAKE_FIN_SPACING_M = 1.2;
 const MARKER_LIFT_M = 2.6;
 const SPRING_COILS = 22;
 const EVENT_CROSS_PX = 8;
+/** Franja de fuerza g: por debajo del larguero, con grosor fijo en pantalla. */
+const RIBBON_OFFSET_M = -1.25;
+const RIBBON_WIDTH_PX = 5;
+/** Un tramo excedido nunca se dibuja más chico que este punto: puede medir menos de un píxel. */
+const OVER_MARK_RADIUS_PX = 5;
+const GHOST_WIDTH_PX = 3;
+const GHOST_DASH = Object.freeze([9, 6]);
+
+const RIBBON_COLORS = Object.freeze({
+  comfort: PALETTE.loadComfort,
+  near: PALETTE.loadNear,
+  over: PALETTE.loadOver,
+  float: PALETTE.loadFloat
+});
+const FOCUS_LABEL_LIFT_PX = 42;
 
 /** Etiquetas cortas por código de incumplimiento. */
 const EVENT_LABELS = Object.freeze({
-  contact: "N ≤ 0: pérdida de contacto",
-  "loop-contact": "N ≤ 0 en el loop",
-  "max-load": "n > n_máx",
-  "min-load": "n < n_mín",
-  compression: "x > x_máx",
-  overrun: "Fin de la zona de frenado",
-  reverse: "Retroceso hasta A",
-  "min-speed": "v < v_mín en subida",
+  contact: "Se despega de la vía (N ≤ 0)",
+  "loop-contact": "Se despega en el loop (N ≤ 0)",
+  "max-load": "Fuerza g excesiva",
+  "min-load": "Fuerza g demasiado baja",
+  compression: "Resorte comprimido de más",
+  overrun: "No se detuvo antes de F",
+  reverse: "Retrocedió hasta A",
+  "min-speed": "Se quedó sin impulso",
   timeout: "Tiempo agotado"
 });
 
@@ -331,6 +346,9 @@ export function drawEventMarker({ ctx, camera, scene }) {
 
   if (!event) return;
 
+  // Con auditoría, el pin ya rotula el problema: aquí solo se marca la cruz.
+  const labelled = !(scene.issues?.length);
+
   const x = camera.toX(event.x);
   const y = camera.toY(event.y);
   const size = EVENT_CROSS_PX;
@@ -344,6 +362,8 @@ export function drawEventMarker({ ctx, camera, scene }) {
   ctx.moveTo(x + size, y - size);
   ctx.lineTo(x - size, y + size);
   ctx.stroke();
+
+  if (!labelled) return;
 
   const text = EVENT_LABELS[/** @type {keyof typeof EVENT_LABELS} */ (event.code)] ?? event.condition;
 
@@ -365,4 +385,119 @@ export function drawEventMarker({ ctx, camera, scene }) {
     color: PALETTE.danger,
     background: PALETTE.panel
   });
+}
+
+/**
+ * Resplandor sobre los tramos que controla el grupo del panel de diseño
+ * que se está editando (rangos de coordenada s).
+ * @param {import("./index.js").Frame} frame
+ */
+export function drawFocus({ ctx, camera, scene }) {
+  const ranges = scene.focus ?? [];
+
+  if (!ranges.length) return;
+
+  const m = (/** @type {number} */ v) => v * camera.scale;
+  /** @type {any[]} */
+  const allPoints = scene.track.points;
+
+  let topY = Infinity;
+  let minX = Infinity;
+  let maxX = -Infinity;
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  for (const range of ranges) {
+    const screen = allPoints
+      .filter(point => point.distance >= range.from - 1e-6 && point.distance <= range.to + 1e-6)
+      .map(point => ({ x: camera.toX(point.x), y: camera.toY(point.y) }));
+
+    if (screen.length < 2) continue;
+
+    for (const point of screen) {
+      topY = Math.min(topY, point.y);
+      minX = Math.min(minX, point.x);
+      maxX = Math.max(maxX, point.x);
+    }
+
+    ctx.strokeStyle = PALETTE.focusGlow;
+    ctx.lineWidth = Math.max(18, m(4));
+    tracePolyline(ctx, screen);
+    ctx.stroke();
+
+    ctx.strokeStyle = PALETTE.focusEdge;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 5]);
+    tracePolyline(ctx, screen);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  ctx.restore();
+
+  if (Number.isFinite(topY) && scene.focusLabel) {
+    label(ctx, scene.focusLabel, (minX + maxX) / 2, Math.max(18, topY - FOCUS_LABEL_LIFT_PX), {
+      size: 11,
+      weight: 800,
+      color: PALETTE.focusLabel,
+      background: PALETTE.focusLabelBackground,
+      padding: 7
+    });
+  }
+}
+
+/**
+ * Franja de fuerza g pegada a la vía: cada tramo se tiñe con el peor valor
+ * que sintieron los pasajeros ahí (cómodo, cerca del límite, excede, flotación).
+ * @param {import("./index.js").Frame} frame
+ */
+export function drawLoadRibbon({ ctx, camera, scene }) {
+  const runs = scene.ribbon ?? [];
+
+  if (!runs.length) return;
+
+  ctx.save();
+  ctx.lineWidth = RIBBON_WIDTH_PX;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  for (const run of runs) {
+    const color = RIBBON_COLORS[/** @type {keyof typeof RIBBON_COLORS} */ (run.tone)] ?? PALETTE.loadComfort;
+    const screen = run.points.map((/** @type {any} */ point) => offsetPoint(camera, point, RIBBON_OFFSET_M));
+
+    ctx.strokeStyle = color;
+    tracePolyline(ctx, screen);
+    ctx.stroke();
+
+    if (run.tone === "over") {
+      const middle = screen[Math.floor(screen.length / 2)];
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(middle.x, middle.y, OVER_MARK_RADIUS_PX, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Pista corregida, punteada, para comparar antes de aplicar una corrección.
+ * @param {import("./index.js").Frame} frame
+ */
+export function drawGhostTrack({ ctx, camera, scene }) {
+  const ghost = scene.ghostTrack;
+
+  if (!ghost) return;
+
+  ctx.save();
+  ctx.strokeStyle = PALETTE.ghost;
+  ctx.lineWidth = GHOST_WIDTH_PX;
+  ctx.lineJoin = "round";
+  ctx.setLineDash([...GHOST_DASH]);
+  tracePolyline(ctx, ghost.points.map((/** @type {any} */ point) => ({ x: camera.toX(point.x), y: camera.toY(point.y) })));
+  ctx.stroke();
+  ctx.restore();
 }

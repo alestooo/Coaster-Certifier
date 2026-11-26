@@ -174,7 +174,7 @@ export function evaluateRun(history, input) {
   const reasons = approved
     ? [
         `El tren completó el recorrido y quedó detenido a ${final.distance.toFixed(2)} m, dentro de la zona de frenado.`,
-        `Carga máxima ${summary.maxLoad.value.toFixed(2)} g y mínima ${summary.minLoad.value.toFixed(2)} g, dentro de [${config.minLoad}, ${config.maxLoad}] g.`,
+        `Fuerza g máxima ${summary.maxLoad.value.toFixed(2)} g y mínima ${summary.minLoad.value.toFixed(2)} g, dentro de [${config.minLoad}, ${config.maxLoad}] g.`,
         `Fuerza normal mínima ${summary.minNormal.value.toFixed(1)} N (${summary.minNormal.section}).`
       ]
     : violations.map(

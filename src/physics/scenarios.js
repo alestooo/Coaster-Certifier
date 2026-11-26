@@ -20,7 +20,7 @@ export const SCENARIOS = Object.freeze([
     id: "certification",
     title: "Trazado de certificación (anexo)",
     description:
-      "Caída, loop en lágrima, colina y frenos de estación con los parámetros del anexo. Aprueba con margen.",
+      "Caída, loop en lágrima, colina y frenos en la recta final con los parámetros del anexo. Aprueba con margen.",
     summary: "H 30 m · v₀ 2 m/s · h_L 21,5 m · R 5 m · h_c 10 m · ρ_c 55 m · μ 0,01 · a_f 6 m/s² · d_f 60 m",
     config: {
       mapId: "reference",
@@ -98,7 +98,7 @@ export const SCENARIOS = Object.freeze([
   {
     id: "line",
     title: "Línea: llegar a la estación",
-    description: "Bajada sencilla y detención con frenos de estación.",
+    description: "Bajada sencilla y detención con frenos en la recta final.",
     summary: "H 20 m · ancho 220 m · μ 0,01 · a_f 5 m/s² · d_f 80 m",
     config: {
       mapId: "slope",
@@ -114,7 +114,7 @@ export const SCENARIOS = Object.freeze([
   {
     id: "valley",
     title: "Valle: superar la colina",
-    description: "Caída, colina con cresta suave y frenado. La carga mínima ocurre en la cresta.",
+    description: "Caída, colina con cresta suave y frenado. La fuerza g mínima ocurre en la cresta.",
     summary: "H 25 m · h_c 10 m · ρ_c 60 m · μ 0,01 · a_f 5 m/s² · d_f 80 m",
     config: {
       mapId: "valley",
@@ -130,10 +130,10 @@ export const SCENARIOS = Object.freeze([
   },
   {
     id: "airtime",
-    title: "Colina con airtime (ruedas de seguridad)",
+    title: "Colina con airtime (ruedas anti-levantamiento)",
     description:
-      "Con el modelo de ruedas de seguridad la carga puede bajar de 0 g hasta −1 g en la cresta sin rechazo.",
-    summary: "H 30 m · h_c 6 m · ρ_c 30 m · contacto: ruedas de seguridad",
+      "Con ruedas anti-levantamiento la fuerza g puede bajar de 0 g hasta −1 g en la cresta sin rechazo.",
+    summary: "H 30 m · h_c 6 m · ρ_c 30 m · contacto: ruedas anti-levantamiento",
     config: {
       mapId: "valley",
       initialHeight: 30,

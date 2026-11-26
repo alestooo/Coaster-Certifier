@@ -13,7 +13,8 @@ import {
   CSV_COLUMNS,
   CRITERIA,
   recommendationSearch,
-  explainFailure
+  explainFailure,
+  SCENARIOS
 } from "../src/physics/index.js";
 import { IDEAL, simulate, deepFreeze } from "./helpers.js";
 
@@ -223,6 +224,23 @@ describe("Recomendaciones", () => {
     }
   });
 
+  it.each(["circular-loop", "loop-contact", "stall", "brake-short", "spring-ideal"])(
+    "el escenario que falla «%s» recibe al menos una corrección verificada",
+    id => {
+      const scenario = SCENARIOS.find(candidate => candidate.id === id);
+      const search = recommendationSearch(scenario.config);
+
+      let result = search.next();
+      while (!result.done) result = search.next();
+
+      expect(result.value.recommendations.length, result.value.reason).toBeGreaterThan(0);
+      for (const option of result.value.recommendations) {
+        expect(runSimulation(option.config).verdict.approved).toBe(true);
+      }
+    },
+    60_000
+  );
+
   it("explica la pérdida de contacto en el loop", () => {
     const run = simulate({ mapId: "loop", initialHeight: 12, loopHeight: 16, loopTopRadius: 4 });
     const detail = explainFailure(run.final, run.config);
@@ -233,6 +251,20 @@ describe("Recomendaciones", () => {
 });
 
 describe("Robustez (hallazgos de revisión)", () => {
+  it("un tren que la fricción frena en una recta queda en reposo, no se arrastra a velocidad constante", () => {
+    // Resorte amortiguado que lo devuelve a la recta: ahí la fricción lo frena antes de la estación.
+    // Con |v| < a·h/2, las etapas de RK4 cambian el signo de la fricción y se anulan: v quedaba fija (~3e-5 m/s)
+    // y el recorrido terminaba en «tiempo agotado» en lugar de «detenido antes de la estación».
+    const run = runSimulation(
+      { mapId: "slope", initialHeight: 20, trackWidth: 220, friction: 0.01, brakeMode: "spring", springConstant: 6000, springDamping: 2078, maxCompression: 8, brakingLength: 80, maxTime: 120 },
+      { timeStep: 0.02 }
+    );
+
+    expect(run.verdict.status).toBe("stalled");
+    expect(run.final.speed).toBe(0);
+    expect(run.final.time).toBeLessThan(60);
+  });
+
   it("resume historiales de más de 150 000 estados sin desbordar la pila", () => {
     const run = runSimulation({ ...IDEAL, mapId: "slope", initialHeight: 20, brakeMode: "spring", springConstant: 6000, maxCompression: 60, maxTime: 90 }, { timeStep: 0.0005 });
 

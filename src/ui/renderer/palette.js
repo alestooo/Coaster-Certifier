@@ -103,6 +103,19 @@ export const PALETTE = Object.freeze({
   safe: "#2f9d78",
   warning: "#f2a93b",
   danger: "#d9465a",
+  dangerHalo: "217, 70, 90",
+  focusGlow: "rgba(242, 169, 59, 0.45)",
+  focusEdge: "rgba(176, 112, 20, 0.85)",
+  focusLabel: "#6b4508",
+  focusLabelBackground: "rgba(255, 241, 214, 0.96)",
+
+  /** Franja de fuerza g: cómoda, cerca del límite, excede, flotación. */
+  loadComfort: "#2f9d78",
+  loadNear: "#f2a93b",
+  loadOver: "#d9465a",
+  loadFloat: "#3a7bd5",
+  /** Pista corregida que se previsualiza antes de aplicar una corrección. */
+  ghost: "#1f8a64",
 
   weight: "#d9465a",
   normal: "#3a7bd5",

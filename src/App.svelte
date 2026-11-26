@@ -1,160 +1,75 @@
 <script lang="ts">
-  import TopNav from "./components/TopNav.svelte";
+  import { onMount } from "svelte";
+  import { whenIdle } from "./lib/idle";
   import Menu from "./screens/Menu.svelte";
-  import Setup from "./screens/Setup.svelte";
-  import Passengers from "./screens/Passengers.svelte";
-  import Simulation from "./screens/Simulation.svelte";
   import Credits from "./components/Credits.svelte";
+  import LoadError from "./components/LoadError.svelte";
+  import { LazyModule } from "./lib/lazy-module.svelte";
+  import { createPassenger } from "./game/passengers";
 
-  import { createSession } from "./game/session";
-  import { MAPS } from "./game/maps";
+  type Screen = "menu" | "workshop";
 
-  import {
-    resizePassengers,
-    calculateTotalMass,
-    MIN_PASSENGER_MASS,
-    MAX_PASSENGER_MASS,
-    type Passenger
-  } from "./game/passengers";
+  /** Tripulación inicial del taller: dos pasajeros en un carrito. */
+  const INITIAL_PASSENGERS = [createPassenger(1), createPassenger(2)];
+  /** Sin `requestIdleCallback` (Safari), el taller se precarga a este tiempo del menú. */
+  const PREFETCH_FALLBACK_MS = 1500;
 
-  import { DEFAULT_CONFIG } from "./physics/index.js";
-  import type { SimulationConfig } from "./lib/types";
-
-  type Screen =
-    | "menu"
-    | "setup"
-    | "passengers"
-    | "simulation";
+  /** El taller (con la física, el lienzo y la auditoría) no frena la portada: baja aparte. */
+  const workshop = new LazyModule(() => import("./screens/Workshop.svelte"));
 
   let screen = $state<Screen>("menu");
   let showCredits = $state(false);
+  /** El taller se monta la primera vez y queda vivo (oculto) para no perder el diseño al volver al menú. */
+  let workshopOpened = $state(false);
 
-  // El usuario debe seleccionar explícitamente un recorrido.
-  let session = $state({
-    ...createSession(),
-    mapId: ""
-  });
+  // Cuando el menú ya se ve, el taller baja en segundo plano: «Diseñar y certificar» abre al instante.
+  // Un fallo acá no se muestra: al entrar se vuelve a intentar.
+  onMount(() => whenIdle(() => void workshop.load(), PREFETCH_FALLBACK_MS));
 
-  let routeConfirmed = $state(false);
-  let passengersConfirmed = $state(false);
-
-  let routeValid = $derived(
-    MAPS.some(
-      map =>
-        map.id === session.mapId &&
-        map.available
-    )
-  );
-
-  let peopleValid = $derived(
-    session.passengers.length >= 1 &&
-    session.passengers.length <= 4 &&
-    session.passengers.every(
-      passenger =>
-        Number.isFinite(passenger.mass) &&
-        passenger.mass >= MIN_PASSENGER_MASS &&
-        passenger.mass <= MAX_PASSENGER_MASS
-    )
-  );
-
-  let canPassengers = $derived(
-    routeConfirmed && routeValid
-  );
-
-  let canSimulation = $derived(
-    canPassengers &&
-    passengersConfirmed &&
-    peopleValid
-  );
-
-  let simulationConfig = $derived({
-    ...DEFAULT_CONFIG,
-    mass: calculateTotalMass(session.passengers),
-    mapId: session.mapId as SimulationConfig["mapId"]
-  });
-
-  function chooseRoute() {
-    routeConfirmed = false;
-    passengersConfirmed = false;
-  }
-
-  function confirmRoute() {
-    if (!routeValid) return;
-
-    session.passengers = resizePassengers(
-      session.passengers,
-      session.passengerCount
-    );
-
-    routeConfirmed = true;
-    passengersConfirmed = false;
-    screen = "passengers";
-  }
-
-  function updatePassengers(updated: Passenger[]) {
-    session.passengers = updated;
-    session.passengerCount = updated.length;
-    passengersConfirmed = false;
-  }
-
-  function confirmPeople() {
-    if (!canPassengers || !peopleValid) return;
-
-    passengersConfirmed = true;
-    screen = "simulation";
-  }
-
-  function navigate(next: Exclude<Screen, "menu">) {
-    if (
-      next === "setup" ||
-      (next === "passengers" && canPassengers) ||
-      (next === "simulation" && canSimulation)
-    ) {
-      screen = next;
-    }
+  function openWorkshop() {
+    void workshop.load();
+    workshopOpened = true;
+    screen = "workshop";
   }
 </script>
 
-{#if screen !== "menu"}
-  <TopNav
-    current={screen}
-    {canPassengers}
-    {canSimulation}
-    onHome={() => (screen = "menu")}
-    onNavigate={navigate}
-  />
-{/if}
-
 {#if screen === "menu"}
-  <Menu
-    onPlay={() => (screen = "setup")}
-    onCredits={() => (showCredits = true)}
-  />
-{:else if screen === "setup"}
-  <Setup
-    bind:mapId={session.mapId}
-    onSelect={chooseRoute}
-    onBack={() => (screen = "menu")}
-    onContinue={confirmRoute}
-  />
-{:else if screen === "passengers"}
-  <Passengers
-    passengers={session.passengers}
-    onChange={updatePassengers}
-    onBack={() => (screen = "setup")}
-    onStart={confirmPeople}
-  />
-{:else if canSimulation}
-  <Simulation
-    config={simulationConfig}
-    passengers={session.passengers}
-    onEditPassengers={() => (screen = "passengers")}
-    onChangeMap={() => (screen = "setup")}
-    onMapChange={mapId => (session.mapId = mapId)}
-  />
+  <Menu onPlay={openWorkshop} onCredits={() => (showCredits = true)} />
 {/if}
 
-<Credits
-  open={showCredits}
-  onClose={() => (showCredits = false)}
-/>
+{#if workshopOpened}
+  <div class="workshop-host" hidden={screen !== "workshop"}>
+    {#await workshop.promise}
+      <p class="opening" role="status">Abriendo el taller…</p>
+    {:then module}
+      {#if module}
+        <module.default passengers={INITIAL_PASSENGERS} active={screen === "workshop"} onHome={() => (screen = "menu")} />
+      {/if}
+    {:catch}
+      <div class="opening">
+        <!-- Todavía no hay nada diseñado, y recargar es lo único que repara también los archivos
+             compartidos que fallaron o una versión nueva publicada mientras tanto. -->
+        <LoadError
+          message="No se pudo descargar el taller."
+          hint="Cuando vuelva la conexión, recargá la página."
+          actionLabel="Recargar la página"
+          onRetry={() => location.reload()}
+        />
+      </div>
+    {/await}
+  </div>
+{/if}
+
+<Credits open={showCredits} onClose={() => (showCredits = false)} />
+
+<style>
+  .opening {
+    display: grid;
+    place-items: center;
+    min-height: 100svh;
+    margin: 0;
+    padding: 20px;
+    color: var(--muted);
+    font-weight: 700;
+  }
+</style>

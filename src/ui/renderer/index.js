@@ -9,8 +9,9 @@
  *  2. suelo;
  *  3. mundo estático (utilería, subida por cadena, estación, soportes,
  *     vía, frenos, puntos críticos), cacheado fuera de pantalla;
- *  4. cadena en movimiento, estela, resorte, incumplimiento, tren,
- *     fuerzas y lecturas.
+ *  4. cadena en movimiento, tramo resaltado, franja de fuerza g, pista
+ *     corregida en vista previa, estela, resorte, incumplimiento en vivo,
+ *     tren, fuerzas y lecturas. Los pines de la auditoría son DOM.
  */
 import { prepareCanvas, createCamera } from "./camera.js";
 import { drawSkyAndDistant, drawGroundFill, drawWorldScenery } from "./scenery.js";
@@ -22,7 +23,10 @@ import {
   drawBrakeHardware,
   drawSpring,
   drawMarkers,
-  drawEventMarker
+  drawEventMarker,
+  drawFocus,
+  drawLoadRibbon,
+  drawGhostTrack
 } from "./track.js";
 import { drawTrail } from "./trail.js";
 import { drawTrain } from "./train.js";
@@ -38,6 +42,7 @@ import { getWorldLayer, blitWorldLayer } from "./layers.js";
  * @property {boolean} showGauge Indicador semicircular de carga dentro del lienzo.
  * @property {boolean} showScenery Utilería del parque (árboles, cerca, feria).
  * @property {boolean} showReadings Panel de lecturas numéricas.
+ * @property {boolean} [cacheWorld] Falso mientras la escala cambia en cada cuadro (animación de zoom): no se crean capas nuevas.
  */
 
 /**
@@ -47,8 +52,13 @@ import { getWorldLayer, blitWorldLayer } from "./layers.js";
  * @property {any} track Trazado construido con buildTrack.
  * @property {ReadonlyArray<any>} [passengers] Pasajeros del tren.
  * @property {ReadonlyArray<any>} [history] Historial de estados.
- * @property {{mode?: "full" | "follow", zoom?: number}} [camera]
+ * @property {import("./camera.js").CameraView} [camera] Vista pedida (encuadre ajustado con zoom, o seguimiento).
  * @property {Partial<RenderOptions>} [options]
+ * @property {ReadonlyArray<{x: number, y: number, title: string}>} [issues] Incumplimientos que halló la auditoría.
+ * @property {ReadonlyArray<{from: number, to: number}>} [focus] Tramos resaltados (coordenada s).
+ * @property {string} [focusLabel] Nombre del grupo resaltado.
+ * @property {ReadonlyArray<{tone: string, points: ReadonlyArray<{x: number, y: number, angle: number}>}>} [ribbon] Franja de fuerza g (ver lib/load-profile).
+ * @property {any} [ghostTrack] Trazado corregido que se previsualiza punteado.
  */
 
 /**
@@ -94,11 +104,12 @@ function drawWorld(frame) {
  *
  * @param {HTMLCanvasElement} canvas
  * @param {Scene} scene
+ * @returns {import("./camera.js").Camera | null} Cámara usada, para posicionar elementos DOM sobre el lienzo.
  */
 export function renderSimulation(canvas, scene) {
   const prepared = prepareCanvas(canvas);
 
-  if (!prepared) return;
+  if (!prepared) return null;
 
   const options = { ...RENDER_DEFAULT_OPTIONS, ...(scene.options ?? {}) };
   const camera = createCamera(prepared.width, prepared.height, scene);
@@ -118,6 +129,9 @@ export function renderSimulation(canvas, scene) {
   }
 
   drawChainLinks(frame);
+  drawFocus(frame);
+  drawLoadRibbon(frame);
+  drawGhostTrack(frame);
 
   if (options.showTrail) drawTrail(frame);
   if (scene.config.brakeMode === "spring") drawSpring(frame);
@@ -128,6 +142,8 @@ export function renderSimulation(canvas, scene) {
   if (options.showForces) drawForces(frame);
   if (options.showGauge) drawGauge(frame);
   if (options.showReadings) drawReadings(frame);
+
+  return camera;
 }
 
-export { MIN_ZOOM, MAX_ZOOM, CART_LENGTH_M, MIN_TRAIN_PX } from "./camera.js";
+export { MIN_ZOOM, MAX_ZOOM, MIN_VIEW_ZOOM, MAX_VIEW_ZOOM, CART_LENGTH_M, MIN_TRAIN_PX, frameView, frameViewAbove, fitBounds } from "./camera.js";

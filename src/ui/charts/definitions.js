@@ -34,7 +34,7 @@
  * @property {string} id
  * @property {string} label
  * @property {string} unit
- * @property {string} yTitle Título del eje vertical con unidad.
+ * @property {string} yTitle Título del eje vertical: símbolo y unidad (el encabezado de la tarjeta nombra la magnitud).
  * @property {ReadonlyArray<SeriesDefinition>} series
  * @property {(config: SimulationConfig) => ReferenceLine[]} references Líneas horizontales de referencia.
  * @property {(config: SimulationConfig) => {from: number, to: number} | null} band Banda horizontal permitida.
@@ -65,7 +65,7 @@ export const CHART_KINDS = Object.freeze([
   { id: "dissipated", label: "Energía disipada acumulada", unit: "J" },
   { id: "normal", label: "Fuerza normal", unit: "N" },
   { id: "acceleration", label: "Aceleraciones", unit: "m/s²" },
-  { id: "load", label: "Carga sobre los pasajeros", unit: "g" },
+  { id: "load", label: "Fuerza g sobre los pasajeros", unit: "g" },
   { id: "spring", label: "Energía elástica del frenado", unit: "J" }
 ]);
 
@@ -91,7 +91,7 @@ const DEFINITIONS = Object.freeze([
     id: "speed",
     label: "Rapidez",
     unit: "m/s",
-    yTitle: "Rapidez (m/s)",
+    yTitle: "v (m/s)",
     series: [
       { key: "speed", label: "Rapidez", color: CHART_PALETTE.speed, read: state => state.speed }
     ],
@@ -103,7 +103,7 @@ const DEFINITIONS = Object.freeze([
     id: "energy",
     label: "Energías",
     unit: "J",
-    yTitle: "Energía (J)",
+    yTitle: "E (J)",
     series: ENERGY_SERIES,
     references: () => [],
     band: () => null,
@@ -113,7 +113,7 @@ const DEFINITIONS = Object.freeze([
     id: "dissipated",
     label: "Energía disipada acumulada",
     unit: "J",
-    yTitle: "Energía (J)",
+    yTitle: "E (J)",
     series: [
       { key: "dissipated", label: "Disipada acumulada", color: CHART_PALETTE.dissipated, read: state => state.energies.dissipated },
       {
@@ -133,7 +133,7 @@ const DEFINITIONS = Object.freeze([
     id: "normal",
     label: "Fuerza normal",
     unit: "N",
-    yTitle: "Fuerza normal (N)",
+    yTitle: "N (N)",
     series: [
       { key: "normal", label: "Normal N", color: CHART_PALETTE.normal, read: state => state.forces.normal }
     ],
@@ -145,7 +145,7 @@ const DEFINITIONS = Object.freeze([
     id: "acceleration",
     label: "Aceleraciones",
     unit: "m/s²",
-    yTitle: "Aceleración (m/s²)",
+    yTitle: "a (m/s²)",
     series: [
       { key: "tangential", label: "Tangencial a_t", color: CHART_PALETTE.tangential, read: state => state.tangentialAcceleration },
       { key: "normalAcceleration", label: "Normal a_n (con signo)", color: CHART_PALETTE.normalAcceleration, read: state => state.normalAcceleration }
@@ -156,11 +156,11 @@ const DEFINITIONS = Object.freeze([
   },
   {
     id: "load",
-    label: "Carga sobre los pasajeros",
+    label: "Fuerza g sobre los pasajeros",
     unit: "g",
-    yTitle: "Carga n = N/(mg) (g)",
+    yTitle: "n (g)",
     series: [
-      { key: "load", label: "Carga n", color: CHART_PALETTE.load, read: state => state.load }
+      { key: "load", label: "Fuerza g (n)", color: CHART_PALETTE.load, read: state => state.load }
     ],
     references: config => [
       { value: config.maxLoad, label: loadLabel("+", config.maxLoad), color: CHART_PALETTE.limit },
@@ -173,7 +173,7 @@ const DEFINITIONS = Object.freeze([
     id: "spring",
     label: "Energía elástica del frenado",
     unit: "J",
-    yTitle: "Energía elástica (J)",
+    yTitle: "U (J)",
     series: [
       { key: "elastic", label: "Resorte ½·k·x²", color: CHART_PALETTE.elastic, read: state => state.energies.elastic }
     ],
@@ -192,7 +192,7 @@ export function chartDefinition(kind) {
   return DEFINITIONS.find(definition => definition.id === kind) ?? DEFINITIONS[0];
 }
 
-/** Margen añadido alrededor de los límites de carga (g). */
+/** Margen añadido alrededor de los límites de fuerza g (g). */
 const LOAD_RANGE_PADDING = 0.5;
 
 /**

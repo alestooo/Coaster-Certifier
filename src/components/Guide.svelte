@@ -69,12 +69,12 @@
         <article>
           <ShieldCheck size={18} />
           <h4>Contacto con la vía</h4>
-          <p>N = m·(g·cos θ + κ·v²) debe ser positiva. Con «ruedas de seguridad» puede ser negativa fuera del loop, pero la carga no baja de n_mín.</p>
+          <p>La vía debe empujar al tren: N = m·(g·cos θ + κ·v²) &gt; 0. Con «ruedas anti-levantamiento» puede ser negativa fuera del loop, pero la fuerza g no baja de n_mín.</p>
         </article>
         <article>
           <Gauge size={18} />
-          <h4>Carga sobre los pasajeros</h4>
-          <p>n = N/(m·g) dentro de [n_mín, n_máx]. El anexo fija −1 g y +5 g; la base del loop y las crestas son los puntos críticos.</p>
+          <h4>Fuerza g sobre los pasajeros</h4>
+          <p>Lo que siente el pasajero, n = N/(m·g): 1 g es estar sentado en reposo. Debe quedar entre n_mín y n_máx (el anexo fija −1 g y +5 g); la base del loop y las crestas son los puntos críticos.</p>
         </article>
         <article>
           <Info size={18} />

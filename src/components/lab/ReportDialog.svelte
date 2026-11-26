@@ -1,10 +1,12 @@
 <script lang="ts">
-  import { toCsv } from "../../physics/index.js";
+  import { runSimulation, toCsv } from "../../physics/index.js";
   import type { SimulationConfig, SimulationState, Track, Verdict } from "../../lib/types";
   import type { Passenger } from "../../game/passengers";
-  import { FIELD_GROUPS } from "../../lib/field-definitions";
+  import { visibleFields } from "../../lib/field-definitions";
   import { downloadText, downloadJson, stampedName } from "../../ui/export";
   import { formatNumber, formatSeconds, kmh } from "../../ui/format";
+  import { resultLines } from "../../lib/report-text";
+  import { Download, Printer, X } from "lucide-svelte";
 
   let {
     verdict,
@@ -31,17 +33,18 @@
   let generatedAt = $state(new Date());
 
   let parameterRows = $derived(
-    FIELD_GROUPS.flatMap(group =>
-      group.fields
-        .filter(field => !field.visible || field.visible(config))
-        .map(field => ({ symbol: field.symbol, label: field.label, value: `${formatNumber(config[field.key], field.step < 0.01 ? 4 : 2)} ${field.unit}`.trim() }))
-    )
+    visibleFields(config).map(field => ({
+      symbol: field.symbol,
+      label: field.label,
+      value: `${formatNumber(config[field.key], field.step < 0.01 ? 4 : 2)} ${field.unit}`.trim()
+    }))
   );
 
   let summary = $derived(verdict?.summary ?? null);
 
+  /** CSV a resolución completa (cada paso dt), idéntico al del script headless. */
   function exportCsv() {
-    downloadText(stampedName(`coaster-${config.mapId}`, "csv"), toCsv(history), "text/csv");
+    downloadText(stampedName(`coaster-${config.mapId}`, "csv"), toCsv(runSimulation(config).history), "text/csv");
   }
 
   function exportJson() {
@@ -68,10 +71,10 @@
     </div>
 
     <div class="report-buttons">
-      <button type="button" onclick={exportCsv} title="Serie temporal completa en CSV (mismas columnas que el script headless)">⤓ CSV</button>
-      <button type="button" onclick={exportJson} title="Configuración y dictamen en JSON">⤓ JSON</button>
-      <button type="button" onclick={print}>🖨 Imprimir / PDF</button>
-      <button type="button" aria-label="Cerrar reporte" onclick={() => dialog.close()}>✕</button>
+      <button type="button" onclick={exportCsv} title="Serie temporal completa en CSV (mismas columnas que el script headless)"><Download size={14} /> CSV</button>
+      <button type="button" onclick={exportJson} title="Configuración y dictamen en JSON"><Download size={14} /> JSON</button>
+      <button type="button" onclick={print}><Printer size={14} /> Imprimir / PDF</button>
+      <button type="button" aria-label="Cerrar reporte" onclick={() => dialog.close()}><X size={15} /></button>
     </div>
   </div>
 
@@ -93,8 +96,8 @@
       <section>
         <h2>1. Resultado</h2>
         <ul>
-          {#each verdict.reasons as reason}
-            <li>{reason}</li>
+          {#each resultLines(verdict, history.at(-1)?.distance ?? 0, config) as line}
+            <li>{line}</li>
           {/each}
         </ul>
 
@@ -152,8 +155,8 @@
         <table>
           <tbody>
             <tr><th>Rapidez máxima</th><td class="num">{formatNumber(summary.maxSpeed.value)} m/s ({formatNumber(kmh(summary.maxSpeed.value), 0)} km/h)</td><td>{summary.maxSpeed.section} · t = {formatNumber(summary.maxSpeed.time)} s</td></tr>
-            <tr><th>Carga máxima</th><td class="num">{formatNumber(summary.maxLoad.value)} g</td><td>{summary.maxLoad.section} · s = {formatNumber(summary.maxLoad.distance)} m</td></tr>
-            <tr><th>Carga mínima</th><td class="num">{formatNumber(summary.minLoad.value)} g</td><td>{summary.minLoad.section} · s = {formatNumber(summary.minLoad.distance)} m</td></tr>
+            <tr><th>Fuerza g máxima</th><td class="num">{formatNumber(summary.maxLoad.value)} g</td><td>{summary.maxLoad.section} · s = {formatNumber(summary.maxLoad.distance)} m</td></tr>
+            <tr><th>Fuerza g mínima</th><td class="num">{formatNumber(summary.minLoad.value)} g</td><td>{summary.minLoad.section} · s = {formatNumber(summary.minLoad.distance)} m</td></tr>
             <tr><th>Fuerza normal mínima</th><td class="num">{formatNumber(summary.minNormal.value, 0)} N</td><td>{summary.minNormal.section}</td></tr>
             <tr><th>Fuerza normal máxima</th><td class="num">{formatNumber(summary.maxNormal.value, 0)} N</td><td>{summary.maxNormal.section}</td></tr>
             <tr><th>Aceleración tangencial máxima</th><td class="num">{formatNumber(summary.maxTangentialAcceleration.value)} m/s²</td><td>{summary.maxTangentialAcceleration.section}</td></tr>
@@ -168,7 +171,7 @@
 
       {#if summary.braking.reached}
         <section>
-          <h2>4. Frenado E → F</h2>
+          <h2>4. Frenado (de E a F)</h2>
           <table>
             <tbody>
               <tr><th>Rapidez de entrada v_E</th><td class="num">{formatNumber(summary.braking.entrySpeed)} m/s</td></tr>
@@ -235,8 +238,8 @@
         <h2>7. Parámetros de la simulación</h2>
         <table class="parameters">
           <tbody>
-            <tr><th>Trazado</th><td>{mapName} ({config.mapId})</td><th>Frenado</th><td>{config.brakeMode === "station" ? "frenos de estación" : "resorte"}</td></tr>
-            <tr><th>Contacto</th><td>{config.contactModel === "strict" ? "estricto (N > 0)" : "ruedas de seguridad"}</td><th>m</th><td>{formatNumber(config.mass, 1)} kg</td></tr>
+            <tr><th>Trazado</th><td>{mapName} ({config.mapId})</td><th>Frenado</th><td>{config.brakeMode === "station" ? "frenos en la recta final" : "resorte de tope"}</td></tr>
+            <tr><th>Contacto</th><td>{config.contactModel === "strict" ? "siempre apoyado (N > 0)" : "ruedas anti-levantamiento"}</td><th>m</th><td>{formatNumber(config.mass, 1)} kg</td></tr>
             {#each Array.from({ length: Math.ceil(parameterRows.length / 2) }, (_, index) => parameterRows.slice(index * 2, index * 2 + 2)) as pair}
               <tr>
                 {#each pair as row}
@@ -309,6 +312,9 @@
   }
 
   .report-buttons button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     padding: 8px 12px;
     border: 1px solid #dfd0ea;
     border-radius: 9px;

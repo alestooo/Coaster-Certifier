@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Play, Info, Sparkles } from "lucide-svelte";
+  import { onMount } from "svelte";
+  import { Play, Info, PencilRuler, Activity, ShieldCheck } from "lucide-svelte";
 
   let {
     onPlay,
@@ -8,18 +9,39 @@
     onPlay: () => void;
     onCredits: () => void;
   } = $props();
+
+  const BACKGROUND_VIDEO = "/assets/backgrounds/coaster-menu-fondo.mp4";
+  const BACKGROUND_POSTER = "/assets/backgrounds/coaster-menu-fondo-poster.webp";
+  const LOGO = "/assets/images/coaster-certifier-logo.webp";
+  /** Con movimiento reducido no se monta el video: queda el póster de fondo. */
+  const reduceMotion = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let video = $state<HTMLVideoElement>();
+  /** El navegador no dejó reproducir (p. ej. iOS en bajo consumo, que dibuja un botón encima): queda el póster. */
+  let blocked = $state(false);
+
+  onMount(() => {
+    video?.play()?.catch((error: unknown) => {
+      // Solo un bloqueo del autoplay; una reproducción interrumpida (pausa, desmontar) no quita el video.
+      if (error instanceof DOMException && error.name === "NotAllowedError") blocked = true;
+    });
+  });
 </script>
 
 <section class="menu-screen" aria-label="Menú principal de Coaster-Certifier">
+  {#if !reduceMotion && !blocked}
+    <video bind:this={video} class="menu-video" src={BACKGROUND_VIDEO} poster={BACKGROUND_POSTER} autoplay muted loop playsinline aria-hidden="true" tabindex="-1"></video>
+  {/if}
+
   <div class="version-badge">AVANCE 2 · v0.9</div>
 
   <div class="menu-content">
     <h1 class="menu-title">
-      <img class="menu-logo" src="/assets/images/coaster-certifier-logo.png" alt="Coaster-Certifier" />
+      <img class="menu-logo" src={LOGO} width="512" height="512" alt="Coaster-Certifier" />
     </h1>
 
     <p class="menu-tagline">
-      Diseñá una montaña rusa, subí a tus pasajeros y comprobá con física si el trazado aprueba.
+      Diseñá una montaña rusa, simulá el recorrido con física y dejá que el auditor la certifique o te diga qué ajustar.
     </p>
 
     <nav class="menu-actions" aria-label="Opciones">
@@ -33,9 +55,9 @@
     </nav>
 
     <ul class="menu-features">
-      <li><Sparkles size={13} /> Loops en lágrima, colinas y frenado a escala</li>
-      <li><Sparkles size={13} /> Dictamen con puntos críticos A–F</li>
-      <li><Sparkles size={13} /> Gráficas, informe y CSV auditables</li>
+      <li><PencilRuler size={13} /> <b>Diseñá</b> loops, colinas y frenado a escala real</li>
+      <li><Activity size={13} /> <b>Simulá</b> el recorrido con las leyes de Newton y la energía</li>
+      <li><ShieldCheck size={13} /> <b>Auditá</b> con dictamen en vivo y ajustes verificados</li>
     </ul>
   </div>
 </section>
@@ -77,5 +99,10 @@
     font-size: 12px;
     font-weight: 700;
     backdrop-filter: blur(6px);
+  }
+
+  .menu-features b {
+    color: #ffd27a;
+    font-weight: 900;
   }
 </style>

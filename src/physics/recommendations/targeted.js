@@ -1,9 +1,16 @@
 import { CRITERIA } from "../evaluation/criteria.js";
 import { MAX_BRAKE_DECELERATION } from "../constants.js";
+import { CONFIG_LIMITS } from "../config.js";
 import { maxOf } from "../utils.js";
 
 /** Margen multiplicativo aplicado a las correcciones calculadas. */
 const MARGIN = 1.1;
+
+/** Fracciones del largo máximo de la zona que se prueban cuando la zona sola no alcanza. */
+const BRAKE_LENGTH_FRACTIONS = [1, 0.8, 0.6];
+
+/** Altura extra sobre el obstáculo que se suma a las pérdidas (m). */
+const CLEARANCE_M = 0.5;
 
 /** @param {number} value @param {number} digits */
 function round(value, digits = 2) {
@@ -95,11 +102,23 @@ export function targetedPatches(config, run) {
       const entrySpeed = summary.braking.entrySpeed ?? summary.maxSpeed.value;
 
       if (config.brakeMode === "station") {
-        patches.push({ brakingLength: round((entrySpeed ** 2 / (2 * config.brakeDeceleration)) * MARGIN) });
+        const [, maxLength] = CONFIG_LIMITS.brakingLength;
+        const length = (entrySpeed ** 2 / (2 * config.brakeDeceleration)) * MARGIN;
         const deceleration = (entrySpeed ** 2 / (2 * config.brakingLength)) * MARGIN;
 
-        if (deceleration <= MAX_BRAKE_DECELERATION) {
-          patches.push({ brakeDeceleration: round(deceleration) });
+        if (length <= maxLength) patches.push({ brakingLength: round(length) });
+        if (deceleration <= MAX_BRAKE_DECELERATION) patches.push({ brakeDeceleration: round(deceleration) });
+
+        // Si la zona necesaria pasa del máximo, se alarga lo posible y los frenos aprietan lo que falta.
+        if (length > maxLength) {
+          for (const fraction of BRAKE_LENGTH_FRACTIONS) {
+            const longer = maxLength * fraction;
+            const needed = (entrySpeed ** 2 / (2 * longer)) * MARGIN;
+
+            if (longer > config.brakingLength && needed <= MAX_BRAKE_DECELERATION) {
+              patches.push({ brakingLength: round(longer), brakeDeceleration: round(needed) });
+            }
+          }
         }
       } else {
         patches.push({ brakingLength: round(config.brakingLength * MARGIN * 1.3) });
@@ -121,12 +140,20 @@ export function targetedPatches(config, run) {
     }
 
     case CRITERIA.MIN_SPEED: {
-      const obstacle = maxOf(
-        run.track.nodes.filter(node => node.y < config.initialHeight),
-        node => node.y
-      );
-      patches.push({ initialHeight: round((obstacle + lossHead + 0.5) * MARGIN) });
+      // El obstáculo es lo más alto después de la salida (la cresta que no alcanzó), que
+      // puede estar por encima de la altura inicial.
+      const obstacle = maxOf(run.track.nodes.slice(1), node => node.y);
+      const required = obstacle + lossHead + CLEARANCE_M - config.initialSpeed ** 2 / (2 * g);
+
+      patches.push({ initialHeight: round(required * MARGIN) });
+      patches.push({ initialHeight: round(required * MARGIN * 1.15) });
       patches.push({ friction: round(config.friction / 2, 4) });
+
+      // Con una colina, bajarla también alcanza: que la cresta quede por debajo de la energía disponible.
+      if (["valley", "reference"].includes(config.mapId) && config.hillHeight > 0) {
+        const lower = (head - lossHead - CLEARANCE_M) / MARGIN;
+        if (lower > 0 && lower < config.hillHeight) patches.push({ hillHeight: round(lower) });
+      }
       break;
     }
 

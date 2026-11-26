@@ -67,7 +67,7 @@ export const ACCESSORIES: { id: Accessory; label: string }[] = [
 export const MOODS: { id: Mood; label: string; description: string }[] = [
   { id: "happy", label: "Feliz", description: "Sonríe todo el recorrido y grita de alegría en las bajadas." },
   { id: "brave", label: "Valiente", description: "Brazos arriba en cada loop; nada lo asusta." },
-  { id: "nervous", label: "Nervioso", description: "Se agarra fuerte y cierra los ojos cuando la carga sube." }
+  { id: "nervous", label: "Nervioso", description: "Se agarra fuerte y cierra los ojos cuando la fuerza g sube." }
 ];
 
 export const PASSENGER_NAMES = [

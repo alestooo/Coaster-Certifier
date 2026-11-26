@@ -23,7 +23,7 @@ const MAX_ARROW_WEIGHTS = 6;
 const MPS_TO_KMH = 3.6;
 
 /**
- * Color semántico de una carga respecto a los límites.
+ * Color semántico de una fuerza g respecto a los límites.
  * @param {number} load
  * @param {number} minLoad
  * @param {number} maxLoad
@@ -37,7 +37,7 @@ function loadColor(load, minLoad, maxLoad) {
 }
 
 /**
- * Indicador semicircular de carga n = N/(mg).
+ * Indicador semicircular de fuerza g, n = N/(mg).
  * @param {import("./index.js").Frame} frame
  */
 export function drawGauge({ ctx, camera, scene }) {
@@ -99,7 +99,7 @@ export function drawGauge({ ctx, camera, scene }) {
 
   ctx.font = `600 9px ${FONT_FAMILY}`;
   ctx.fillStyle = PALETTE.muted;
-  ctx.fillText("carga N/(mg)", centerX, centerY + 24);
+  ctx.fillText("fuerza g", centerX, centerY + 24);
 }
 
 /**
@@ -113,7 +113,7 @@ export function drawReadings({ ctx, scene }) {
 
   const rows = [
     ["Rapidez", `${fmt(state.speed, 1)} m/s · ${fmt(state.speed * MPS_TO_KMH, 0)} km/h`, PALETTE.text],
-    ["Carga", `${fmt(state.load, 2)} g`, loadColor(state.load, config.minLoad, config.maxLoad)],
+    ["Fuerza g", `${fmt(state.load, 2)} g`, loadColor(state.load, config.minLoad, config.maxLoad)],
     ["Tramo", state.section, PALETTE.text],
     ["Tiempo", `${fmt(state.time, 2)} s`, PALETTE.text]
   ];
