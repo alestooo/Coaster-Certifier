@@ -3,8 +3,6 @@ import App from "./App.svelte";
 import "./styles/tokens.css";
 import "./app.css";
 import "./styles/shared.css";
-import "./styles/setup.css";
-import "./styles/passengers.css";
 import "./styles/credits.css";
 import "./styles/print.css";
 

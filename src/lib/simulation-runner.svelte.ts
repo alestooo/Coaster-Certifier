@@ -7,12 +7,19 @@ import {
 } from "../physics/index.js";
 
 import type { ConfigInput, SimulationConfig, SimulationState, Track, Verdict } from "./types";
+import { SAMPLE_INTERVAL } from "./sampling";
 
-/** Intervalo entre muestras guardadas en el historial (s). */
-export const SAMPLE_INTERVAL = 0.02;
+export { SAMPLE_INTERVAL };
 
 /** Tiempo real máximo consumido por cuadro para evitar saltos (s). */
 const MAX_FRAME_ELAPSED = 0.05;
+
+/**
+ * Intervalo de tiempo real entre publicaciones del historial durante la
+ * reproducción (s): las gráficas y lecturas se actualizan a ≤ 10 Hz
+ * mientras el tren se dibuja en cada cuadro con `state`.
+ */
+export const HISTORY_FLUSH_INTERVAL_S = 0.1;
 
 /** Multiplicadores de velocidad de reproducción disponibles. */
 export const PLAYBACK_SPEEDS = [0.25, 0.5, 1, 2, 4] as const;
@@ -39,6 +46,7 @@ export class SimulationRunner {
   #accumulator = 0;
   #lastSample = 0;
   #pending: SimulationState[] = [];
+  #sinceFlush = 0;
 
   constructor(input: ConfigInput = {}) {
     this.apply(input);
@@ -156,7 +164,11 @@ export class SimulationRunner {
       }
     }
 
-    this.#flush();
+    this.#sinceFlush += elapsedSeconds;
+
+    if (!this.running || this.#sinceFlush >= HISTORY_FLUSH_INTERVAL_S - 1e-6) {
+      this.#flush();
+    }
   }
 
   /** Selecciona un instante del historial para inspeccionarlo. */
@@ -182,6 +194,8 @@ export class SimulationRunner {
   }
 
   #flush(): void {
+    this.#sinceFlush = 0;
+
     if (!this.#pending.length) return;
 
     this.history = [...this.history, ...this.#pending];
@@ -192,6 +206,7 @@ export class SimulationRunner {
     this.#accumulator = 0;
     this.#lastSample = 0;
     this.#pending = [];
+    this.#sinceFlush = 0;
     this.scrubIndex = null;
   }
 }

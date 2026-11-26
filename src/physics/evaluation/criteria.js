@@ -98,7 +98,7 @@ export function evaluateState(state, config, track) {
       event: createEvent(
         state,
         CRITERIA.MAX_LOAD,
-        "Carga máxima sobre los pasajeros: n ≤ n_máx",
+        "Fuerza g máxima sobre los pasajeros: n ≤ n_máx",
         state.load,
         config.maxLoad,
         "g",
@@ -113,7 +113,7 @@ export function evaluateState(state, config, track) {
       event: createEvent(
         state,
         CRITERIA.MIN_LOAD,
-        "Carga mínima sobre los pasajeros: n ≥ n_mín",
+        "Fuerza g mínima sobre los pasajeros: n ≥ n_mín",
         state.load,
         config.minLoad,
         "g",
@@ -143,7 +143,7 @@ export function evaluateState(state, config, track) {
       event: createEvent(
         state,
         CRITERIA.OVERRUN,
-        "Detención dentro de la zona de frenado: s < s_F",
+        "Detenerse antes del final de la zona de frenado: s < s_F",
         state.distance,
         track.totalLength,
         "m",
@@ -196,7 +196,7 @@ export function evaluateState(state, config, track) {
       event: createEvent(
         state,
         CRITERIA.TIMEOUT,
-        "Detención dentro del tiempo de observación: t < t_máx",
+        "Detenerse dentro del tiempo de observación: t < t_máx",
         state.time,
         config.maxTime,
         "s",

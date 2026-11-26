@@ -85,8 +85,8 @@ function printReport(run, title) {
 
   console.log("\nExtremos:");
   console.log(`  Rapidez máxima     ${fmt(summary.maxSpeed.value)} m/s en ${summary.maxSpeed.section} (t = ${fmt(summary.maxSpeed.time)} s)`);
-  console.log(`  Carga máxima       ${fmt(summary.maxLoad.value)} g en ${summary.maxLoad.section}`);
-  console.log(`  Carga mínima       ${fmt(summary.minLoad.value)} g en ${summary.minLoad.section}`);
+  console.log(`  Fuerza g máxima    ${fmt(summary.maxLoad.value)} g en ${summary.maxLoad.section}`);
+  console.log(`  Fuerza g mínima    ${fmt(summary.minLoad.value)} g en ${summary.minLoad.section}`);
   console.log(`  Normal mínima      ${fmt(summary.minNormal.value, 1)} N en ${summary.minNormal.section}`);
   console.log(`  Energía disipada   ${fmt(summary.dissipatedEnergy, 1)} J de ${fmt(summary.initialEnergy, 1)} J iniciales`);
   console.log(`  Error de balance   ${summary.maxBalanceError.value.toExponential(2)} J (máximo absoluto)`);

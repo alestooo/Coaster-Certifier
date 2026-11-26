@@ -69,6 +69,9 @@ function layerKey(frame, ratio) {
 /**
  * Devuelve la capa estática (creándola si hace falta) o `null` cuando
  * no se puede cachear; en ese caso el llamador dibuja directamente.
+ * Con `options.cacheWorld` en falso (la escala cambia en cada cuadro, como
+ * en una animación de zoom) solo se reusa una capa que ya existe: crear una
+ * por cuadro costaría más que dibujar directo y vaciaría la caché.
  *
  * @param {import("./index.js").Frame} frame
  * @param {number} ratio Densidad de píxeles.
@@ -79,6 +82,7 @@ export function getWorldLayer(frame, ratio, drawWorld) {
   const cached = cache.get(key);
 
   if (cached) return cached;
+  if (frame.options.cacheWorld === false) return null;
 
   const { camera } = frame;
   const width = (camera.world.maxX - camera.world.minX) * camera.scale;

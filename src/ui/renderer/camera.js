@@ -18,6 +18,14 @@ const FOLLOW_PX_PER_METRE = 12;
 
 export const MIN_ZOOM = 1;
 export const MAX_ZOOM = 2.5;
+
+/** Zoom del encuadre ajustado, en veces la escala que muestra de A a F. */
+export const MIN_VIEW_ZOOM = 1;
+export const MAX_VIEW_ZOOM = 8;
+
+/** Márgenes del encuadre ajustado alrededor del trazado (m). */
+const FIT_PAD_M = 4;
+const FIT_PAD_TOP_M = 6;
 const DEFAULT_FOLLOW_ZOOM = 1.6;
 
 /** Dimensiones del tren en metros. */
@@ -44,15 +52,29 @@ const WORLD_PAD_TOP = 9;
 export const WORLD_DEPTH = 4;
 
 /**
+ * Vista pedida por la interfaz.
+ * @typedef {Object} CameraView
+ * @property {"fit" | "follow"} mode
+ * @property {number} zoom Veces la escala del encuadre (fit) o zoom de seguimiento.
+ * @property {number} [centerX] Centro visible (m), solo en `fit`.
+ * @property {number} [centerY] Centro visible (m), solo en `fit`.
+ * @property {number} [scale] Escala absoluta (px/m) en `fit`; reemplaza al zoom. Congela la
+ *   proyección mientras se arrastra una manija aunque el trazado cambie de tamaño.
+ */
+
+/**
  * @typedef {Object} Camera
  * @property {number} width Ancho del lienzo (px CSS).
  * @property {number} height Alto del lienzo (px CSS).
  * @property {number} scale Píxeles por metro.
+ * @property {number} fitScale Píxeles por metro del encuadre ajustado (zoom 1).
  * @property {number} trainScale Píxeles por metro usados para el tren (con escala visual mínima).
  * @property {number} zoom Zoom pedido (1 en encuadre completo).
  * @property {boolean} follow Verdadero en modo seguimiento.
  * @property {(x: number) => number} toX Metros → píxeles (horizontal).
  * @property {(y: number) => number} toY Metros → píxeles (vertical, y hacia arriba).
+ * @property {(px: number) => number} fromX Píxeles → metros (horizontal).
+ * @property {(py: number) => number} fromY Píxeles → metros (vertical).
  * @property {number} groundY Altura en píxeles del suelo (y = 0).
  * @property {{x: number, y: number}[]} lift Perfil de la rampa de la cadena (m).
  * @property {{minX: number, maxX: number, minY: number, maxY: number}} world Extensión del mundo (m).
@@ -122,67 +144,161 @@ export function prepareCanvas(canvas) {
 }
 
 /**
- * Construye la proyección mundo → pantalla para la escena.
+ * Encuadre ajustado del taller: de la cresta de la cadena a F, sin el
+ * relleno de escenario que rodea al mundo (m).
+ *
+ * @param {any} track
+ * @param {{x: number, y: number}[]} lift
+ * @returns {{minX: number, maxX: number, minY: number, maxY: number}}
+ */
+export function fitBounds(track, lift) {
+  const crest = lift[1];
+
+  return {
+    minX: Math.min(crest.x, track.minX) - FIT_PAD_M,
+    maxX: track.endX + FIT_PAD_M,
+    minY: 0,
+    maxY: Math.max(track.maxHeight, crest.y, 1) + FIT_PAD_TOP_M
+  };
+}
+
+/**
+ * Píxeles por metro que encuadran `bounds` dentro del lienzo.
+ * @param {number} width
+ * @param {number} height
+ * @param {{minX: number, maxX: number, minY: number, maxY: number}} bounds
+ */
+function scaleToFit(width, height, bounds) {
+  const spanX = Math.max(1, bounds.maxX - bounds.minX);
+  const spanY = Math.max(1, bounds.maxY - bounds.minY);
+
+  return Math.max(1e-6, Math.min((width - 2 * MARGIN_X) / spanX, (height - MARGIN_TOP - MARGIN_BOTTOM) / spanY));
+}
+
+/**
+ * Vista que encuadra un rectángulo del mundo (zoom a la selección).
  *
  * @param {number} width
  * @param {number} height
- * @param {{state: any, track: any, camera?: {mode?: string, zoom?: number}}} scene
+ * @param {any} track
+ * @param {{minX: number, maxX: number, minY: number, maxY: number}} bounds
+ * @returns {CameraView}
+ */
+export function frameView(width, height, track, bounds) {
+  const fitScale = scaleToFit(width, height, fitBounds(track, liftProfile(track)));
+  const wanted = scaleToFit(width, height, bounds);
+
+  return {
+    mode: "fit",
+    zoom: clamp(wanted / fitScale, MIN_VIEW_ZOOM, MAX_VIEW_ZOOM),
+    centerX: (bounds.minX + bounds.maxX) / 2,
+    centerY: (bounds.minY + bounds.maxY) / 2
+  };
+}
+
+/**
+ * Como `frameView`, pero con los `inset` px de abajo tapados (la hoja del
+ * panel en el teléfono): encuadra `bounds` en lo que queda visible arriba.
+ * @param {number} width
+ * @param {number} height
+ * @param {number} inset
+ * @param {any} track
+ * @param {{minX: number, maxX: number, minY: number, maxY: number}} bounds
+ * @returns {CameraView}
+ */
+export function frameViewAbove(width, height, inset, track, bounds) {
+  if (inset <= 0) return frameView(width, height, track, bounds);
+
+  const visible = Math.max(1, height - inset);
+  const fitScale = scaleToFit(width, height, fitBounds(track, liftProfile(track)));
+  const scale = clamp(scaleToFit(width, visible, bounds), fitScale * MIN_VIEW_ZOOM, fitScale * MAX_VIEW_ZOOM);
+
+  return {
+    mode: "fit",
+    zoom: scale / fitScale,
+    centerX: (bounds.minX + bounds.maxX) / 2,
+    // El centro del lienzo queda `inset / 2` px por debajo del centro de lo visible.
+    centerY: (bounds.minY + bounds.maxY) / 2 - inset / (2 * scale)
+  };
+}
+
+/**
+ * Proyección lineal centrada en (centerX, centerY) con la escala dada.
+ * @param {number} width
+ * @param {number} height
+ * @param {number} scale
+ * @param {number} centerX
+ * @param {number} centerY
+ * @param {number} anchorX Fracción horizontal del lienzo donde cae el centro.
+ * @param {number} anchorY Posición vertical (px) donde cae el centro.
+ */
+function projection(width, height, scale, centerX, centerY, anchorX, anchorY) {
+  const originX = width * anchorX;
+
+  return {
+    toX: (/** @type {number} */ x) => originX + (x - centerX) * scale,
+    toY: (/** @type {number} */ y) => anchorY - (y - centerY) * scale,
+    fromX: (/** @type {number} */ px) => centerX + (px - originX) / scale,
+    fromY: (/** @type {number} */ py) => centerY + (anchorY - py) / scale
+  };
+}
+
+/**
+ * Construye la proyección mundo → pantalla para la escena.
+ *
+ * Modos:
+ *  - `fit`: encuadre ajustado de A a F; con `zoom > 1` amplía alrededor de
+ *    (`centerX`, `centerY`) o, si no se indican, del centro del encuadre.
+ *  - `follow`: escala real centrada en el tren.
+ *
+ * @param {number} width
+ * @param {number} height
+ * @param {{state: any, track: any, camera?: Partial<CameraView> | {mode?: string, zoom?: number}}} scene
  * @returns {Camera}
  */
 export function createCamera(width, height, scene) {
   const { track, state } = scene;
   const lift = liftProfile(track);
   const world = worldBounds(track, lift);
-  const follow = scene.camera?.mode === "follow";
+  const bounds = fitBounds(track, lift);
+  const fitScale = scaleToFit(width, height, bounds);
+  const view = /** @type {Partial<CameraView>} */ (scene.camera ?? {});
+  const follow = view.mode === "follow";
 
   if (follow) {
-    const zoom = clamp(Number(scene.camera?.zoom) || DEFAULT_FOLLOW_ZOOM, MIN_ZOOM, MAX_ZOOM);
+    const zoom = clamp(Number(view.zoom) || DEFAULT_FOLLOW_ZOOM, MIN_ZOOM, MAX_ZOOM);
     const scale = FOLLOW_PX_PER_METRE * zoom;
     const anchorY = height * FOLLOW_ANCHOR_Y;
     const centerY = Math.max(state.position.y, (height - FOLLOW_GROUND_MARGIN - anchorY) / scale);
     const centerX = state.position.x;
+    const map = projection(width, height, scale, centerX, centerY, FOLLOW_ANCHOR_X, anchorY);
 
-    const toX = (/** @type {number} */ x) => width * FOLLOW_ANCHOR_X + (x - centerX) * scale;
-    const toY = (/** @type {number} */ y) => anchorY - (y - centerY) * scale;
-
-    return {
-      width,
-      height,
-      scale,
-      trainScale: scale,
-      zoom,
-      follow,
-      toX,
-      toY,
-      groundY: toY(0),
-      lift,
-      world,
-      viewCenterX: centerX
-    };
+    return { width, height, scale, fitScale, trainScale: scale, zoom, follow, ...map, groundY: map.toY(0), lift, world, viewCenterX: centerX };
   }
 
-  const spanX = Math.max(1, world.maxX - world.minX);
-  const spanY = Math.max(1, world.maxY);
-  const scale = Math.min((width - 2 * MARGIN_X) / spanX, (height - MARGIN_TOP - MARGIN_BOTTOM) / spanY);
-  const offsetX = (width - spanX * scale) / 2 - world.minX * scale;
-  const groundY = height - MARGIN_BOTTOM;
-
-  const toX = (/** @type {number} */ x) => offsetX + x * scale;
-  const toY = (/** @type {number} */ y) => groundY - y * scale;
+  const fixedScale = Number(view.scale);
+  const zoom = Number.isFinite(fixedScale) && fixedScale > 0 ? fixedScale / fitScale : clamp(Number(view.zoom) || 1, MIN_VIEW_ZOOM, MAX_VIEW_ZOOM);
+  const scale = Number.isFinite(fixedScale) && fixedScale > 0 ? fixedScale : fitScale * zoom;
+  const centerX = Number.isFinite(view.centerX) ? Number(view.centerX) : (bounds.minX + bounds.maxX) / 2;
+  // Sin centro pedido, el encuadre queda centrado verticalmente en el área libre entre márgenes.
+  const usableMiddle = (MARGIN_TOP + height - MARGIN_BOTTOM) / 2;
+  const fitMiddle = (bounds.minY + bounds.maxY) / 2 - (height / 2 - usableMiddle) / fitScale;
+  const centerY = Number.isFinite(view.centerY) ? Number(view.centerY) : fitMiddle;
+  const map = projection(width, height, scale, centerX, centerY, 0.5, height / 2);
 
   return {
     width,
     height,
     scale,
+    fitScale,
     trainScale: Math.max(scale, MIN_TRAIN_PX / CART_LENGTH_M),
-    zoom: 1,
+    zoom,
     follow,
-    toX,
-    toY,
-    groundY,
+    ...map,
+    groundY: map.toY(0),
     lift,
     world,
-    viewCenterX: (world.minX + world.maxX) / 2
+    viewCenterX: centerX
   };
 }
 
@@ -197,6 +313,8 @@ export function layerCamera(camera) {
   const { world, scale } = camera;
   const toX = (/** @type {number} */ x) => (x - world.minX) * scale;
   const toY = (/** @type {number} */ y) => (world.maxY - y) * scale;
+  const fromX = (/** @type {number} */ px) => world.minX + px / scale;
+  const fromY = (/** @type {number} */ py) => world.maxY - py / scale;
 
   return {
     ...camera,
@@ -204,6 +322,8 @@ export function layerCamera(camera) {
     height: (world.maxY - world.minY) * scale,
     toX,
     toY,
+    fromX,
+    fromY,
     groundY: toY(0)
   };
 }

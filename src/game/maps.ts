@@ -15,9 +15,9 @@ export type MapDefinition = {
 export const MAPS: MapDefinition[] = [
   {
     id: "reference",
-    name: "Certificación",
-    description: "Caída, loop en lágrima, colina y frenado: el trazado completo del anexo.",
-    tag: "Puntos críticos A–F",
+    name: "Recorrido del anexo",
+    description: "Caída, loop en lágrima, colina y frenado: el trazado completo que define el proyecto.",
+    tag: "Todos los puntos críticos, de A a F",
     available: true,
     preview: { mapId: "reference", initialHeight: 30, trackWidth: 320, loopHeight: 21.5, loopTopRadius: 5, hillHeight: 10, hillCrestRadius: 55, brakingLength: 60 }
   },
@@ -25,7 +25,7 @@ export const MAPS: MapDefinition[] = [
     id: "loop",
     name: "Loop",
     description: "Caída y loop con altura y radio en la cima ajustables.",
-    tag: "Contacto en C y carga en B",
+    tag: "¿Se despega en la cima? ¿Cuánta fuerza g en la base?",
     available: true,
     preview: { mapId: "loop", initialHeight: 30, trackWidth: 240, loopHeight: 21.5, loopTopRadius: 5, brakingLength: 90 }
   },
@@ -33,15 +33,15 @@ export const MAPS: MapDefinition[] = [
     id: "valley",
     name: "Valle y colina",
     description: "Bajá, superá una colina con cresta de radio conocido y frená.",
-    tag: "Carga mínima en D",
+    tag: "¿Flotan los pasajeros sobre la cresta?",
     available: true,
     preview: { mapId: "valley", initialHeight: 25, trackWidth: 260, hillHeight: 10, hillCrestRadius: 60, brakingLength: 80 }
   },
   {
     id: "slope",
     name: "Línea",
-    description: "Bajada suave con llegada a la estación.",
-    tag: "Frenado E → F",
+    description: "Bajada suave hasta la recta final de frenado.",
+    tag: "¿Alcanza la zona de frenado?",
     available: true,
     preview: { mapId: "slope", initialHeight: 20, trackWidth: 220, brakingLength: 80 }
   },
@@ -49,7 +49,7 @@ export const MAPS: MapDefinition[] = [
     id: "incline",
     name: "Plano inclinado",
     description: "Rampa recta: el caso con solución exacta usado para validar el motor.",
-    tag: "Validación analítica",
+    tag: "Caso con solución exacta",
     available: true,
     preview: { mapId: "incline", initialHeight: 20, trackWidth: 60, brakingLength: 60 }
   },

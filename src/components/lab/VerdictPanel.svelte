@@ -1,80 +1,144 @@
 <script lang="ts">
-  import { CheckCircle2, XCircle, Hourglass, Clock3, FileText, Download, Printer, Lightbulb, AlertTriangle, ChevronRight } from "lucide-svelte";
-  import FailureDialog from "../FailureDialog.svelte";
-  import type { SimulationConfig, SimulationState, Verdict } from "../../lib/types";
-  import { formatNumber, formatSeconds } from "../../ui/format";
+  import { CheckCircle2, XCircle, LoaderCircle, FileText, Download, Printer, AlertTriangle, ChevronRight, Play, Wrench } from "lucide-svelte";
+  import type { AuditResult, AuditStatus } from "../../lib/live-audit.svelte";
+  import type { SimulationConfig } from "../../lib/types";
+  import { formatNumber, formatSeconds, kmh } from "../../ui/format";
 
   let {
-    verdict,
-    running,
-    state,
-    config,
-    onApplyRecommendation,
+    result,
+    status,
+    onShowIssue,
     onOpenReport,
     onExportCsv,
-    onExportJson
+    onExportJson,
+    onWatch
   }: {
-    verdict: Verdict | null;
-    running: boolean;
-    state: SimulationState;
-    config: SimulationConfig;
-    onApplyRecommendation: (config: SimulationConfig) => void;
-    onOpenReport: () => void;
+    result: AuditResult | null;
+    status: AuditStatus;
+    /** Muestra el problema sobre la pista, con sus correcciones verificadas. */
+    onShowIssue: (index: number) => void;
+    /** Abre el informe (puede tener que descargarse); la promesa dice si quedó abierto. */
+    onOpenReport: () => Promise<boolean>;
     onExportCsv: () => void;
     onExportJson: () => void;
+    onWatch: () => void;
   } = $props();
 
-  let finished = $derived(state.status !== "running");
+  /** Duración de la espera antes de abrir el diálogo de impresión (ms). */
+  const PRINT_DELAY_MS = 300;
 
-  let badge = $derived.by(() => {
-    if (running) return { text: "EN CURSO", kind: "live", icon: Clock3, hint: "El dictamen se emite cuando el tren se detiene o incumple un criterio." };
-    if (!finished) return { text: "SIN DICTAMEN", kind: "idle", icon: Hourglass, hint: "Presioná Certificar para simular el recorrido completo, o Reproducir para verlo." };
-    return verdict?.approved
-      ? { text: "APROBADO", kind: "ok", icon: CheckCircle2, hint: "El trazado cumple todos los criterios del anexo." }
-      : { text: "RECHAZADO", kind: "bad", icon: XCircle, hint: "Se detectó al menos un incumplimiento." };
+  /** Imprime el informe recién cuando está abierto; si no se pudo abrir, no imprime una página vacía. */
+  async function printReport() {
+    if (await onOpenReport()) setTimeout(() => window.print(), PRINT_DELAY_MS);
+  }
+
+  let report = $derived(result?.report ?? null);
+  let config = $derived(result?.config ?? null);
+  let checks = $derived(result?.verdict.designChecks ?? []);
+
+  let brakingCard = $derived.by(() => {
+    if (!report) return null;
+    const braking = report.braking;
+
+    switch (braking.outcome) {
+      case "stopped":
+        return {
+          value: `${formatNumber(braking.stoppingDistance, 1)} m`,
+          note: `de ${formatNumber(braking.available, 0)} m disponibles`,
+          fill: (braking.stoppingDistance ?? 0) / braking.available,
+          tone: braking.tone
+        };
+      case "overrun":
+        return {
+          value: "Se pasa",
+          note:
+            braking.requiredDistance === null
+              ? "el resorte no alcanza a detenerlo"
+              : `necesita ${formatNumber(braking.requiredDistance, 0)} m de ${formatNumber(braking.available, 0)} m`,
+          fill: 1,
+          tone: "bad"
+        };
+      case "no-stop":
+        return { value: "No se detiene", note: "rebota sin quedar quieto", fill: 1, tone: "bad" };
+      default:
+        return { value: "No llega", note: "el tren no alcanza la zona de frenado", fill: 0, tone: "info" };
+    }
   });
 
-  let violations = $derived(verdict?.violations ?? []);
-  let checks = $derived(verdict?.designChecks ?? []);
-  let failedChecks = $derived(checks.filter(check => !check.ok));
-  let summary = $derived(verdict?.summary ?? null);
+  function fraction(value: number, limit: number) {
+    return Math.max(0, Math.min(1, limit > 0 ? value / limit : 0));
+  }
 </script>
 
 <div class="verdict">
-  <div class="badge {badge.kind}">
-    <badge.icon size={26} />
-    <div>
-      <strong>{badge.text}</strong>
-      <span>{badge.hint}</span>
-    </div>
-  </div>
+  {#if report && config}
+    {#key report.approved}
+      <div class="badge {report.approved ? 'ok' : 'bad'}">
+        {#if report.approved}<CheckCircle2 size={28} />{:else}<XCircle size={28} />{/if}
+        <div>
+          <strong>{report.approved ? "APROBADO" : "RECHAZADO"}</strong>
+          <span>{report.headline}</span>
+        </div>
+      </div>
+    {/key}
 
-  {#if finished && verdict && summary}
     <ul class="facts">
-      <li><span>Carga máxima</span><strong class:bad={summary.maxLoad.value > config.maxLoad}>{formatNumber(summary.maxLoad.value, 2)} g</strong><small>{summary.maxLoad.section}</small></li>
-      <li><span>Carga mínima</span><strong class:bad={summary.minLoad.value < (config.contactModel === "strict" ? 0 : config.minLoad)}>{formatNumber(summary.minLoad.value, 2)} g</strong><small>{summary.minLoad.section}</small></li>
-      <li><span>Rapidez máxima</span><strong>{formatNumber(summary.maxSpeed.value * 3.6, 0)} km/h</strong><small>{summary.maxSpeed.section}</small></li>
-      <li><span>Detención</span><strong>{summary.braking.stoppingDistance === null || summary.braking.stoppingDistance === undefined ? "—" : `${formatNumber(summary.braking.stoppingDistance, 1)} m`}</strong><small>de {formatNumber(config.brakingLength, 0)} m disponibles</small></li>
+      <li class={report.maxG.tone}>
+        <span>Fuerza g máxima</span>
+        <strong>{formatNumber(report.maxG.value, 2)} g</strong>
+        <i class="meter"><b style:width={`${100 * fraction(report.maxG.value, report.maxG.limit)}%`}></b></i>
+        <small>límite {formatNumber(report.maxG.limit, 1)} g · en {report.maxG.section}</small>
+      </li>
+      <li class={report.minG.tone}>
+        <span>Fuerza g mínima</span>
+        <strong>{formatNumber(report.minG.value, 2)} g</strong>
+        <small>
+          {config.contactModel === "strict" ? "debe ser mayor que 0 g (siempre apoyado)" : `no puede bajar de ${formatNumber(report.minG.limit, 1)} g`}
+          · en {report.minG.section}
+        </small>
+      </li>
+      <li>
+        <span>Rapidez máxima</span>
+        <strong>{formatNumber(kmh(report.maxSpeed.value), 0)} km/h</strong>
+        <small>{formatNumber(report.maxSpeed.value, 1)} m/s · en {report.maxSpeed.section}</small>
+      </li>
+      {#if brakingCard}
+        <li class={brakingCard.tone}>
+          <span>Distancia de frenado</span>
+          <strong>{brakingCard.value}</strong>
+          {#if report.braking.outcome !== "not-reached"}
+            <i class="meter"><b style:width={`${100 * Math.min(1, brakingCard.fill)}%`}></b></i>
+          {/if}
+          <small>{brakingCard.note}</small>
+        </li>
+      {/if}
     </ul>
 
-    {#if violations.length}
-      <ul class="violations">
-        {#each violations as violation}
+    {#if report.issues.length}
+      <ul class="issues">
+        {#each report.issues as issue, index}
+          {@const violation = result?.verdict.violations[index]}
           <li>
-            <AlertTriangle size={15} />
-            <div>
-              <strong>{violation.condition}</strong>
-              <span>
-                {formatNumber(violation.value, 3)} {violation.unit} frente a {violation.comparison} {formatNumber(violation.limit, 3)} {violation.unit}
-                · {violation.section} · s = {formatNumber(violation.position, 1)} m · t = {formatSeconds(violation.time)}
+            <button type="button" class="issue" onclick={() => onShowIssue(index)} title="Ver en la pista y cómo corregirlo">
+              <AlertTriangle size={15} />
+              <span class="issue-text">
+                <strong>{issue.title}</strong>
+                <span>{issue.detail}</span>
+                {#if violation}
+                  <small>{violation.condition} · t = {formatSeconds(violation.time)} · s = {formatNumber(violation.position, 1)} m</small>
+                {/if}
               </span>
-            </div>
+            </button>
           </li>
         {/each}
       </ul>
 
-      <FailureDialog failedState={state} {config} onApply={onApplyRecommendation} />
+      <button type="button" class="fixes" onclick={() => onShowIssue(0)}>
+        <Wrench size={15} /> Ver dónde falla y cómo corregirlo
+      </button>
     {/if}
+
+    <button type="button" class="watch" onclick={onWatch}><Play size={14} /> Ver el recorrido desde el inicio</button>
 
     <details class="checks">
       <summary><ChevronRight size={14} class="chev" /> Condiciones de diseño por energía · {checks.filter(check => check.ok).length}/{checks.length} cumplidas</summary>
@@ -90,26 +154,18 @@
 
     <div class="exports">
       <button type="button" class="primary" onclick={onOpenReport}><FileText size={15} /> Informe completo</button>
-      <button type="button" onclick={onExportCsv} title="Serie temporal (CSV)"><Download size={14} /> CSV</button>
+      <button type="button" onclick={onExportCsv} title="Serie temporal del recorrido completo (CSV)"><Download size={14} /> CSV</button>
       <button type="button" onclick={onExportJson} title="Configuración y dictamen (JSON)"><Download size={14} /> JSON</button>
-      <button type="button" onclick={() => { onOpenReport(); setTimeout(() => window.print(), 300); }} title="Imprimir o guardar como PDF"><Printer size={14} /> PDF</button>
+      <button type="button" onclick={printReport} title="Imprimir o guardar como PDF"><Printer size={14} /> PDF</button>
     </div>
   {:else}
-    {#if failedChecks.length}
-      <ul class="pre-checks">
-        {#each failedChecks as check}
-          <li class={check.severity}>
-            <Lightbulb size={15} />
-            <div>
-              <strong>{check.name}</strong>
-              <span><code>{check.formula}</code> · {check.detail}</span>
-            </div>
-          </li>
-        {/each}
-      </ul>
-    {:else}
-      <p class="muted">Criterios evaluados: contacto con la vía, carga en [{config.minLoad}, +{config.maxLoad}] g, recorrido completo y detención dentro de la zona de frenado.</p>
-    {/if}
+    <div class="badge idle">
+      <LoaderCircle size={26} class="spin" />
+      <div>
+        <strong>{status === "error" ? "SIN DICTAMEN" : "AUDITANDO"}</strong>
+        <span>{status === "error" ? "No se pudo simular este diseño. Revisá los valores del panel Diseño." : "Simulando el recorrido completo para emitir el dictamen…"}</span>
+      </div>
+    </div>
   {/if}
 </div>
 
@@ -128,11 +184,12 @@
     border-radius: 14px;
     background: var(--surface-soft);
     color: var(--muted);
+    animation: badge-in 0.35s ease-out;
   }
 
   .badge div {
     display: grid;
-    gap: 2px;
+    gap: 3px;
   }
 
   .badge strong {
@@ -143,7 +200,7 @@
 
   .badge span {
     font-size: 11.5px;
-    line-height: 1.45;
+    line-height: 1.5;
   }
 
   .badge.ok {
@@ -154,11 +211,6 @@
   .badge.bad {
     background: var(--danger-soft);
     color: #b7303f;
-  }
-
-  .badge.live {
-    background: var(--info-soft);
-    color: var(--info);
   }
 
   .facts {
@@ -172,9 +224,11 @@
 
   .facts li {
     display: grid;
-    gap: 1px;
-    padding: 8px 10px;
-    border-radius: 10px;
+    align-content: start;
+    gap: 3px;
+    padding: 9px 10px;
+    border: 1px solid transparent;
+    border-radius: 11px;
     background: var(--surface-soft);
   }
 
@@ -187,22 +241,59 @@
   }
 
   .facts strong {
-    font-size: 15px;
+    font-size: 16px;
     color: var(--text);
     font-variant-numeric: tabular-nums;
   }
 
-  .facts strong.bad {
+  .facts small {
+    font-size: 10.5px;
+    line-height: 1.4;
+    color: var(--muted);
+  }
+
+  .facts li.warn {
+    border-color: #f3d9a6;
+  }
+
+  .facts li.warn strong {
+    color: #8a5a12;
+  }
+
+  .facts li.bad {
+    border-color: #f5c3cb;
+    background: var(--danger-soft);
+  }
+
+  .facts li.bad strong {
     color: var(--danger);
   }
 
-  .facts small {
-    font-size: 10.5px;
-    color: var(--faint);
+  .meter {
+    display: block;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--surface-muted);
+    overflow: hidden;
   }
 
-  .violations,
-  .pre-checks,
+  .meter b {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--success);
+    transition: width 0.35s ease-out;
+  }
+
+  .warn .meter b {
+    background: var(--accent);
+  }
+
+  .bad .meter b {
+    background: var(--danger);
+  }
+
+  .issues,
   .checks ul {
     display: grid;
     gap: 6px;
@@ -211,37 +302,87 @@
     list-style: none;
   }
 
-  .violations li,
-  .pre-checks li {
+  .issues li {
+    display: block;
+  }
+
+  .issue {
     display: grid;
     grid-template-columns: auto 1fr;
     gap: 8px;
+    width: 100%;
     padding: 10px;
+    border: 1px solid transparent;
     border-radius: 10px;
     background: var(--danger-soft);
     color: #9d2a39;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
   }
 
-  .pre-checks li.warning {
+  .issue:hover {
+    border-color: #f5c3cc;
+  }
+
+  .issue-text {
+    display: grid;
+    gap: 3px;
+  }
+
+  .issues strong {
+    font-size: 12.5px;
+  }
+
+  .issues span {
+    font-size: 11.5px;
+    line-height: 1.45;
+  }
+
+  .issues small {
+    font-size: 10px;
+    color: #b45d69;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .watch {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    height: 38px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--primary-strong);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .watch:hover {
+    background: var(--primary-soft);
+  }
+
+  .fixes {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    height: 40px;
+    border: 1px solid #efd29a;
+    border-radius: 10px;
     background: var(--accent-soft);
     color: #8a5a12;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 800;
+    cursor: pointer;
   }
 
-  .violations li div,
-  .pre-checks li div {
-    display: grid;
-    gap: 2px;
-  }
-
-  .violations strong,
-  .pre-checks strong {
-    font-size: 12px;
-  }
-
-  .violations span,
-  .pre-checks span {
-    font-size: 11px;
-    line-height: 1.45;
+  .fixes:hover {
+    border-color: #e3b860;
   }
 
   .checks summary {
@@ -320,10 +461,16 @@
     color: white;
   }
 
-  .muted {
-    margin: 0;
-    font-size: 12px;
-    line-height: 1.55;
-    color: var(--muted);
+  @keyframes badge-in {
+    from {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .badge {
+      animation: none;
+    }
   }
 </style>

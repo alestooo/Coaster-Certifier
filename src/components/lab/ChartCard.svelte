@@ -14,7 +14,8 @@
     config,
     track,
     events,
-    height = 240
+    height = 240,
+    showHead = true
   }: {
     kind: string;
     xAxis: "time" | "distance";
@@ -25,6 +26,8 @@
     track: Track;
     events: Verdict["violations"];
     height?: number;
+    /** Sin encabezado cuando otro control ya nombra la gráfica. */
+    showHead?: boolean;
   } = $props();
 
   let canvas: HTMLCanvasElement;
@@ -63,10 +66,12 @@
 </script>
 
 <div class="chart-card">
-  <div class="chart-head">
-    <strong>{definition.label} <small>({definition.unit})</small></strong>
-    <button type="button" onclick={download} title="Descargar como PNG" aria-label="Descargar gráfica como PNG"><Download size={14} /></button>
-  </div>
+  {#if showHead}
+    <div class="chart-head">
+      <strong>{definition.label} <small>({definition.unit})</small></strong>
+      <button type="button" onclick={download} title="Descargar como PNG" aria-label="Descargar gráfica como PNG"><Download size={14} /></button>
+    </div>
+  {/if}
 
   <div class="chart-area" style:height={`${height}px`}>
     <canvas bind:this={canvas} aria-label={`Gráfica de ${definition.label}`}></canvas>

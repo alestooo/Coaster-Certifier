@@ -17,7 +17,6 @@
   --primary: #7a4bc6;
   --primary-strong: #5f329a;
   --primary-soft: #efe6fb;
-  --primary-text: #ffffff;
 
   --accent: #f2a93b;
   --accent-soft: #fff1d6;
@@ -25,15 +24,10 @@
   --success-soft: #e3f5ec;
   --danger: #d9465a;
   --danger-soft: #fde6ea;
-  --info: #3a7bd5;
-  --info-soft: #e7f0ff;
 
-  --radius-sm: 8px;
   --radius: 14px;
   --radius-lg: 20px;
   --shadow-sm: 0 2px 8px rgb(60 30 90 / 6%);
   --shadow: 0 10px 30px rgb(60 30 90 / 8%);
   --shadow-lg: 0 24px 60px rgb(40 20 70 / 18%);
-
-  --control-height: 40px;
 }

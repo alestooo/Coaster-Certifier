@@ -7,15 +7,15 @@ Proyecto de Simulación · Física I (FUN-18) · Universidad CENFOTEC · 2026-C3
 - **Aplicación desplegada:** https://coaster-certifier.vercel.app
 - **Repositorio público:** https://github.com/alestooo/Coaster-Certifier
 
-![Laboratorio de certificación: escenario a escala con el trazado del anexo aprobado, indicadores, dictamen y gráficas](docs/img/laboratorio.png)
+![Taller de diseño: el recorrido del anexo aprobado, con manijas A–F sobre la vía, franja de fuerza g, lectura v/g/N al pasar el cursor y telemetría](docs/img/taller.png)
 
-| Cámara de seguimiento a escala real | Editor de pista a escala |
+| Correcciones verificadas sobre la vía | Trazado personalizado |
 | --- | --- |
-| ![Tren bajando la caída inicial con la cadena de subida y los soportes](docs/img/seguimiento.png) | ![Editor con grilla en metros, nodos arrastrables y plantillas](docs/img/editor.png) |
+| ![Loop circular rechazado: el pin abre las correcciones y «Ver» dibuja la pista corregida punteada en verde](docs/img/correcciones.png) | ![Punto con un loop agregado desde la mini barra, con sus manijas de altura y radio](docs/img/personalizado.png) |
 
-| Selección del recorrido | Tren y pasajeros |
+| Tren y pasajeros | En el teléfono |
 | --- | --- |
-| ![Seis trazados dibujados a escala a partir de su geometría](docs/img/recorridos.png) | ![Personalización de pasajeros con vista previa de la reacción a 5 g](docs/img/pasajeros.png) |
+| ![Panel de pasajeros con avatares, peinados, masa y reacción](docs/img/pasajeros.png) | ![Zona de frenado elegida en un teléfono: la hoja inferior muestra sus valores](docs/img/telefono.png) |
 
 ---
 
@@ -52,7 +52,8 @@ src/physics/                 ← LIBRERÍA DE FÍSICA (pura, determinista, sin D
   export/csv.js              toCsv() — compartido por el script headless y la interfaz
   recommendations/           búsqueda verificada de alternativas que aprueban
   run.js                     runSimulation(): recorrido completo + dictamen
-tests/                       vitest: analytical, track, config, engine, scenarios
+tests/                       vitest: analytical, track, config, engine, scenarios + ayudas de la interfaz (auditoría, manijas, cámara, sesión)
+tests/e2e/                   Playwright: flujo completo del taller en Chrome
 scripts/headless.js          ejecución sin interfaz → CSV + JSON + reporte en consola
 src/ui/                      renderizado Canvas 2D (renderer/), gráficas Chart.js (charts/), exportación
 src/components/, src/screens/, src/lib/, src/game/   interfaz Svelte 5 (consume la librería; nunca implementa ecuaciones)
@@ -74,9 +75,9 @@ N       = m·(g·cos θ + κ·v²)                                              
 
 | Magnitud | Expresión | Función |
 | --- | --- | --- |
-| Carga sobre los pasajeros (g) | `n = N / (m·g) = cos θ + κ·v²/g` | `loadFactor` |
+| Fuerza g sobre los pasajeros (factor de carga, g) | `n = N / (m·g) = cos θ + κ·v²/g` | `loadFactor` |
 | Fricción efectiva (rodadura + aire) | `f = μ·|N|`, opuesta al movimiento (estática cuando v = 0) | `frictionMagnitude`, `resistiveForce` |
-| Frenos de estación | desaceleración constante `a_f` en E→F; `d_det = v_E²/(2·a_f)`, `t_f = v_E/a_f` | `brakingDistance`, `brakingTime` |
+| Frenos en la recta final | desaceleración constante `a_f` entre E y F; `d_det = v_E²/(2·a_f)`, `t_f = v_E/a_f` | `brakingDistance`, `brakingTime` |
 | Resorte de frenado | `F = −k·x`, `E_e = ½·k·x²`; amortiguador opcional `F = −c·v` | `springForce`, `damperForce`, `elasticEnergy` |
 | Energías | `E_c = ½·m·v²`, `E_p = m·g·y`, `E_m = E_c + E_p + E_e`, `E_m(t) + E_dis(t) = E_m(0)` | `calculateEnergies` |
 | Energía disipada | `dE_dis/dt = |f·v| + |F_freno·v| + |F_amort·v|` integrada junto con el movimiento | `step` |
@@ -102,9 +103,9 @@ N       = m·(g·cos θ + κ·v²)                                              
 | Código | Condición | Estado |
 | --- | --- | --- |
 | `contact` | N > 0 en toda la vía (modelo estricto) | `lost-contact` |
-| `loop-contact` | N > 0 dentro del loop (modelo con ruedas de seguridad) | `lost-contact` |
+| `loop-contact` | N > 0 dentro del loop (con ruedas anti-levantamiento) | `lost-contact` |
 | `max-load` | n ≤ n_máx (+5 g) | `rejected` |
-| `min-load` | n ≥ n_mín (−1 g; solo con ruedas de seguridad) | `rejected` |
+| `min-load` | n ≥ n_mín (−1 g; solo con ruedas anti-levantamiento) | `rejected` |
 | `compression` | x ≤ x_máx | `rejected` |
 | `overrun` | detención antes del fin de la zona de frenado | `rejected` |
 | `min-speed` | v > v_mín (0,5 m/s) en subida antes de E | `stalled` |
@@ -238,7 +239,7 @@ Parámetros (`SimulationConfig`): `mass` (kg), `gravity` (m/s²), `initialHeight
 | Convergencia | subpaso 1 ms frente a 0,25 ms | 1e-5 relativo en v |
 | Tabla 5 del anexo | loop circular H = 30 m, v₀ = 2 m/s, h_L = 21,5 m ⇒ 6,6 g en la base | 0,1 g |
 
-Además, `npm run e2e` recorre la aplicación compilada en Chrome (menú → recorrido → tren → laboratorio → dictamen e informe, loop circular rechazado con alternativas, editor de pista personalizada y pantalla de pasajeros). Y en la librería: pureza (el estado de entrada congelado no se modifica), determinismo (dos ejecuciones idénticas), geometría (longitud `2π·R_ref`, altura `h_L`, radios en cima y base, continuidad de posición y ángulo en cada unión, `ρ_c = w²/(6h_c)`), validación de configuración (todos los rangos, enumerados, forma del loop, puntos personalizados), criterios (cada código de incumplimiento con su registro completo), dictamen, CSV, recomendaciones y los 12 escenarios de referencia con su dictamen esperado.
+Además, `npm run e2e` recorre la aplicación compilada en Chrome: menú → taller con el anexo aprobado, manijas arrastradas sobre la pista (con deshacer), franja de fuerza g y pin del loop circular con correcciones verificadas, trazado personalizado sobre el lienzo, pasajeros en el panel, informe y PDF, carga bajo demanda (también con descargas fallidas) y teléfono. Y en la librería: pureza (el estado de entrada congelado no se modifica), determinismo (dos ejecuciones idénticas), geometría (longitud `2π·R_ref`, altura `h_L`, radios en cima y base, continuidad de posición y ángulo en cada unión, `ρ_c = w²/(6h_c)`), validación de configuración (todos los rangos, enumerados, forma del loop, puntos personalizados), criterios (cada código de incumplimiento con su registro completo), dictamen, CSV, recomendaciones y los 12 escenarios de referencia con su dictamen esperado.
 
 La cobertura puede medirse mediante `npm run test:coverage`; su porcentaje debe tomarse del informe generado en la versión del código que se entregue.
 
@@ -253,13 +254,80 @@ El código de salida es 0 si el trazado aprueba, 2 si se rechaza y 1 ante una co
 
 ## 7. Interfaz
 
-1. **Recorrido**: seis trazados dibujados **a escala real** a partir de su geometría (certificación del anexo con puntos A–F, loop, valle y colina, línea, plano inclinado, personalizado).
-2. **Tren**: hasta cuatro personas (dos por carrito) con nombre, tono de piel, seis peinados, tres prendas, seis accesorios, estado de ánimo (afecta sus reacciones a la carga) y masa individual; vista previa de la reacción a 0 g y a 5 g.
-3. **Editor de pista a escala**: la curva real del motor se redibuja al arrastrar cada nodo (grilla en metros, loops en lágrima con h_L y R, colinas con su altura, plantillas, controles de altura y ancho).
-4. **Laboratorio**: escenario ilustrado a escala (vía con rieles, soportes, estación, cadena de subida, árboles y parque) con un tren cuyos pasajeros reaccionan a la carga; una barra de transporte (**Reproducir / Certificar / paso / reiniciar**, velocidad, línea de tiempo, cámara completa o de seguimiento, capas); indicadores de rapidez y carga, reparto de energía y lecturas clave; panel lateral con pestañas **Diseño** (parámetros con símbolo, unidad, rango y ayuda), **Tren** (masas) y **Dictamen**.
-5. **Gráficas en tiempo real** (Chart.js, ejes con unidades): rapidez, energías, energía disipada, fuerza normal con N = 0, aceleraciones tangencial y normal, carga con banda [−1, +5] g y energía elástica; una gráfica o las siete a la vez; eje horizontal en tiempo o posición; marcadores de puntos críticos, tramos e incumplimientos; descarga PNG.
-6. **Dictamen** con incumplimientos (condición, instante, tramo, posición, valor, límite), condiciones de diseño y **tres alternativas verificadas** calculadas a partir de la física del fallo.
-7. **Informe completo** imprimible (PDF): resultado, puntos críticos, extremos, frenado, tramos, condiciones de diseño y parámetros; exportación CSV y JSON.
+La app es un **taller de una sola pantalla**: del menú se entra directo al recorrido del anexo, ya auditado.
+
+1. **Diseño sobre la pista.** Los puntos críticos son manijas que se arrastran sobre el lienzo, a escala real y con la cámara congelada mientras dura el gesto. Cada manija se mueve en una sola dirección:
+
+   | Manija | Movimiento | Parámetro |
+   |---|---|---|
+   | A | vertical | H |
+   | Flecha en A | a lo largo de la tangente | v₀ |
+   | C | vertical | h_L |
+   | Círculo osculador | horizontal | R |
+   | D | vertical | h_c |
+   | Pie de la colina | horizontal | ρ_c |
+   | E | horizontal | W |
+   | F | horizontal | d_f |
+
+   Mientras se arrastra, una etiqueta muestra el valor y su consecuencia física (p. ej. «necesita ≥ 5,9 m/s en la cima»). Si la geometría no se puede construir, la manija se detiene en el último valor válido y explica por qué.
+
+   Las manijas también responden al teclado: Tab para elegir, flechas para mover (Shift = ×10) y Enter o doble clic para escribir el valor.
+
+   **Trazado personalizado**, también sobre la pista:
+   - cada punto se arrastra en dos dimensiones;
+   - doble clic sobre la vía agrega un punto (hasta 9);
+   - al tocar un punto aparece una mini barra para agregar un punto a su lado (sin doble clic: teclado y tacto), agregar o quitar su loop (hasta 3, con manijas de altura y radio que también se mueven con las flechas) o borrarlo;
+   - el panel del punto permite escribir x, altura, h_L y R, y empezar desde una plantilla.
+2. **Auditoría en vivo, sobre la vía.** Cada cambio se simula completo en un Web Worker y la píldora de la barra dice si el diseño aprueba y, si no, por qué. El resultado se dibuja en la propia pista:
+   - **Franja de fuerza g:** cada tramo se tiñe con lo que sienten los pasajeros. La leyenda permite ocultarla.
+
+     | Color | Significado |
+     |---|---|
+     | verde | cómodo |
+     | ámbar | ≥ 90 % del límite |
+     | rojo | excede |
+     | azul | flotación, < 0,2 g |
+
+   - **Pin en cada incumplimiento:** al tocarlo, explica el problema y propone hasta tres **correcciones verificadas** (cada una se comprueba simulando el recorrido completo). «Ver» dibuja la pista corregida punteada en verde antes de aplicarla.
+   - **Lectura al pasar el cursor por la vía:** muestra s, t, v, fuerza g y fuerza normal en ese punto.
+
+   **Deshacer / Rehacer** (Ctrl+Z / Ctrl+Shift+Z) agrupa cada gesto en un solo paso.
+3. **Paneles a pedido**, uno a la vez, que se cierran con Esc:
+   - *Selección*: clic en un tramo de la vía. La cámara encuadra esa parte y el panel muestra su estado y sus pocos valores en campos que se ajustan arrastrando la etiqueta.
+   - *Dictamen*: fuerza g máxima y mínima, rapidez máxima, distancia de frenado, incumplimientos en lenguaje claro (cada uno lleva a su pin), informe y exportaciones.
+   - *Reglas y precisión*: contacto con la vía, límites de fuerza g y parámetros numéricos.
+   - *Tren y pasajeros*:
+     - cantidad de personas (1 a 4) y masa de cada carrito;
+     - por pasajero: avatar (rostro, cabello, ropa, accesorios), estado de ánimo, nombre y masa;
+     - vista previa de su reacción a 0 g y a 5 g.
+4. **Recorridos y casos de prueba** en el selector de la barra: seis trazados con miniaturas a escala, los escenarios de referencia de la librería y la guía con los criterios (también en el teléfono).
+5. **Cámara.** El encuadre va de A a F; se acerca con la rueda, con dos dedos o con los botones y se desplaza arrastrando el fondo. Doble clic vuelve al encuadre, y hay un modo para seguir al tren. La reproducción (reproducir, reiniciar, ir al final, línea de tiempo, velocidad) flota sobre el lienzo.
+6. **Telemetría plegable** (Chart.js, ejes con unidades): lecturas de rapidez, fuerza g, energía y tramo, y una gráfica en tiempo real elegible entre siete magnitudes, o las siete a la vez. El eje horizontal puede ser tiempo o posición, con marcadores A–F, tramos e incumplimientos.
+7. **Informe completo** imprimible (PDF) y exportación CSV (resolución completa, igual que `npm run headless`) y JSON.
+8. **Recursos.**
+   - El lienzo se redibuja solo cuando algo cambia, y el historial y las gráficas se publican a ≤ 10 Hz durante la reproducción.
+   - El menú solo trae su propio código. Mientras se mira el menú, el taller baja en segundo plano. Cuando el taller ya está a la vista, se precargan en reposo:
+     - las gráficas (Chart.js registra solo líneas, escala lineal, leyenda y tooltip);
+     - el informe, la guía, el editor de pasajeros y el popover de correcciones.
+
+     Así abren al instante y siguen andando si después se corta la red. Cada pieza trae sus estilos dentro de su JS. Si una descarga falla, la app lo dice y ofrece «Reintentar»; si el que no llega es el taller, «Recargar la página».
+   - El menú usa un logo WebP de 512 px y un video MP4 de fondo con póster. Con movimiento reducido queda solo el póster.
+
+   Bytes medidos con el build de producción (gzip):
+
+   | | Antes del rediseño | Ahora |
+   |---|---|---|
+   | JS + CSS que baja el menú | 178,5 KB (todo) | 28,7 KB |
+   | Al entrar al taller (escritorio, con telemetría y el worker de auditoría) | +10,4 KB (solo el worker) | +144,8 KB |
+   | Precarga en reposo (informe, guía, pasajeros, correcciones) | — | +22,6 KB |
+   | Imágenes y video del menú | 2,7 MB (PNG de 2 MB + GIF de 712 KB) | 216 KB |
+
+   CPU del hilo principal (métricas de Chrome por CDP, 1440 × 900). Antes se midió en el servidor de desarrollo; ahora da lo mismo en desarrollo y en el build de producción:
+
+   | | Antes del rediseño | Ahora |
+   |---|---|---|
+   | En reposo en el taller | 22,7 % | 0 % |
+   | Reproduciendo | 47,9 % | ≈ 35 % |
 
 ![Reporte de certificación con puntos críticos y extremos del recorrido](docs/img/reporte.png)
 

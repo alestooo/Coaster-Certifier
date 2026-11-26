@@ -243,23 +243,43 @@ function advanceFree(current, values, h, config, track) {
     )
   });
 
-  if (values[1] * next[1] < 0) {
-    const tau = locateEvent(derivative, values, h, candidate => values[1] * candidate[1] <= 0);
-    const turning = rk4(derivative, values, tau);
-    const result = finish(tau, [turning[0], 0, turning[2]]);
+  /**
+   * El tren quedó con v = 0 en `distance`: si la fricción estática lo sostiene,
+   * está en reposo; si no, el próximo paso arranca desde v = 0.
+   * @param {number} elapsed
+   * @param {number[]} stopped
+   */
+  const settle = (elapsed, stopped) => {
+    const result = finish(elapsed, stopped);
 
     if (result.state.status !== "running") return result;
 
-    const atRest = calculateForces(track, config, turning[0], 0);
+    const atRest = calculateForces(track, config, stopped[0], 0);
 
     if (Math.abs(atRest.acceleration) < REST_ACCELERATION_EPSILON) {
       return {
-        elapsed: tau,
-        state: { ...result.state, status: restingStatus(turning[0], config, track) }
+        elapsed,
+        state: { ...result.state, status: restingStatus(stopped[0], config, track) }
       };
     }
 
     return result;
+  };
+
+  // Con |v| < |a|·h, la fuerza que se opone al movimiento lo detiene dentro del paso. RK4 no
+  // sirve ahí: sus etapas cambian el signo de la fricción (Coulomb) y se anulan, y v quedaría
+  // fija para siempre. El tramo hasta v = 0 se integra en forma cerrada (aceleración constante).
+  const [, acceleration, dissipationRate] = derivative(values);
+
+  if (values[1] * acceleration < 0 && Math.abs(values[1]) < Math.abs(acceleration) * h) {
+    const tau = Math.abs(values[1] / acceleration);
+    return settle(tau, [values[0] + (values[1] * tau) / 2, 0, values[2] + (dissipationRate * tau) / 2]);
+  }
+
+  if (values[1] * next[1] < 0) {
+    const tau = locateEvent(derivative, values, h, candidate => values[1] * candidate[1] <= 0);
+    const turning = rk4(derivative, values, tau);
+    return settle(tau, [turning[0], 0, turning[2]]);
   }
 
   const crossings = [

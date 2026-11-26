@@ -3,7 +3,10 @@
  * La interfaz solo entrega el historial de estados; aquí no se calcula
  * ninguna magnitud física.
  */
-import Chart from "chart.js/auto";
+import { Chart, LineController, LineElement, PointElement, LinearScale, Legend, Tooltip } from "chart.js";
+
+// Solo lo que usan las gráficas: con «chart.js/auto» viajaban también barras, tortas, radares y escalas de tiempo.
+Chart.register(LineController, LineElement, PointElement, LinearScale, Legend, Tooltip);
 
 import { chartDefinition, yAxisRange, CHART_PALETTE } from "./definitions.js";
 import { decimateHistory, DEFAULT_MAX_POINTS } from "./decimate.js";

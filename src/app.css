@@ -44,21 +44,44 @@ summary:focus-visible {
   padding: 40px 20px;
   overflow: hidden;
 
-  background:
-    linear-gradient(
-      180deg,
-      rgb(12 9 35 / 12%),
-      rgb(12 9 35 / 25%) 55%,
-      rgb(12 9 35 / 65%)
-    ),
-    url("/assets/backgrounds/coaster-menu-fondo.gif")
-      center / cover no-repeat;
-
+  /* El póster queda debajo del video y es el fondo con movimiento reducido. */
+  background: url("/assets/backgrounds/coaster-menu-fondo-poster.webp") center / cover no-repeat;
   background-color: #171333;
+}
+
+.menu-video,
+.menu-screen::after {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.menu-video {
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* Safari dibuja un botón de reproducir si bloquea el autoplay; es un fondo, no un reproductor. */
+.menu-video::-webkit-media-controls-start-playback-button {
+  display: none !important;
+}
+
+/* Degradado sobre el video para que el texto se lea. */
+.menu-screen::after {
+  content: "";
+  background: linear-gradient(
+    180deg,
+    rgb(12 9 35 / 12%),
+    rgb(12 9 35 / 25%) 55%,
+    rgb(12 9 35 / 65%)
+  );
+  pointer-events: none;
 }
 
 .menu-content {
   position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
