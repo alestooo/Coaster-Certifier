@@ -10,7 +10,7 @@ export const MAX_CANDIDATES = 160;
 export const TARGET_RECOMMENDATIONS = 3;
 
 /** Margen de seguridad respecto a los límites de carga (g). */
-const LOAD_MARGIN = 0.02;
+export const LOAD_MARGIN = 0.02;
 
 /** Error de balance energético relativo máximo admitido. */
 const MAX_BALANCE_ERROR = 0.01;
@@ -19,7 +19,7 @@ const MAX_BALANCE_ERROR = 0.01;
  * Comprueba que una ejecución sea aprobada con margen.
  * @param {import("../run.js").SimulationRun} run
  */
-function isAcceptable(run) {
+export function isAcceptable(run) {
   const { verdict, config } = run;
   const { summary } = verdict;
 
@@ -39,9 +39,11 @@ function isAcceptable(run) {
  * progreso, lo que permite ejecutarlo en un worker sin bloquear.
  *
  * @param {Partial<import("../config.js").SimulationConfig>} input
+ * @param {{target?: number, maxTested?: number, filter?: (config: any) => boolean}} [options] Cuántas buscar (3), cuántas
+ *   candidatas simular como máximo y cuáles se pueden proponer (las demás no se simulan).
  * @returns {Generator<{tested: number, total: number, found: number}, {recommendations: any[], tested: number, reason: string}>}
  */
-export function* recommendationSearch(input) {
+export function* recommendationSearch(input, { target = TARGET_RECOMMENDATIONS, maxTested = MAX_CANDIDATES, filter } = {}) {
   const config = resolveConfig(input);
   const original = runSimulation(config, { timeStep: 0.02 });
   const candidates = candidateList(config, targetedPatches(config, original)).slice(0, MAX_CANDIDATES);
@@ -51,9 +53,11 @@ export function* recommendationSearch(input) {
   let tested = 0;
 
   for (const candidate of candidates) {
+    if (tested >= maxTested) break;
     const strategy = candidate.changes.map(change => `${change.key}${change.element ?? ""}`).sort().join("|");
 
     if (strategies.has(strategy)) continue;
+    if (filter && !filter(candidate.config)) continue;
 
     const run = runSimulation(candidate.config, { timeStep: 0.02 });
     tested += 1;
@@ -71,14 +75,14 @@ export function* recommendationSearch(input) {
 
     yield { tested, total: candidates.length, found: found.length };
 
-    if (found.length === TARGET_RECOMMENDATIONS) break;
+    if (found.length === target) break;
   }
 
   return {
     recommendations: found,
     tested,
     reason:
-      found.length === TARGET_RECOMMENDATIONS
+      found.length === target
         ? ""
         : `La búsqueda comprobó ${tested} configuraciones y encontró ` +
           `${found.length} estrategias que aprueban el dictamen. ` +

@@ -699,6 +699,31 @@ test.describe("Taller de diseño", () => {
     await expect(page.getByRole("dialog", { name: /Informe de certificación/ })).toContainText(/5 carros · criterios sobre el peor carro/);
   });
 
+  test("optimizar la altura del anexo: muestra el resultado verificado y qué lo limita, se aplica y se deshace", async ({ page }) => {
+    await openWorkshop(page);
+    const heightOfA = async () => Number(await handle(page, /Cima de la subida A/).getAttribute("aria-valuenow"));
+    const before = await heightOfA();
+
+    await verdict(page).click();
+    await page.getByRole("complementary", { name: "Dictamen" }).getByRole("button", { name: "Optimizar el diseño" }).click();
+    const panel = page.getByRole("complementary", { name: "Optimizar" });
+    await panel.getByRole("radio", { name: /Menor altura H/ }).click();
+    await expect(panel.getByRole("button", { name: "Altura inicial" })).toHaveAttribute("aria-pressed", "true");
+    await panel.getByRole("button", { name: "Buscar una mejora" }).click();
+
+    await expect(panel.getByText(/Verificado con la simulación completa/)).toBeVisible({ timeout: 60_000 });
+    await expect(panel.getByText(/Qué limita la mejora/)).toBeVisible();
+    await panel.getByRole("button", { name: "Aplicar" }).click();
+    await expect.poll(heightOfA).toBeLessThan(before);
+    await expect(verdict(page)).toContainText("Aprobado");
+    await expect(panel.getByText("Aplicado. Ctrl+Z lo deshace.")).toBeVisible();
+
+    await page.keyboard.press("Control+z");
+    await expect.poll(heightOfA).toBe(before);
+    // Deshecho: el aviso ya no corresponde al diseño.
+    await expect(panel.getByText("Aplicado. Ctrl+Z lo deshace.")).toHaveCount(0);
+  });
+
   test("quitar la subida desde «Salida» deja A sin cadena y un Ctrl+Z la devuelve", async ({ page }) => {
     await openWorkshop(page);
     const a = await center(page.getByRole("slider", { name: /Cima de la subida A/ }));

@@ -20,16 +20,18 @@
 │     │    ├─ TrackProbe ────────► lib/probe (v, g, N en un punto)             │
 │     │    └─ ElementLayer ──────► lib/track-edit (puntos, loops, colinas, E)  │
 │     ├─ SidePanel: Selection · Element · Rules · Verdict · PassengerEditor    │
+│     │    Estimate · Optimize ► lib/optimizer ► optimization.worker           │
 │     └─ TelemetryDrawer ··· ChartCard ► ui/charts/* (Chart.js)                │
 │   lab/ReportDialog ············► ui/export (CSV/JSON/PDF)                    │
 │   ··· = se descarga la primera vez que se pide (lib/lazy-module)             │
 └──────────────────────────────────────────┬───────────────────────────────────┘
                                            ▼
-┌──────────────────────── Librería de física (src/physics) ───────────────────┐
+┌──────────────────────── Librería de física (src/physics) ────────────────────┐
 │ config ─► track/{elements,layouts,builder,hermite,loop,line,geometry}        │
 │        ─► dynamics/{kinematics,forces,energy,booster,lift,train} ─► estimate │
 │        ─► integration/{rk4,step}   ─► evaluation/{criteria,summary,verdict}  │
-│        ─► run.js  ─► export/csv.js ─► recommendations/*  ─► scenarios.js     │
+│        ─► run.js  ─► export/csv.js ─► recommendations/* ─► optimization/*    │
+│        ─► scenarios.js                                                       │
 └──────────────────────────────────────────┬───────────────────────────────────┘
                                            ▼
                                scripts/headless.js  ·  tests/*.test.js
@@ -78,6 +80,7 @@ cualquier otro cambio pide un único cuadro ─► renderSimulation(canvas, esce
 - **Edición sobre el lienzo con manijas DOM**: A, v₀ y F tienen una manija de un solo grado de libertad (`lib/handles.ts`); los elementos, manijas libres en 2D (puntos y crestas) o de un eje (cima y radio del loop, radio de la cresta, E), todas de `lib/track-edit.ts`. Las ediciones son funciones puras sobre la lista: cada una devuelve una lista nueva y, si la geometría no se puede construir, busca por bisección el último valor construible y explica por qué. Son botones (los de un eje, con `role="slider"`), así que se enfocan, se mueven con el teclado y se prueban con Playwright sin pruebas de impacto en el canvas. Mover E solo cambia la x del final: el resto del trazado queda igual. Agregar, borrar o poner un loop es un paso de deshacer propio (`setTrack(…, { step: true })`).
 - **Tramos con función** (fase 7): el aire es una fuerza más (`−½·ρ·C_dA·v²`); el lanzador (`min(m·a_máx, P/v)`) y los frenos de ajuste (`−c·v`) son elementos rectos y horizontales, y el trazado construido expone sus `zones`. El vector de estado suma el trabajo de entrada (`[s, v, E_dis, W_entrada]`) y el balance pasa a `E_m + E_dis = E₀ + W_entrada`. Los bordes de zona son eventos en los dos sentidos y el paso que llega a uno se integra con la fuerza del lado donde está el tren, así el lanzador y los frenos siguen sus soluciones analíticas (pruebas a < 1e-4). La subida por cadena es una propiedad de A (`start.lift`): no cambia el recorrido evaluado, pero da su potencia y su dibujo; sin subida, el primer tramo puede ir en plano.
 - **Tren articulado** (`dynamics/train.js`, fase 8): con `trainCars > 1`, `calculateForces` suma las fuerzas de cada carro (s − i·d), con su normal, su zona y su fuerza g; los criterios usan el peor carro y la zona de frenado se integra con RK4 (frenos solo sobre los carros que entraron). Los carros detrás de A van por la rampa de la subida, y la cadena sostiene al tren a v_c mientras tenga carros enganchados (su trabajo entra al balance). Con un carro, el camino es exactamente el de la partícula.
+- **Optimizador** (`optimization/`, fase 8): generador puro como el de las correcciones (`variables` con sus rangos y la Tabla 2, `objectives`, `search` con factibilidad, semillas, coordenadas con sección áurea y verificación, `limit` que prueba un paso más para decir qué frena la mejora). `lib/generator-job` lo corre en un Worker o, si no hay, en el hilo principal de a pedazos.
 - **Estimador** (`estimate/`, fase 8): función pura sobre una corrida auditada (recorrido, tiempos y capacidad, fuerza g, energía, estructura) con supuestos editables; el panel «Estimación» la llama con la masa del tren del taller.
 - **Cámara quieta al editar** (`lib/view-fit.ts`): al soltar una manija la vista no cambia mientras el trazado siga entrando en ella (`needsReframe`); si ya no entra, o si después se abre un panel y el trazado queda afuera, se vuelve a encuadrar.
 - **Auditoría dibujada sobre la vía**: el perfil de fuerza g se calcula por tramos de 0,5 m a partir del recorrido auditado. Cada par de muestras cubre todos los tramos que recorre, así no quedan huecos a alta rapidez. El motor detiene el recorrido en el primer incumplimiento, así que la franja termina ahí y el pin lo señala. Las correcciones son las mismas alternativas verificadas de `recommendations/`; se buscan una vez por diseño y se previsualizan como pista fantasma antes de aplicarlas.

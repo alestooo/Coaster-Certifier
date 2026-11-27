@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CheckCircle2, XCircle, LoaderCircle, FileText, Download, Printer, AlertTriangle, Play } from "lucide-svelte";
+  import { CheckCircle2, XCircle, LoaderCircle, FileText, Download, Printer, AlertTriangle, Play, Sparkles } from "lucide-svelte";
   import type { AuditResult, AuditStatus } from "../../lib/live-audit.svelte";
   import CheckMark from "../ui/CheckMark.svelte";
   import Disclosure from "../ui/Disclosure.svelte";
@@ -18,7 +18,8 @@
     onOpenReport,
     onExportCsv,
     onExportJson,
-    onWatch
+    onWatch,
+    onOptimize
   }: {
     result: AuditResult | null;
     status: AuditStatus;
@@ -29,6 +30,8 @@
     onExportCsv: () => void;
     onExportJson: () => void;
     onWatch: () => void;
+    /** Abre el optimizador (objetivo, valores que se pueden cambiar, resultado verificado). */
+    onOptimize: () => void;
   } = $props();
 
   /** Duración de la espera antes de abrir el diálogo de impresión (ms). */
@@ -136,7 +139,10 @@
       </ul>
     {/if}
 
-    <Button variant="secondary" onclick={onWatch}><Play size={14} /> Reproducir desde A</Button>
+    <div class="tools">
+      <Button variant="secondary" onclick={onWatch}><Play size={14} /> Reproducir desde A</Button>
+      <Button variant="secondary" onclick={onOptimize} aria-label="Optimizar el diseño"><Sparkles size={14} /> Optimizar</Button>
+    </div>
 
     <div class="checks">
       <Disclosure summary={`Condiciones de energía sin fricción · ${checks.filter(check => check.ok).length} de ${checks.length}`}>
@@ -433,6 +439,12 @@
   }
 
   /* Una acción por fila: el nombre completo del informe entra aun en el panel angosto. */
+  .tools {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
   .exports {
     display: grid;
     grid-template-columns: minmax(0, 1fr);

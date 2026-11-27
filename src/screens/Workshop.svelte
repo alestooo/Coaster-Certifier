@@ -9,6 +9,7 @@
   import ElementPanel from "../components/workshop/ElementPanel.svelte";
   import LiftControls from "../components/workshop/LiftControls.svelte";
   import EstimatePanel from "../components/workshop/EstimatePanel.svelte";
+  import OptimizePanel from "../components/workshop/OptimizePanel.svelte";
   import { designName } from "../lib/report-text";
   import { SEATS_PER_CART } from "../game/passengers";
   import RulesPanel from "../components/workshop/RulesPanel.svelte";
@@ -60,6 +61,8 @@
   /** Problema abierto sobre la pista, corrección en vista previa y aviso al terminar rechazado. */
   let openIssue = $state<number | null>(null);
   let ghost = $state.raw<SimulationConfig | null>(null);
+  /** Resultado del optimizador que se previsualiza (solo con su panel abierto). */
+  let optimizerGhost = $state.raw<SimulationConfig | null>(null);
   let ping = $state(false);
   let pingTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -446,7 +449,7 @@
       passengers={session.passengers}
       {report}
       {result}
-      {ghost}
+      ghost={ghost ?? (panel === "optimize" ? optimizerGhost : null)}
       {fixes}
       {openIssue}
       {ping}
@@ -513,6 +516,7 @@
               runner.reset();
               runner.start();
             }}
+            onOptimize={() => openPanel("optimize")}
           />
         </SidePanel>
       {:else if panel === "rules"}
@@ -528,6 +532,18 @@
       {:else if panel === "estimate"}
         <SidePanel onSheet={height => (sheetHeight = height)} title={PANEL_TITLES.estimate} subtitle="Capacidad, energía y estructura del recorrido auditado" onClose={closePanel}>
           <EstimatePanel {result} seats={session.cartCount * SEATS_PER_CART} />
+        </SidePanel>
+      {:else if panel === "optimize"}
+        <SidePanel onSheet={height => (sheetHeight = height)} title={PANEL_TITLES.optimize} subtitle="Mejora un objetivo con resultados verificados" onClose={closePanel}>
+          <OptimizePanel
+            {result}
+            draftKey={JSON.stringify(session.draft)}
+            onPreview={config => (optimizerGhost = config)}
+            onApply={config => {
+              optimizerGhost = null;
+              session.applyRecommendation(config);
+            }}
+          />
         </SidePanel>
       {:else if panel === "passengers"}
         <SidePanel

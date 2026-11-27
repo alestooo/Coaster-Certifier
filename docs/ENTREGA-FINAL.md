@@ -46,5 +46,6 @@ Requiere Node.js ≥ 18.17. Sin motores físicos de terceros: la librería vive 
   - auditoría en vivo con dictamen, franja de fuerza g sobre la vía y correcciones verificadas por simulación;
   - siete gráficas en tiempo real con ejes y unidades;
   - estimador de capacidad, energía y estructura;
+  - optimizador con objetivo y valores elegibles (rangos de la Tabla 2), resultado verificado como pista fantasma y qué limita la mejora;
   - informe de certificación imprimible y descargas CSV y JSON.
 - **Documentación:** el `README.md` cubre el modelo, los supuestos, el dominio de validez, el método numérico (RK4, subpaso, eventos, corrección del reposo con fricción de Coulomb), las pruebas y la API; la arquitectura está en `docs/ARQUITECTURA.md`.

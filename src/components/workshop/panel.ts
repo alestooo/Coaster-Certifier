@@ -1,10 +1,11 @@
 /** Contenido del panel derecho del taller: uno solo a la vez. */
-export type PanelMode = "selection" | "verdict" | "rules" | "passengers" | "estimate";
+export type PanelMode = "selection" | "verdict" | "rules" | "passengers" | "estimate" | "optimize";
 
 export const PANEL_TITLES: Record<PanelMode, string> = {
   selection: "Parte seleccionada",
   verdict: "Dictamen",
   rules: "Reglas y precisión",
   passengers: "Tren y pasajeros",
-  estimate: "Estimación"
+  estimate: "Estimación",
+  optimize: "Optimizar"
 };

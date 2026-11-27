@@ -68,4 +68,15 @@ export {
   RECOMMENDATION_FIELDS
 } from "./recommendations/index.js";
 
+export {
+  optimizeDesign,
+  defaultVariables,
+  optimizationVariables,
+  readVariable,
+  writeVariable,
+  OBJECTIVES,
+  ANNEX_RANGES,
+  OPTIMIZATION_BUDGET
+} from "./optimization/index.js";
+
 export { SCENARIOS, findScenario } from "./scenarios.js";
