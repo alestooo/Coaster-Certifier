@@ -28,3 +28,6 @@ export type TrackElement = SimulationConfig["track"][number];
 export type PointElement = Extract<TrackElement, { type: "point" }>;
 export type HillElement = Extract<TrackElement, { type: "hill" }>;
 export type EndElement = Extract<TrackElement, { type: "end" }>;
+export type BoosterElement = Extract<TrackElement, { type: "booster" }>;
+export type TrimElement = Extract<TrackElement, { type: "trim" }>;
+export type ZoneElement = BoosterElement | TrimElement;

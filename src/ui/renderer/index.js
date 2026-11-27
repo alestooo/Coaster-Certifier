@@ -16,6 +16,7 @@
 import { prepareCanvas, createCamera } from "./camera.js";
 import { drawSkyAndDistant, drawGroundFill, drawWorldScenery } from "./scenery.js";
 import { drawStation, drawChainLift, drawChainLinks } from "./station.js";
+import { drawZoneHardware, drawZoneActivity } from "./zones.js";
 import {
   drawSectionBands,
   drawSupports,
@@ -95,6 +96,7 @@ function drawWorld(frame) {
 
   drawTrack(frame);
   drawBrakeHardware(frame);
+  drawZoneHardware(frame);
 
   if (frame.options.showMarkers) drawMarkers(frame);
 }
@@ -129,6 +131,7 @@ export function renderSimulation(canvas, scene) {
   }
 
   drawChainLinks(frame);
+  drawZoneActivity(frame);
   drawFocus(frame);
   drawLoadRibbon(frame);
   drawGhostTrack(frame);

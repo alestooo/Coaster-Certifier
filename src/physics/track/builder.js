@@ -46,6 +46,20 @@ import { maxOf, minOf } from "../utils.js";
  * @property {number} maxX Posición horizontal máxima (m).
  * @property {TrackPoint[]} points Polilínea para dibujar la vía.
  * @property {any[]} loops Tramos de loop.
+ * @property {TrackZone[]} zones Lanzadores y frenos de ajuste, en orden de avance.
+ * @property {import("./elements.js").LiftSpec | null} lift Subida por cadena hasta A, o null si no hay.
+ */
+
+/**
+ * @typedef {Object} TrackZone
+ * @property {"booster"|"trim"} kind
+ * @property {number} element Índice del elemento.
+ * @property {string} name «Lanzador 1», «Frenos de ajuste 2»…
+ * @property {number} start Coordenada s de entrada (m).
+ * @property {number} end Coordenada s de salida (m).
+ * @property {number} [power] Potencia del lanzador P (W).
+ * @property {number} [maxAcceleration] Aceleración máxima del lanzador (m/s²).
+ * @property {number} [damping] Coeficiente c de los frenos de ajuste (N·s/m).
  */
 
 const cache = new Map();
@@ -73,6 +87,18 @@ function sectionName(start, end, isFirst, fromLoop) {
   if (end.y > start.y) return "Subida";
   if (end.y < start.y) return "Descenso";
   return "Recta";
+}
+
+/**
+ * Zona de un tramo recto de lanzador o de frenos de ajuste, con sus valores.
+ * @param {any} segment
+ * @param {import("../config.js").SimulationConfig} config
+ * @returns {TrackZone}
+ */
+function zoneOf(segment, config) {
+  const element = /** @type {import("./elements.js").ZoneElement} */ (config.track[segment.element]);
+  const base = { kind: segment.zone, element: segment.element, name: segment.section, start: segment.start, end: segment.end };
+  return element.type === "booster" ? { ...base, power: element.power, maxAcceleration: element.maxAcceleration } : { ...base, damping: element.damping };
 }
 
 /**
@@ -156,7 +182,9 @@ export function buildTrack(input) {
 
   const nodes = layoutNodes(config);
 
-  if (nodes[0].y <= nodes[1].y) {
+  // Con subida por cadena, el tren arranca por gravedad desde A; sin subida (lanzada) puede salir en plano.
+  const lift = config.track[0]?.type === "start" ? (config.track[0].lift ?? null) : null;
+  if (lift && nodes[0].y <= nodes[1].y) {
     throw new ConfigError(
       "El primer tramo debe descender para iniciar por gravedad.",
       "initialHeight"
@@ -178,6 +206,8 @@ export function buildTrack(input) {
 
   let totalLength = 0;
   let loopCount = 0;
+  /** Lanzadores y frenos de ajuste vistos hasta ahora, para numerarlos. */
+  const zoneCount = { booster: 0, trim: 0 };
   let crestCount = 0;
 
   /** @param {any} segment */
@@ -206,7 +236,9 @@ export function buildTrack(input) {
 
     if (end.line) {
       const metrics = lineMetrics(start, end);
-      push({ kind: "line", x: start.x, y: start.y, angle: metrics.angle, length: metrics.length, section: index === 0 ? "Plano inclinado" : "Recta", element: end.element });
+      const zone = end.zone;
+      const section = zone ? `${zone === "booster" ? "Lanzador" : "Frenos de ajuste"} ${(zoneCount[zone] += 1)}` : index === 0 ? "Plano inclinado" : "Recta";
+      push({ kind: "line", x: start.x, y: start.y, angle: metrics.angle, length: metrics.length, section, element: end.element, ...(zone ? { zone } : {}) });
     } else {
       const slope = index === 0 ? (end.y - start.y) / (end.x - start.x) : 0;
       const table = arcLengthTable(start, end, slope, ARC_LENGTH_SAMPLES);
@@ -298,7 +330,9 @@ export function buildTrack(input) {
     minX: Math.min(0, minOf(points, point => point.x)),
     maxX: brakeX + config.brakingLength,
     points,
-    loops: segments.filter(segment => segment.kind === "loop")
+    loops: segments.filter(segment => segment.kind === "loop"),
+    zones: segments.filter(segment => segment.zone).map(segment => zoneOf(segment, config)),
+    lift: lift ? { ...lift } : null
   };
 
   if (cache.size >= CACHE_SIZE) {

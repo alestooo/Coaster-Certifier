@@ -4,10 +4,14 @@
  * el valor calculado con su unidad y el límite exigido.
  */
 
+import { MAX_BRAKE_DECELERATION } from "../constants.js";
+
 export const CRITERIA = Object.freeze({
   CONTACT: "contact",
   LOOP_CONTACT: "loop-contact",
   MAX_LOAD: "max-load",
+  LAUNCH: "launch",
+  TRIM: "trim",
   MIN_LOAD: "min-load",
   COMPRESSION: "compression",
   OVERRUN: "overrun",
@@ -89,6 +93,32 @@ export function evaluateState(state, config, track) {
         "N",
         ">"
       )
+    };
+  }
+
+  // Dentro de un lanzador, la aceleración hacia adelante no puede pasar del límite de la regla.
+  const launchLimit = config.maxLaunchAcceleration * config.gravity;
+  if (state.zoneKind === "booster" && state.tangentialAcceleration > launchLimit + 1e-9) {
+    return {
+      status: "rejected",
+      event: createEvent(
+        state,
+        CRITERIA.LAUNCH,
+        `Aceleración del lanzador ≤ ${config.maxLaunchAcceleration} g`,
+        state.tangentialAcceleration / config.gravity,
+        config.maxLaunchAcceleration,
+        "g",
+        "≤"
+      )
+    };
+  }
+
+  // Los frenos de ajuste no pueden desacelerar más de 1 g, igual que los frenos de la recta final.
+  const trimDeceleration = Math.abs(state.forces.trim ?? 0) / config.mass;
+  if (state.zoneKind === "trim" && trimDeceleration > MAX_BRAKE_DECELERATION + 1e-9) {
+    return {
+      status: "rejected",
+      event: createEvent(state, CRITERIA.TRIM, "Desaceleración de los frenos de ajuste ≤ 1 g", trimDeceleration / config.gravity, MAX_BRAKE_DECELERATION / config.gravity, "g", "≤")
     };
   }
 

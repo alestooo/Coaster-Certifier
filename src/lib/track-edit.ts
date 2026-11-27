@@ -16,13 +16,14 @@ import {
   withElement,
   copyElement,
   CONFIG_LIMITS,
+  ZONE_LIMITS,
   APPROACH_LENGTH,
   MAX_TRACK_ELEMENTS
 } from "../physics/index.js";
 import { explainConfigError } from "./handles";
 import { MIN_TOP_RADIUS_FRACTION } from "./field-definitions";
 import { formatNumber } from "../ui/format";
-import type { SimulationConfig, Track, TrackElement, PointElement, HillElement } from "./types";
+import type { SimulationConfig, Track, TrackElement, PointElement, HillElement, ZoneElement } from "./types";
 
 /** Separación mínima entre elementos vecinos al editar (m). */
 export const EDIT_MIN_GAP_M = 2;
@@ -34,11 +35,14 @@ export interface TrackEdit {
   reason: string | null;
 }
 
-export type ElementKey = "x" | "y" | "loopHeight" | "loopTopRadius" | "hillHeight" | "hillCrestRadius";
+export type ElementKey = "x" | "y" | "loopHeight" | "loopTopRadius" | "hillHeight" | "hillCrestRadius" | "length" | "power" | "maxAcceleration" | "damping";
+
+/** Qué se agrega desde la mini barra. */
+export type InsertKind = "point" | "hill" | "booster" | "trim";
 
 export interface ElementHandle {
   id: string;
-  kind: "point" | "loopTop" | "loopRadius" | "hillCrest" | "hillRadius" | "end";
+  kind: "point" | "loopTop" | "loopRadius" | "hillCrest" | "hillRadius" | "end" | "zoneStart" | "zoneEnd";
   /** Índice del elemento en `config.track`. */
   index: number;
   /** Posición en metros. */
@@ -75,6 +79,9 @@ const DEFAULT_HILL_CREST_RADIUS = 25;
 /** Si no entra, la colina nueva se achica: primero el radio (hasta 10 m), después la altura (hasta 2 m). */
 const MIN_INSERT_CREST_RADIUS = 10;
 const MIN_INSERT_HILL_HEIGHT = 2;
+/** Lanzador y frenos de ajuste que se agregan por defecto (se acortan hasta 2 m si el hueco es corto). */
+const DEFAULT_BOOSTER = { length: 30, power: 300_000, maxAcceleration: 12 } as const;
+const DEFAULT_TRIM = { length: 20, damping: 100 } as const;
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const round = (value: number, decimals = POSITION_DECIMALS) => Number(value.toFixed(decimals));
@@ -136,6 +143,7 @@ function reach(element: TrackElement, height = element.type === "hill" ? element
     const half = hillHalfWidth(height, element.crestRadius);
     return [half, half];
   }
+  if (element.type === "booster" || element.type === "trim") return [0, element.length];
   if (element.type !== "point" || !element.loop) return [0, 0];
 
   const loop = createLoop({ x: element.x, y: element.y, height: element.loop.height, topRadius: element.loop.topRadius, section: "" });
@@ -169,7 +177,7 @@ function xRange(track: readonly TrackElement[], index: number, own: [number, num
   const element = track[index];
   const previous = track[index - 1];
   const next = track[index + 1];
-  const min = (previous ? extent(previous)[1] : 0) + EDIT_MIN_GAP_M + own[0];
+  const min = startsAtStation(track, index) ? 0 : (previous ? extent(previous)[1] : 0) + EDIT_MIN_GAP_M + own[0];
   const max = next ? extent(next)[0] - EDIT_MIN_GAP_M - own[1] : CONFIG_LIMITS.trackWidth[1];
   const current = element && "x" in element ? element.x : null;
   return current === null ? [min, max] : [Math.min(min, current), Math.max(max, current)];
@@ -209,7 +217,9 @@ export function moveElement(config: SimulationConfig, index: number, x: number, 
 
   const [min, max] = xRange(track, index, reach(element));
   const targetX = round(clamp(x, min, Math.max(min, max)));
-  const targetY = round(clamp(y ?? element.y, 0, MAX_POINT_HEIGHT));
+  // Una zona que llega a la estación (x = 0) queda a la altura de A.
+  const atStation = targetX === 0 && startsAtStation(track, index);
+  const targetY = atStation ? config.initialHeight : round(clamp(y ?? element.y, 0, MAX_POINT_HEIGHT));
   const limited = Math.abs(targetX - x) > 1e-3 || (y !== undefined && Math.abs(targetY - y) > 1e-3);
   const from = element;
 
@@ -300,8 +310,83 @@ function hillRoomReason(track: readonly TrackElement[], index: number, height: n
 /** Altura de un elemento a nivel de la vía para promediar (A: H; una colina, su base). */
 function levelOf(config: SimulationConfig, element: TrackElement): number {
   if (element.type === "start") return config.initialHeight;
-  if (element.type === "point") return element.y;
+  if (element.type === "point" || element.type === "booster" || element.type === "trim") return element.y;
   return 0;
+}
+
+/** Verdadero si A no tiene subida por cadena (montaña rusa lanzada). */
+const isLaunched = (track: readonly TrackElement[]) => track[0]?.type === "start" && !track[0].lift;
+
+/**
+ * Una zona que sigue a A en una montaña rusa sin subida puede empezar en la
+ * propia estación (x = 0, a la altura de A): no lleva margen con A.
+ */
+function startsAtStation(track: readonly TrackElement[], index: number): boolean {
+  const element = track[index];
+  return index === 1 && isLaunched(track) && (element?.type === "booster" || element?.type === "trim");
+}
+
+/** Nombre de una zona en los textos: «el lanzador», «los frenos de ajuste». */
+const zoneNoun = (kind: "booster" | "trim") => (kind === "booster" ? "un lanzador" : "unos frenos de ajuste");
+
+/**
+ * Agrega un lanzador o unos frenos de ajuste entre `left` y `right` (m): el
+ * por defecto, o más corto (hasta 2 m) si el hueco no alcanza; centrado en
+ * el hueco y a la altura media de sus vecinos.
+ */
+function insertZone(config: SimulationConfig, kind: "booster" | "trim", from: number, to: number): { track: TrackElement[]; index: number } | { error: string } {
+  const track = config.track;
+  if (track.length >= MAX_TRACK_ELEMENTS) return { error: `El trazado ya tiene ${MAX_TRACK_ELEMENTS} elementos: es el máximo.` };
+
+  const left = extent(track[from])[1];
+  const right = extent(track[to])[0];
+  // Sin subida, la zona que sigue a A arranca en la estación misma (x = 0, a la altura de A).
+  const atStation = from === 0 && isLaunched(track);
+  const room = right - left - (atStation ? 1 : 2) * EDIT_MIN_GAP_M;
+  const [minLength] = ZONE_LIMITS.length;
+  const wanted = kind === "booster" ? DEFAULT_BOOSTER.length : DEFAULT_TRIM.length;
+  const length = round(Math.min(wanted, room), 2);
+
+  if (length < minLength) return { error: `No hay lugar para ${zoneNoun(kind)} junto a este elemento: hace falta un hueco recto de al menos ${meters(minLength + 2 * EDIT_MIN_GAP_M)} m.` };
+
+  const x = atStation ? 0 : round(left + EDIT_MIN_GAP_M + (room - length) / 2);
+  const y = atStation ? config.initialHeight : round((levelOf(config, track[from]) + levelOf(config, track[to])) / 2);
+  const zone: ZoneElement =
+    kind === "booster" ? { type: "booster", x, y, length, power: DEFAULT_BOOSTER.power, maxAcceleration: DEFAULT_BOOSTER.maxAcceleration } : { type: "trim", x, y, length, damping: DEFAULT_TRIM.damping };
+  const next = withoutLines([...track.slice(0, to), zone, ...track.slice(to)]);
+  const error = buildError(config, next);
+
+  return error ? { error: `No entra ${zoneNoun(kind)} ahí: ${explainConfigError(error)}` } : { track: next, index: to };
+}
+
+/**
+ * Cambia el largo, la potencia, la aceleración máxima o el coeficiente c de
+ * una zona, sin salirse de sus rangos; un largo que choca con el vecino se
+ * detiene en el último construible.
+ */
+export function setZone(config: SimulationConfig, index: number, patch: { length?: number; power?: number; maxAcceleration?: number; damping?: number }): TrackEdit {
+  const track = config.track;
+  const element = track[index];
+  if (element?.type !== "booster" && element?.type !== "trim") return unchanged(config, "Ese elemento no es un lanzador ni unos frenos de ajuste.");
+
+  const limit = (value: number | undefined, [min, max]: readonly [number, number]) => (value === undefined ? undefined : clamp(value, min, max));
+  const [, maxRoom] = xRange(track, index, [0, element.length]);
+  const roomLength = maxRoom - element.x + element.length;
+  const lengthLimits: [number, number] = [ZONE_LIMITS.length[0], Math.max(element.length, Math.min(ZONE_LIMITS.length[1], roomLength))];
+  const length = limit(patch.length, lengthLimits);
+  const values = {
+    ...(patch.power === undefined ? {} : { power: limit(patch.power, ZONE_LIMITS.power) }),
+    ...(patch.maxAcceleration === undefined ? {} : { maxAcceleration: limit(patch.maxAcceleration, ZONE_LIMITS.maxAcceleration) }),
+    ...(patch.damping === undefined ? {} : { damping: limit(patch.damping, ZONE_LIMITS.damping) })
+  };
+  const asked = [patch.length, patch.power, patch.maxAcceleration, patch.damping];
+  const got = [length, values.power, values.maxAcceleration, values.damping];
+  const limited = asked.some((value, position) => value !== undefined && Math.abs((got[position] ?? value) - value) > 1e-6);
+  const from = element.length;
+  const target = length === undefined ? from : round(length, 2);
+
+  const edit = lastBuildable(config, t => withElement(track, index, { ...values, length: round(from + (target - from) * t, 2) }), limited);
+  return patch.length !== undefined && patch.length > lengthLimits[1] + 1e-6 ? withNeighborReason(edit, true) : edit;
 }
 
 /** Agrega un punto en (x, y) metros entre sus vecinos. */
@@ -369,9 +454,10 @@ function insertHill(config: SimulationConfig, x: number): { track: TrackElement[
  * elemento, o hacia el anterior si después no hay lugar. Es «Agregar punto» y
  * «Agregar colina» de la mini barra (teclado y tacto).
  */
-export function insertAfter(config: SimulationConfig, index: number, kind: "point" | "hill"): { track: TrackElement[]; index: number } | { error: string } {
+export function insertAfter(config: SimulationConfig, index: number, kind: InsertKind): { track: TrackElement[]; index: number } | { error: string } {
   const track = config.track;
-  let lastError = kind === "hill" ? "No hay lugar para una colina junto a este elemento." : "No hay lugar para otro punto junto a este.";
+  let lastError =
+    kind === "hill" ? "No hay lugar para una colina junto a este elemento." : kind === "point" ? "No hay lugar para otro punto junto a este." : `No hay lugar para ${zoneNoun(kind)} junto a este elemento.`;
 
   for (const [from, to] of [[index, index + 1], [index - 1, index]]) {
     if (from < 0 || to >= track.length) continue;
@@ -379,7 +465,12 @@ export function insertAfter(config: SimulationConfig, index: number, kind: "poin
     const left = extent(track[from])[1];
     const right = extent(track[to])[0];
     const x = (left + right) / 2;
-    const result = kind === "hill" ? insertHill(config, x) : insertPoint(config, x, (levelOf(config, track[from]) + levelOf(config, track[to])) / 2);
+    const result =
+      kind === "hill"
+        ? insertHill(config, x)
+        : kind === "point"
+          ? insertPoint(config, x, (levelOf(config, track[from]) + levelOf(config, track[to])) / 2)
+          : insertZone(config, kind, from, to);
 
     if (!("error" in result)) return result;
     lastError = result.error;
@@ -424,6 +515,17 @@ export function elementLimits(config: SimulationConfig, index: number, key: Elem
       return [MIN_HILL_HEIGHT, CONFIG_LIMITS.hillHeight[1]];
     case "hillCrestRadius":
       return [CONFIG_LIMITS.hillCrestRadius[0], CONFIG_LIMITS.hillCrestRadius[1]];
+    case "length": {
+      if (element?.type !== "booster" && element?.type !== "trim") return [ZONE_LIMITS.length[0], ZONE_LIMITS.length[1]];
+      const [, maxStart] = xRange(track, index, [0, element.length]);
+      return [ZONE_LIMITS.length[0], Math.max(element.length, Math.min(ZONE_LIMITS.length[1], maxStart - element.x + element.length))];
+    }
+    case "power":
+      return [ZONE_LIMITS.power[0], ZONE_LIMITS.power[1]];
+    case "maxAcceleration":
+      return [ZONE_LIMITS.maxAcceleration[0], ZONE_LIMITS.maxAcceleration[1]];
+    case "damping":
+      return [ZONE_LIMITS.damping[0], ZONE_LIMITS.damping[1]];
   }
 }
 
@@ -495,6 +597,19 @@ export function elementHandles(track: Track, config: SimulationConfig): ElementH
       return;
     }
 
+    if (element.type === "booster" || element.type === "trim") {
+      const kind = element.type;
+      const name = `${kind === "booster" ? "Lanzador" : "Frenos de ajuste"} ${elements.slice(0, index + 1).filter(candidate => candidate.type === kind).length}`;
+      // Una zona que arranca en A no tiene manija de inicio: sería la de A (se mueve desde su panel).
+      const atStation = index === 1 && element.x === 0;
+      const y = atStation ? config.initialHeight : element.y;
+      if (!atStation) {
+        handles.push({ id: `zone-start-${index}`, kind: "zoneStart", index, x: element.x, y, name: `${name}: inicio en x ${meters(element.x)} m, altura ${meters(y)} m` });
+      }
+      handles.push({ id: `zone-end-${index}`, kind: "zoneEnd", index, x: element.x + element.length, y, name: `Fin de ${name}: largo`, anchor: { x: element.x, y } });
+      return;
+    }
+
     if (element.type === "end") {
       handles.push({ id: "end", kind: "end", index, x: element.x + APPROACH_LENGTH, y: 0, letter: "E", name: "Inicio de la zona de frenado E: largo de la recta final" });
     }
@@ -518,6 +633,13 @@ export function proposeElementHandle(config: SimulationConfig, handle: ElementHa
       return moveElement(config, handle.index, point.x, point.y);
     case "end":
       return moveElement(config, handle.index, point.x - APPROACH_LENGTH);
+    case "zoneStart":
+      return moveElement(config, handle.index, point.x, point.y);
+    case "zoneEnd": {
+      const zone = element as ZoneElement;
+      const tail = start ? start.handle.x + (point.x - start.point.x) : point.x;
+      return setZone(config, handle.index, { length: tail - zone.x });
+    }
     case "hillRadius": {
       const hill = element as HillElement;
       const half = start ? start.handle.x - hill.x + (point.x - start.point.x) : point.x - hill.x;

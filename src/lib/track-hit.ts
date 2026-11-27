@@ -67,7 +67,9 @@ export function elementAtDistance(track: Track, distance: number): number | null
   if (distance >= track.stationStart - 1e-6) return null;
 
   const section = track.sections.find(candidate => distance >= candidate.start && distance <= candidate.end);
-  if (!section || section.index === 0 || areaForSection(section.name) === "start") return null;
+  if (!section || areaForSection(section.name) === "start") return null;
+  // El primer tramo es la caída (área «Salida»), salvo que sea un lanzador o unos frenos que arrancan en A.
+  if (section.index === 0 && areaForSection(section.name) !== "zone") return null;
   return section.element ?? null;
 }
 

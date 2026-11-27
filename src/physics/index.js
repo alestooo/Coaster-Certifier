@@ -37,11 +37,16 @@ export {
   copyElement,
   mergeConfigPatch,
   LEGACY_TRACK_KEYS,
-  MAX_TRACK_ELEMENTS
+  MAX_TRACK_ELEMENTS,
+  DEFAULT_LIFT,
+  LIFT_LIMITS,
+  ZONE_LIMITS
 } from "./track/index.js";
 
 export { calculateForces, resistiveForce } from "./dynamics/forces.js";
 export { calculateEnergies, initialEnergy } from "./dynamics/energy.js";
+export { boosterForce, boosterWork } from "./dynamics/booster.js";
+export { liftMetrics } from "./dynamics/lift.js";
 export * from "./dynamics/kinematics.js";
 
 export { rk4 } from "./integration/rk4.js";

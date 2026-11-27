@@ -7,6 +7,7 @@
   import SidePanel from "../components/workshop/SidePanel.svelte";
   import SelectionPanel from "../components/workshop/SelectionPanel.svelte";
   import ElementPanel from "../components/workshop/ElementPanel.svelte";
+  import LiftControls from "../components/workshop/LiftControls.svelte";
   import RulesPanel from "../components/workshop/RulesPanel.svelte";
   import TelemetryDrawer from "../components/workshop/TelemetryDrawer.svelte";
   import VerdictPanel from "../components/lab/VerdictPanel.svelte";
@@ -145,8 +146,11 @@
   );
   let selectionGroup = $derived(FIELD_GROUPS.find(group => group.id === selectedArea));
 
-  /** Configuración con su trazado por elementos (el borrador, o la vigente mientras se vuelve a derivar). */
-  let elementConfig = $derived(session.draft.track ? session.draft : runner.config);
+  /**
+   * Configuración con su trazado por elementos (el borrador, o la vigente mientras se vuelve a derivar) y la
+   * masa real del tren: la del borrador no sigue a los pasajeros (se suma recién al simular).
+   */
+  let elementConfig = $derived({ ...(session.draft.track ? session.draft : runner.config), mass: runner.config.mass });
 
   // Un elemento que ya no existe (otro recorrido, elemento borrado o deshecho) deja de estar elegido.
   $effect(() => {
@@ -177,6 +181,8 @@
 
     if (element?.type === "point" && element.loop) return ordinal(candidate => candidate.type === "point" && !!candidate.loop, "Loop");
     if (element?.type === "hill") return ordinal(candidate => candidate.type === "hill", "Colina");
+    if (element?.type === "booster") return ordinal(candidate => candidate.type === "booster", "Lanzador");
+    if (element?.type === "trim") return ordinal(candidate => candidate.type === "trim", "Frenos de ajuste");
     if (element?.type === "end") return "Recta final";
     return `Punto ${index + 1} de ${track.length}`;
   }
@@ -485,6 +491,9 @@
             onPatch={patch => session.patch(patch)}
             onGesture={gesture}
           />
+          {#if selectedArea === "start"}
+            <LiftControls config={elementConfig} onTrack={(track, step) => session.setTrack(track, { step })} onGesture={gesture} />
+          {/if}
         </SidePanel>
       {:else if panel === "verdict"}
         <SidePanel onSheet={height => (sheetHeight = height)} title={PANEL_TITLES.verdict} onClose={closePanel}>

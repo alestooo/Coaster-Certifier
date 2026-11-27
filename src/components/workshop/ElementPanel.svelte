@@ -2,7 +2,8 @@
   import { untrack } from "svelte";
   import ParamSlider from "../ui/ParamSlider.svelte";
   import AreaStatus from "./AreaStatus.svelte";
-  import { moveElement, setPointLoop, setHill, elementLimits, type TrackEdit } from "../../lib/track-edit";
+  import { moveElement, setPointLoop, setHill, setZone, elementLimits, type TrackEdit } from "../../lib/track-edit";
+  import { formatNumber } from "../../ui/format";
   import { fieldByKey } from "../../lib/field-definitions";
   import { APPROACH_LENGTH } from "../../physics/index.js";
   import type { AreaInsight } from "../../lib/audit";
@@ -27,6 +28,33 @@
   /** Metadatos de los valores propios de un elemento (los de loop y colina vienen de field-definitions). */
   const POSITION = { label: "Posición horizontal", symbol: "x", unit: "m", step: 0.5, help: "Distancia horizontal desde A." };
   const HEIGHT = { label: "Altura", symbol: "y", unit: "m", step: 0.5, help: "Altura del punto sobre el suelo. Un valle es un punto en 0 m." };
+  /** Valores de un lanzador y de unos frenos de ajuste. */
+  const LENGTH = { label: "Largo", symbol: "L", unit: "m", step: 0.5, help: "Largo de la recta horizontal donde actúa." };
+  const POWER = {
+    label: "Potencia",
+    symbol: "P",
+    unit: "kW",
+    step: 5,
+    scale: "log" as const,
+    help: "Potencia de los motores lineales (LSM). Empuja con F = min(m·a_máx, P/v): fuerza constante a baja rapidez y potencia constante después."
+  };
+  const ACCELERATION = {
+    label: "Aceleración máxima",
+    symbol: "a_máx",
+    unit: "m/s²",
+    step: 0.1,
+    help: "Lo más que empuja: m·a_máx. La regla de «Reglas» limita la aceleración que sienten los pasajeros (1,5 g por defecto)."
+  };
+  const DAMPING = {
+    label: "Coeficiente c",
+    symbol: "c",
+    unit: "N·s/m",
+    step: 5,
+    scale: "log" as const,
+    help: "Frenos por corrientes parásitas: F = −c·v. Frenan más cuanto más rápido va el tren, sin rozamiento ni desgaste."
+  };
+  const toKilo = ([min, max]: [number, number]): [number, number] => [min / 1000, max / 1000];
+
   const END = {
     label: "Posición de E",
     symbol: "x_E",
@@ -118,6 +146,48 @@
     onInput={value => commit(elementLimits(config, index, "hillCrestRadius"), value, crestRadius => setHill(config, index, { crestRadius }))}
     {onGesture}
   />
+{:else if element?.type === "booster" || element?.type === "trim"}
+  {@const zone = element}
+  <ParamSlider id={`x-${index}`} {...POSITION} value={zone.x} limits={elementLimits(config, index, "x")} onInput={value => commit(elementLimits(config, index, "x"), value, x => moveElement(config, index, x, zone.y))} {onGesture} />
+  <ParamSlider id={`y-${index}`} {...HEIGHT} value={zone.y} limits={elementLimits(config, index, "y")} onInput={value => commit(elementLimits(config, index, "y"), value, y => moveElement(config, index, zone.x, y))} {onGesture} />
+  <ParamSlider
+    id={`length-${index}`}
+    {...LENGTH}
+    value={zone.length}
+    limits={elementLimits(config, index, "length")}
+    onInput={value => commit(elementLimits(config, index, "length"), value, length => setZone(config, index, { length }))}
+    {onGesture}
+  />
+  {#if zone.type === "booster"}
+    <ParamSlider
+      id={`power-${index}`}
+      {...POWER}
+      value={zone.power / 1000}
+      limits={toKilo(elementLimits(config, index, "power"))}
+      hint={`Pasa de fuerza constante a potencia constante a ${formatNumber(zone.power / (config.mass * zone.maxAcceleration), 1)} m/s`}
+      onInput={value => commit(toKilo(elementLimits(config, index, "power")), value, kilowatts => setZone(config, index, { power: kilowatts * 1000 }))}
+      {onGesture}
+    />
+    <ParamSlider
+      id={`acceleration-${index}`}
+      {...ACCELERATION}
+      value={zone.maxAcceleration}
+      limits={elementLimits(config, index, "maxAcceleration")}
+      hint={`≈ ${formatNumber(zone.maxAcceleration / config.gravity, 2)} g · regla: hasta ${formatNumber(config.maxLaunchAcceleration, 1)} g`}
+      onInput={value => commit(elementLimits(config, index, "maxAcceleration"), value, maxAcceleration => setZone(config, index, { maxAcceleration }))}
+      {onGesture}
+    />
+  {:else}
+    <ParamSlider
+      id={`damping-${index}`}
+      {...DAMPING}
+      value={zone.damping}
+      limits={elementLimits(config, index, "damping")}
+      hint={`Sin fricción ni pendiente le quitan Δv = c·L/m = ${formatNumber((zone.damping * zone.length) / config.mass, 1)} m/s`}
+      onInput={value => commit(elementLimits(config, index, "damping"), value, damping => setZone(config, index, { damping }))}
+      {onGesture}
+    />
+  {/if}
 {:else if element?.type === "end"}
   <ParamSlider
     id="end-x"

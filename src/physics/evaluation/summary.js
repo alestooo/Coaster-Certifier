@@ -207,6 +207,7 @@ export function summarizeRun(history, config, track) {
     initialEnergy: final.energies.initial,
     finalMechanicalEnergy: final.energies.mechanical,
     dissipatedEnergy: final.energies.dissipated,
+    inputEnergy: final.energies.input ?? 0,
     braking: summarizeBraking(history, config, track),
     sections: summarizeSections(history, track),
     criticalPoints: summarizeMarkers(history, track)

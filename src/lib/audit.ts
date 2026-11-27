@@ -12,7 +12,7 @@ import { formatNumber } from "../ui/format";
 export type Tone = "ok" | "warn" | "bad" | "info";
 
 /** Grupos del panel de diseño, en el orden en que el tren los recorre. */
-export type AreaId = "start" | "layout" | "loop" | "hill" | "braking" | "criteria" | "numeric";
+export type AreaId = "start" | "layout" | "loop" | "hill" | "zone" | "braking" | "criteria" | "numeric";
 
 export interface PlainIssue {
   code: string;
@@ -84,6 +84,7 @@ const OVERRUN_CODES = new Set(["overrun", "compression"]);
 /** Grupo del panel que controla el tramo donde ocurrió algo. */
 export function areaForSection(section: string, code?: string): AreaId {
   if (code && BRAKING_CODES.has(code)) return "braking";
+  if (/lanzador|frenos de ajuste/i.test(section)) return "zone";
   if (/loop/i.test(section)) return "loop";
   if (/colina/i.test(section)) return "hill";
   if (/frenado|resorte/i.test(section)) return "braking";
@@ -106,6 +107,16 @@ function issueText(violation: Violation, config: SimulationConfig): { title: str
       return {
         title: "Fuerza g demasiado alta",
         detail: `En ${where} los pasajeros sentirían ${formatNumber(value, 2)} g; el máximo permitido es ${num(limit)} g.`
+      };
+    case "launch":
+      return {
+        title: "Lanzamiento demasiado brusco",
+        detail: `En ${where} el lanzador acelera a ${formatNumber(value, 2)} g; el máximo permitido es ${num(limit)} g. Bajá su aceleración máxima (o revisá el límite en «Reglas»).`
+      };
+    case "trim":
+      return {
+        title: "Frenos de ajuste demasiado fuertes",
+        detail: `En ${where} desaceleran ${formatNumber(value, 2)} g; el máximo es ${num(limit)} g, como en los frenos de la recta final. Bajá su coeficiente c.`
       };
     case "min-load":
       return {
@@ -307,15 +318,39 @@ function sectionsOf(verdict: Verdict, area: AreaId): SectionSummary[] {
   return verdict.summary.sections.filter(section => areaForSection(section.name) === area);
 }
 
+/**
+ * Lectura de «Salida»: hasta dónde puede subir el tren (con lo que aportan
+ * los lanzadores) y qué parte de la energía se pierde antes de frenar.
+ */
+function startText(verdict: Verdict, config: SimulationConfig, head: number, maxSpeed: number): string {
+  const input = Math.max(0, verdict.summary.inputEnergy ?? 0);
+  const launched = input > 0;
+  const reach = launched ? head + input / (config.mass * config.gravity) : head;
+  const hasTrims = config.track.some(element => element.type === "trim");
+  const losses = config.friction > 0 || config.airDragArea > 0 || hasTrims;
+  const lossLabel = hasTrims || config.airDragArea > 0 ? "las pérdidas (rodadura, aire y frenos de ajuste) disipan" : "la fricción disipa";
+
+  return (
+    `Puede subir hasta ${formatNumber(reach, 1)} m${launched ? ` con los lanzadores (aportan ${formatNumber(input / 1000, 0)} kJ)` : ""} · rapidez máx. ${formatNumber(maxSpeed, 1)} m/s` +
+    (losses ? ` · ${lossLabel} ${formatNumber(100 * frictionShare(verdict), 0)} % de la energía antes de frenar` : "")
+  );
+}
+
+/** Energía disponible: la inicial más lo que entregaron los lanzadores (J). */
+function availableEnergy(verdict: Verdict): number {
+  return verdict.summary.initialEnergy + Math.max(0, verdict.summary.inputEnergy ?? 0);
+}
+
+/** Fracción de la energía disponible que se pierde antes de frenar (rodadura, aire y frenos de ajuste). */
 function frictionShare(verdict: Verdict): number {
-  const initial = verdict.summary.initialEnergy;
-  if (!(initial > 0)) return 0;
+  const available = availableEnergy(verdict);
+  if (!(available > 0)) return 0;
 
   const lost = verdict.summary.sections
     .filter(section => areaForSection(section.name) !== "braking")
     .reduce((sum, section) => sum + (section.dissipated ?? 0), 0);
 
-  return Math.max(0, lost / initial);
+  return Math.max(0, lost / available);
 }
 
 function loopInsight(verdict: Verdict, config: SimulationConfig): AreaInsight | undefined {
@@ -366,9 +401,7 @@ function buildAreas(
     // μ se edita en la salida: su lectura suma cuánto disipa la fricción antes de frenar.
     start: {
       tone: "ok",
-      text:
-        `Puede subir hasta ${formatNumber(head, 1)} m · rapidez máx. ${formatNumber(maxSpeed, 1)} m/s` +
-        (config.friction > 0 ? ` · la fricción disipa ${formatNumber(100 * frictionShare(verdict), 0)} % antes de frenar` : "")
+      text: startText(verdict, config, head, maxSpeed)
     },
     loop: loopInsight(verdict, config),
     hill: hillInsight(verdict, config),

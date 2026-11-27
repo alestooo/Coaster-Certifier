@@ -94,6 +94,17 @@ export function damperForce(damping, velocity, compression) {
   return compression > 0 ? -damping * velocity : 0;
 }
 
+/**
+ * Resistencia del aire con signo: F = −sign(v)·½·ρ·C_dA·v².
+ * @param {number} density Densidad del aire ρ (kg/m³).
+ * @param {number} dragArea Área de arrastre C_dA (m²).
+ * @param {number} velocity Velocidad tangencial (m/s).
+ * @returns {number} Fuerza (N).
+ */
+export function airDragForce(density, dragArea, velocity) {
+  return -Math.sign(velocity) * 0.5 * density * dragArea * velocity * velocity;
+}
+
 /** @param {number} mass @param {number} speed @returns {number} E_c = ½·m·v² (J). */
 export function kineticEnergy(mass, speed) {
   return 0.5 * mass * speed * speed;

@@ -1,5 +1,7 @@
 import { resolveConfig } from "../config.js";
 import { buildTrack } from "../track/builder.js";
+import { geometryAt } from "../track/geometry.js";
+import { boosterWork } from "../dynamics/booster.js";
 import { MAX_BRAKE_DECELERATION } from "../constants.js";
 import { summarizeRun } from "./summary.js";
 
@@ -16,6 +18,30 @@ import { summarizeRun } from "./summary.js";
  */
 
 /**
+ * Trabajo ideal (J) de los lanzadores que terminan antes de s, en orden:
+ * cada uno recibe la rapidez de la energía ideal que llega a su altura.
+ * @param {import("../track/builder.js").Track} track
+ * @param {import("../config.js").SimulationConfig} config
+ * @param {number} baseHead Altura disponible inicial H + v₀²/(2g) (m).
+ * @param {number} distance Coordenada s (m).
+ */
+function launchWork(track, config, baseHead, distance) {
+  let work = 0;
+
+  for (const zone of track.zones ?? []) {
+    if (zone.kind !== "booster" || zone.end > distance) continue;
+    const head = baseHead + work / (config.mass * config.gravity);
+    const height = geometryAt(track, zone.start).y;
+    // Un lanzador por encima de la energía disponible es inalcanzable: no suma nada.
+    if (head < height) continue;
+    const entrySpeed = Math.sqrt(2 * config.gravity * (head - height));
+    work += boosterWork(zone, config.mass, entrySpeed).work;
+  }
+
+  return work;
+}
+
+/**
  * Condiciones mínimas de diseño por conservación de la energía (sin
  * fricción). Son necesarias pero no suficientes: anticipan trazados
  * imposibles antes de simular.
@@ -27,20 +53,28 @@ export function checkDesignConditions(input) {
   const config = resolveConfig(input);
   const track = buildTrack(config);
   const g = config.gravity;
-  const head = config.initialHeight + config.initialSpeed ** 2 / (2 * g);
+  const baseHead = config.initialHeight + config.initialSpeed ** 2 / (2 * g);
+  /** Altura disponible ideal hasta s: la inicial más el trabajo de los lanzadores anteriores (sin lanzadores, la de siempre). */
+  const headAt = (/** @type {number} */ distance) => {
+    const work = launchWork(track, config, baseHead, distance);
+    return work > 0 ? baseHead + work / (config.mass * g) : baseHead;
+  };
+  const totalWork = launchWork(track, config, baseHead, Infinity);
 
   /** @type {DesignCheck[]} */
   const checks = [];
 
   for (const loop of track.loops) {
     const required = loop.y + loop.height + loop.topRadius / 2;
+    const head = headAt(loop.start);
+    const launched = head !== baseHead;
 
     checks.push({
       id: `loop-${loop.section}`,
       name: `Energía suficiente para mantener contacto en la cima del ${loop.section.toLowerCase()}`,
       ok: head >= required,
       severity: "error",
-      formula: "H + v₀²/(2g) ≥ h_L + R/2",
+      formula: launched ? "H + v₀²/(2g) + W_lanz/(m·g) ≥ h_L + R/2" : "H + v₀²/(2g) ≥ h_L + R/2",
       detail: `${head.toFixed(2)} m frente a ${required.toFixed(2)} m requeridos`,
       actual: head,
       limit: required
@@ -51,13 +85,15 @@ export function checkDesignConditions(input) {
     .filter(node => node.role === "crest")
     .forEach((crest, index, crests) => {
       const suffix = crests.length > 1 ? ` ${index + 1}` : "";
+      const head = headAt(track.markers.filter(marker => marker.role === "crest")[index]?.distance ?? 0);
+      const launched = head !== baseHead;
 
       checks.push({
         id: `crest-${index + 1}`,
         name: `Energía suficiente para superar la cresta de la colina${suffix}`,
         ok: head > crest.y,
         severity: "error",
-        formula: "H + v₀²/(2g) > h_c",
+        formula: launched ? "H + v₀²/(2g) + W_lanz/(m·g) > h_c" : "H + v₀²/(2g) > h_c",
         detail: `${head.toFixed(2)} m frente a ${crest.y.toFixed(2)} m de la cresta`,
         actual: head,
         limit: crest.y
@@ -65,7 +101,8 @@ export function checkDesignConditions(input) {
     });
 
   if (config.brakeMode === "station") {
-    const idealSpeedSquared = 2 * g * config.initialHeight + config.initialSpeed ** 2;
+    const launched = totalWork > 0 ? (2 * totalWork) / config.mass : 0;
+    const idealSpeedSquared = launched > 0 ? 2 * g * config.initialHeight + config.initialSpeed ** 2 + launched : 2 * g * config.initialHeight + config.initialSpeed ** 2;
     const capacity = 2 * config.brakeDeceleration * config.brakingLength;
 
     checks.push({
@@ -73,7 +110,7 @@ export function checkDesignConditions(input) {
       name: "Capacidad de frenado incluso sin pérdidas por fricción",
       ok: idealSpeedSquared <= capacity,
       severity: "warning",
-      formula: "v_E² ≤ 2·a_f·d_f",
+      formula: launched > 0 ? "v_E² ≤ 2·a_f·d_f (v_E ideal con W_lanz)" : "v_E² ≤ 2·a_f·d_f",
       detail: `v_E² ideal = ${idealSpeedSquared.toFixed(1)} m²/s² frente a ${capacity.toFixed(1)} m²/s² disponibles`,
       actual: idealSpeedSquared,
       limit: capacity
@@ -90,7 +127,8 @@ export function checkDesignConditions(input) {
       limit: MAX_BRAKE_DECELERATION
     });
   } else {
-    const idealEnergy = config.mass * g * config.initialHeight + 0.5 * config.mass * config.initialSpeed ** 2;
+    const baseEnergy = config.mass * g * config.initialHeight + 0.5 * config.mass * config.initialSpeed ** 2;
+    const idealEnergy = totalWork > 0 ? baseEnergy + totalWork : baseEnergy;
     const compression = Math.sqrt((2 * idealEnergy) / config.springConstant);
 
     checks.push({

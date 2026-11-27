@@ -8,13 +8,39 @@ import { ConfigError, CONFIG_LIMITS, assertLoopShape } from "../config.js";
  */
 
 /**
- * @typedef {{type: "start"}} StartElement
+ * @typedef {{angle: number, efficiency: number, chainSpeed: number}} LiftSpec
+ *   Subida por cadena hasta A: ángulo α (rad), eficiencia η del motor (0–1] y rapidez de la cadena v_c (m/s).
+ * @typedef {{type: "start", lift?: LiftSpec}} StartElement
+ *   A. Sin `lift` es una montaña rusa sin subida (lanzada): el primer tramo no tiene que descender.
  * @typedef {{type: "point", x: number, y: number, loop?: {height: number, topRadius: number}, line?: boolean}} PointElement
  * @typedef {{type: "hill", x: number, height: number, crestRadius: number}} HillElement
  * @typedef {{type: "end", x: number, line?: boolean}} EndElement
- * @typedef {StartElement | PointElement | HillElement | EndElement} TrackElement
- * @typedef {{x?: number, y?: number, loop?: {height: number, topRadius: number} | undefined, line?: boolean, height?: number, crestRadius?: number}} ElementChanges
+ * @typedef {{type: "booster", x: number, y: number, length: number, power: number, maxAcceleration: number}} BoosterElement
+ *   Lanzador LSM sobre una recta horizontal de `length` m desde x, a la altura y: F = min(m·a_máx, P/v).
+ * @typedef {{type: "trim", x: number, y: number, length: number, damping: number}} TrimElement
+ *   Frenos de ajuste por corrientes parásitas sobre una recta horizontal: F = −c·v.
+ * @typedef {BoosterElement | TrimElement} ZoneElement
+ * @typedef {StartElement | PointElement | HillElement | EndElement | ZoneElement} TrackElement
+ * @typedef {{x?: number, y?: number, loop?: {height: number, topRadius: number} | undefined, line?: boolean, height?: number, crestRadius?: number, length?: number, power?: number, maxAcceleration?: number, damping?: number}} ElementChanges
  */
+
+/** Rangos de los elementos de zona (SI). */
+export const ZONE_LIMITS = Object.freeze({
+  length: /** @type {const} */ ([2, 300]),
+  power: /** @type {const} */ ([1_000, 20_000_000]),
+  maxAcceleration: /** @type {const} */ ([0.1, 30]),
+  damping: /** @type {const} */ ([0, 50_000])
+});
+
+/** Subida de los trazados predefinidos: la rampa que siempre se dibujó (1 m de subida cada 1,35 m), η = 0,8 y v_c = 2 m/s. */
+export const DEFAULT_LIFT = Object.freeze({ angle: Math.atan2(1, 1.35), efficiency: 0.8, chainSpeed: 2 });
+
+/** Rangos de la subida: α en grados, η y v_c. */
+export const LIFT_LIMITS = Object.freeze({
+  angleDegrees: /** @type {const} */ ([10, 60]),
+  efficiency: /** @type {const} */ ([0.05, 1]),
+  chainSpeed: /** @type {const} */ ([0.5, 6])
+});
 
 /** Tope de elementos por rendimiento (no es un límite de diseño). */
 export const MAX_TRACK_ELEMENTS = 40;
@@ -76,6 +102,13 @@ export function compileElements(elements, initialHeight) {
           node(element.x + half, 0, "plain", index)
         ];
       }
+      case "booster":
+      case "trim":
+        // Una zona que empieza en A (x = 0, justo después del inicio) comparte su nodo: es la estación de una
+        // montaña rusa lanzada, a la altura de A. Arranca en reposo dentro del lanzador.
+        if (index === 1 && element.x === 0) return [node(element.length, initialHeight, "plain", index, { line: true, zone: element.type })];
+        // Recta horizontal: las curvas de Hermite llegan horizontales a sus nodos, así que no hay quiebre.
+        return [node(element.x, element.y, "plain", index), node(element.x + element.length, element.y, "plain", index, { line: true, zone: element.type })];
       default:
         return [node(element.x, 0, "end", index, element.line ? { line: true } : {})];
     }
@@ -124,7 +157,7 @@ export function legacyElements(config) {
   const W = config.trackWidth;
   const loop = { height: config.loopHeight, topRadius: config.loopTopRadius };
   /** @type {StartElement} */
-  const start = { type: "start" };
+  const start = { type: "start", lift: { ...DEFAULT_LIFT } };
   /** @type {EndElement} */
   const end = { type: "end", x: W };
 
@@ -188,6 +221,8 @@ function elementName(elements, index) {
   const element = elements[index];
   if (element.type === "hill") return `Colina ${elements.slice(0, index + 1).filter(candidate => candidate.type === "hill").length}`;
   if (element.type === "end") return "Final del trazado (E)";
+  if (element.type === "booster") return `Lanzador ${elements.slice(0, index + 1).filter(candidate => candidate.type === "booster").length}`;
+  if (element.type === "trim") return `Frenos de ajuste ${elements.slice(0, index + 1).filter(candidate => candidate.type === "trim").length}`;
   if (element.type === "start") return "Inicio (A)";
   return `Punto ${index + 1}`;
 }
@@ -214,13 +249,17 @@ export function validateElements(elements) {
   if (!Array.isArray(elements) || elements.length < 2) fail("El trazado necesita al menos el inicio (A) y el final (E).");
   if (elements.length > MAX_TRACK_ELEMENTS) fail(`El trazado admite hasta ${MAX_TRACK_ELEMENTS} elementos.`);
   if (elements[0]?.type !== "start") fail("El trazado empieza en el inicio (A).");
+  const lift = /** @type {StartElement} */ (elements[0]).lift;
+  if (lift) validateLift(lift);
   if (elements.at(-1)?.type !== "end") fail("El trazado termina en el final (E).");
 
   elements.forEach((element, index) => {
     const name = () => elementName(elements, index);
     const inner = index > 0 && index < elements.length - 1;
 
-    if (inner && element.type !== "point" && element.type !== "hill") fail(`Elemento ${index + 1}: tipo desconocido.`);
+    if (inner && !["point", "hill", "booster", "trim"].includes(element.type)) fail(`Elemento ${index + 1}: tipo desconocido.`);
+
+    if (element.type === "booster" || element.type === "trim") validateZone(element, name());
 
     if (element.type === "point") {
       if (!finite(element.x) || !finite(element.y)) fail(`${name()}: valores inválidos.`);
@@ -252,6 +291,44 @@ export function validateElements(elements) {
       if (!finite(element.x) || element.x < minWidth || element.x > maxWidth) fail(`El final (E) debe estar entre ${minWidth} y ${maxWidth} m.`);
     }
   });
+}
+
+/**
+ * Valores de la subida por cadena.
+ * @param {LiftSpec} lift
+ */
+function validateLift(lift) {
+  const degrees = (lift.angle * 180) / Math.PI;
+  const [minAngle, maxAngle] = LIFT_LIMITS.angleDegrees;
+  const [minEfficiency, maxEfficiency] = LIFT_LIMITS.efficiency;
+  const [minSpeed, maxSpeed] = LIFT_LIMITS.chainSpeed;
+
+  if (!finite(lift.angle) || degrees < minAngle || degrees > maxAngle) fail(`Subida: el ángulo debe estar entre ${minAngle}° y ${maxAngle}°.`);
+  if (!finite(lift.efficiency) || lift.efficiency < minEfficiency || lift.efficiency > maxEfficiency) fail("Subida: la eficiencia del motor debe estar entre 5 % y 100 %.");
+  if (!finite(lift.chainSpeed) || lift.chainSpeed < minSpeed || lift.chainSpeed > maxSpeed) fail(`Subida: la rapidez de la cadena debe estar entre ${minSpeed} y ${maxSpeed} m/s.`);
+}
+
+/**
+ * Valores de un lanzador o unos frenos de ajuste.
+ * @param {ZoneElement} element
+ * @param {string} name
+ */
+function validateZone(element, name) {
+  /** @param {number} value @param {readonly [number, number]} range */
+  const outside = (value, [min, max]) => !finite(value) || value < min || value > max;
+
+  if (!finite(element.x) || !finite(element.y)) fail(`${name}: valores inválidos.`);
+  if (element.y < 0 || element.y > maxPointHeight()) fail(`${name}: la altura debe estar entre 0 y ${maxPointHeight()} m.`);
+  if (outside(element.length, ZONE_LIMITS.length)) fail(`${name}: el largo debe estar entre ${ZONE_LIMITS.length[0]} y ${ZONE_LIMITS.length[1]} m.`);
+
+  if (element.type === "booster") {
+    if (outside(element.power, ZONE_LIMITS.power)) fail(`${name}: la potencia debe estar entre ${ZONE_LIMITS.power[0] / 1000} y ${ZONE_LIMITS.power[1] / 1000} kW.`);
+    if (outside(element.maxAcceleration, ZONE_LIMITS.maxAcceleration)) {
+      fail(`${name}: la aceleración máxima debe estar entre ${ZONE_LIMITS.maxAcceleration[0]} y ${ZONE_LIMITS.maxAcceleration[1]} m/s².`);
+    }
+  } else if (outside(element.damping, ZONE_LIMITS.damping)) {
+    fail(`${name}: el coeficiente c debe estar entre ${ZONE_LIMITS.damping[0]} y ${ZONE_LIMITS.damping[1]} N·s/m.`);
+  }
 }
 
 /** Parámetros de la forma vieja que definen la geometría (sin `track`). */
@@ -294,5 +371,7 @@ export function withElement(track, index, changes) {
  * @returns {TrackElement}
  */
 export function copyElement(element) {
-  return element.type === "point" && element.loop ? { ...element, loop: { ...element.loop } } : { ...element };
+  if (element.type === "point" && element.loop) return { ...element, loop: { ...element.loop } };
+  if (element.type === "start" && element.lift) return { ...element, lift: { ...element.lift } };
+  return { ...element };
 }

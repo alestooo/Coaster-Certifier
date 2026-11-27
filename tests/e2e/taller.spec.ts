@@ -584,6 +584,91 @@ test.describe("Taller de diseño", () => {
     await expect(panel).toContainText(/la fricción disipa \d+ %/);
   });
 
+  test("la mini barra agrega un lanzador, su panel cambia la potencia y cada cosa se deshace en un paso", async ({ page }) => {
+    await openWorkshop(page);
+    const boosters = page.getByRole("button", { name: /^Lanzador 1: inicio/ });
+    await expect(boosters).toHaveCount(0);
+
+    await page.getByRole("button", { name: /^Punto 2:/ }).click();
+    await page.getByRole("toolbar", { name: "Punto 2" }).getByRole("button", { name: "Agregar lanzador" }).click();
+    await expect(boosters).toHaveCount(1);
+    const panel = page.getByRole("complementary", { name: "Lanzador" });
+    await expect(panel).toBeVisible();
+
+    const power = panel.getByRole("textbox", { name: "Potencia" });
+    await expect(power).toHaveValue("300");
+    await power.fill("450");
+    await power.press("Enter");
+    await expect(power).toHaveValue("450");
+    await expect(verdict(page)).toContainText(/Aprobado|Rechazado/);
+
+    // Fuera del campo (dentro, Ctrl+Z deshace el texto): el primero devuelve la potencia; el segundo quita el lanzador.
+    await power.press("Escape");
+    await page.keyboard.press("Control+z");
+    await expect(boosters).toHaveCount(1);
+    await page.keyboard.press("Control+z");
+    await expect(boosters).toHaveCount(0);
+  });
+
+  test("el lanzador se dibuja sobre su tramo, se recorre entero y no hay errores de consola", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await openWorkshop(page);
+
+    await page.getByRole("button", { name: /^Punto 2:/ }).click();
+    await page.getByRole("toolbar", { name: "Punto 2" }).getByRole("button", { name: "Agregar frenos de ajuste" }).click();
+    await expect(page.getByRole("button", { name: /^Frenos de ajuste 1: inicio/ })).toHaveCount(1);
+    await expect(verdict(page)).toContainText(/Aprobado|Rechazado/);
+
+    // Reproducir un rato (el tren cruza la zona) y saltar al final.
+    await page.getByRole("button", { name: "Reproducir" }).click();
+    await page.waitForTimeout(1500);
+    await page.getByRole("button", { name: "Pausar" }).click();
+    await page.getByRole("button", { name: "Saltar al final" }).click();
+
+    expect(errors).toEqual([]);
+  });
+
+  test("la potencia de la subida en «Salida» sigue a la masa del tren", async ({ page }) => {
+    await openWorkshop(page);
+    const openStart = async () => {
+      const a = await center(page.getByRole("slider", { name: /Cima de la subida A/ }));
+      const b = await center(page.getByRole("button", { name: /^Punto 2:/ }));
+      await page.mouse.click(a.x + (b.x - a.x) * 0.3, a.y + (b.y - a.y) * 0.3);
+      const panel = page.getByRole("complementary", { name: "Salida" });
+      await expect(panel).toBeVisible();
+      return (await panel.getByRole("status").filter({ hasText: /kW/ }).textContent()) ?? "";
+    };
+    const before = await openStart();
+
+    // Tres pasajeros: el tren pasa de 582 kg a 1 071 kg.
+    await page.getByRole("button", { name: /2 pasajeros, 582 kg/ }).click();
+    await page.getByRole("complementary", { name: "Tren y pasajeros" }).getByRole("radio", { name: "3 pasajeros" }).click();
+    await expect(page.getByRole("button", { name: /3 pasajeros, 1\s?071 kg/ })).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    const after = await openStart();
+    expect(after).not.toBe(before);
+  });
+
+  test("quitar la subida desde «Salida» deja A sin cadena y un Ctrl+Z la devuelve", async ({ page }) => {
+    await openWorkshop(page);
+    const a = await center(page.getByRole("slider", { name: /Cima de la subida A/ }));
+    const b = await center(page.getByRole("button", { name: /^Punto 2:/ }));
+    await page.mouse.click(a.x + (b.x - a.x) * 0.3, a.y + (b.y - a.y) * 0.3);
+    const panel = page.getByRole("complementary", { name: "Salida" });
+    await expect(panel).toBeVisible();
+    await expect(panel.getByRole("status").filter({ hasText: /kW/ })).toBeVisible();
+
+    await panel.getByRole("radio", { name: "Sin subida (lanzada)" }).click();
+    await expect(panel.getByRole("status").filter({ hasText: /Sin subida por cadena/ })).toBeVisible();
+    await expect(verdict(page)).toContainText(/Aprobado|Rechazado/);
+
+    // Deshacer no cierra «Salida»: la subida vuelve con su motor.
+    await page.keyboard.press("Control+z");
+    await expect(panel.getByRole("status").filter({ hasText: /kW/ })).toBeVisible();
+  });
+
   test("Personalizado: arrastrar un punto sobre la pista vuelve a auditar y un Ctrl+Z lo deshace", async ({ page }) => {
     await openWorkshop(page);
     await chooseInPicker(page, /^Personalizado Hasta/);
@@ -947,8 +1032,15 @@ test.describe("Taller de diseño", () => {
     await page.mouse.down();
     await page.mouse.move(first.x - 40, first.y, { steps: 4 });
     await page.mouse.up();
-    // Al soltar se abre el panel y el lienzo se angosta: se toma F recién con el panel abierto, mientras la cámara se anima.
+    // Al soltar se abre el panel y la cámara se reencuadra (≈ 0,3 s). Se toma F apenas queda quieta: leer su
+    // posición y hacer clic son dos acciones separadas, y con la cámara en movimiento el clic puede no caer en F.
     await expect(page.getByRole("complementary", { name: "Frenado" })).toBeVisible();
+    await expect.poll(async () => {
+      const a = await center(f);
+      await page.waitForTimeout(50);
+      const b = await center(f);
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }).toBeLessThan(0.5);
 
     const grab = await center(f);
     await page.mouse.move(grab.x, grab.y);

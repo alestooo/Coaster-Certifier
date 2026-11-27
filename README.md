@@ -69,18 +69,22 @@ Tren modelado como **partícula de masa m** sobre una **vía rígida en un plano
 **Segunda ley de Newton** en el sistema intrínseco (tangente, normal):
 
 ```
-m·dv/dt = −m·g·sin θ − f − F_freno + F_resorte + F_amortiguador        (tangencial)
+m·dv/dt = −m·g·sin θ − f − F_aire − F_freno + F_resorte + F_amortiguador   (tangencial)
 N       = m·(g·cos θ + κ·v²)                                              (normal)
 ```
 
 | Magnitud | Expresión | Función |
 | --- | --- | --- |
 | Fuerza g sobre los pasajeros (factor de carga, g) | `n = N / (m·g) = cos θ + κ·v²/g` | `loadFactor` |
-| Fricción efectiva (rodadura + aire) | `f = μ·|N|`, opuesta al movimiento (estática cuando v = 0) | `frictionMagnitude`, `resistiveForce` |
+| Fricción efectiva (rodadura; también aire si C_dA = 0) | `f = μ·|N|`, opuesta al movimiento (estática cuando v = 0) | `frictionMagnitude`, `resistiveForce` |
+| Resistencia del aire | `F = −sign(v)·½·ρ·C_dA·v²` (ρ = 1,2 kg/m³, C_dA = 0 por defecto); en la zona de frenado se integra en forma cerrada con `dv/dt = −(a_f + μg + k·v²)` | `airDragForce` |
 | Frenos en la recta final | desaceleración constante `a_f` entre E y F; `d_det = v_E²/(2·a_f)`, `t_f = v_E/a_f` | `brakingDistance`, `brakingTime` |
 | Resorte de frenado | `F = −k·x`, `E_e = ½·k·x²`; amortiguador opcional `F = −c·v` | `springForce`, `damperForce`, `elasticEnergy` |
-| Energías | `E_c = ½·m·v²`, `E_p = m·g·y`, `E_m = E_c + E_p + E_e`, `E_m(t) + E_dis(t) = E_m(0)` | `calculateEnergies` |
-| Energía disipada | `dE_dis/dt = |f·v| + |F_freno·v| + |F_amort·v|` integrada junto con el movimiento | `step` |
+| Lanzador LSM | `F = min(m·a_máx, P/|v|)` hacia adelante dentro de su tramo (m·a_máx en reposo); trabajo ideal sobre plano sin pérdidas: fuerza constante hasta `v₁ = P/(m·a_máx)` y después `v³ = v₁³ + 3·(P/m)·Δs` | `boosterForce`, `boosterWork` |
+| Frenos de ajuste | `F = −c·v` dentro de su tramo (corrientes parásitas); en plano sin fricción `v(s) = v₀ − (c/m)·s` | `calculateForces` |
+| Subida por cadena | no forma parte del recorrido evaluado (t = 0 en A); largo `H/sin α`, tiempo `L/v_c`, potencia del motor `P = (m·g·sin α + μ·m·g·cos α + ½·ρ·C_dA·v_c²)·v_c/η` | `liftMetrics` |
+| Energías | `E_c = ½·m·v²`, `E_p = m·g·y`, `E_m = E_c + E_p + E_e`, `E_m(t) + E_dis(t) = E_m(0) + W_entrada(t)` | `calculateEnergies` |
+| Energía disipada y de entrada | `dE_dis/dt = |f·v| + |F_freno·v| + |F_amort·v| + |F_aire·v| + |F_ajuste·v|`; `dW_entrada/dt = F_lanzador·v`, integradas junto con el movimiento | `step` |
 | Contacto en la cima del loop | `N > 0 ⇔ v_C² > g·R` | `loopTopMinimumSpeed`, `evaluateState` |
 
 **Geometría del trazado**
@@ -89,12 +93,13 @@ N       = m·(g·cos θ + κ·v²)                                              
 - **Loop en lágrima**: familia con radio de curvatura `ρ(θ) = R_ref·(1 + c·cos θ)`. El usuario fija la altura `h_L` y el radio en la cima `R` (como en el anexo): `R_ref = h_L/2`, `c = 1 − 2R/h_L`, radio en la base `R_B = h_L − R`, longitud `2π·R_ref`, salida desplazada `π·c·R_ref`. Con `R = h_L/2` el loop es circular. Debe cumplirse `h_L ≥ 2R`.
 - **Colina** de altura `h_c` y radio de curvatura en la cresta `ρ_c`: dos tramos de Hermite de semiancho `w = √(6·h_c·ρ_c)`, de modo que `ρ_c = w²/(6·h_c)` exactamente.
 - **Plano inclinado**: recta de A al suelo (caso con solución cerrada, usado en las pruebas).
+- **Lanzador y frenos de ajuste**: rectas horizontales entre dos nodos; como los tramos de Hermite llegan horizontales a sus nodos, no hay quiebres. Sin subida por cadena (montaña rusa lanzada) el primer tramo puede ir en plano.
 - Tras el último nodo: aproximación horizontal de 8 m y zona de frenado de longitud `d_f`.
 
 **Método numérico**
 
-- Integrador **Runge–Kutta 4** sobre el vector `[s, v, E_dis]` con paso ≤ `maxSubstep` (0,001 s por defecto, como propone el anexo) y ≤ 3 % del período del resorte.
-- **Localización de eventos por bisección** (35 iteraciones): puntos de retorno `v = 0`, entrada exacta a la zona de frenado, fin de la zona y retorno al inicio. Los frenos de estación se integran de forma cerrada (MRUA) desde la entrada exacta.
+- Integrador **Runge–Kutta 4** sobre el vector `[s, v, E_dis, W_entrada]` con paso ≤ `maxSubstep` (0,001 s por defecto, como propone el anexo) y ≤ 3 % del período del resorte.
+- **Localización de eventos por bisección** (35 iteraciones): puntos de retorno `v = 0`, entrada exacta a la zona de frenado, fin de la zona, retorno al inicio y los bordes de cada lanzador y frenos de ajuste (en los dos sentidos). El paso que llega a un borde se integra con la fuerza del lado donde está el tren. Los frenos de estación se integran de forma cerrada (MRUA, o `dv/dt = −(a + k·v²)` con aire) desde la entrada exacta.
 - Los criterios se evalúan tras cada subpaso: el instante de un incumplimiento tiene error ≤ 1 ms.
 - Funciones **puras y deterministas**: mismo estado + mismo `dt` ⇒ mismo resultado; nunca se modifica la entrada. No hay aleatoriedad.
 
@@ -105,6 +110,8 @@ N       = m·(g·cos θ + κ·v²)                                              
 | `contact` | N > 0 en toda la vía (modelo estricto) | `lost-contact` |
 | `loop-contact` | N > 0 dentro del loop (con ruedas anti-levantamiento) | `lost-contact` |
 | `max-load` | n ≤ n_máx (+5 g) | `rejected` |
+| `launch` | aceleración dentro de un lanzador ≤ a_L (1,5 g, en «Reglas») | `rejected` |
+| `trim` | desaceleración de unos frenos de ajuste ≤ 1 g | `rejected` |
 | `min-load` | n ≥ n_mín (−1 g; solo con ruedas anti-levantamiento) | `rejected` |
 | `compression` | x ≤ x_máx | `rejected` |
 | `overrun` | detención antes del fin de la zona de frenado | `rejected` |
@@ -136,6 +143,9 @@ El punto de entrada `src/physics/index.js` también exporta los siguientes símb
 | `withElement(track, i, cambios)` / `copyElement(e)` | Elementos, índice y cambios / un elemento | Copia nueva con el elemento cambiado / copia profunda; nunca modifican la entrada |
 | `mergeConfigPatch(config, patch)` | Configuración y cambios | Configuración nueva; si el cambio toca parámetros de geometría heredados (`LEGACY_TRACK_KEYS`) sin `track`, el trazado se vuelve a derivar |
 | `MAX_TRACK_ELEMENTS` | No aplica | Tope de elementos del trazado (40) |
+| `DEFAULT_LIFT`, `LIFT_LIMITS`, `ZONE_LIMITS` | No aplica | Subida de los trazados predefinidos (36,5°, η = 0,8, v_c = 2 m/s) y rangos de la subida y de las zonas |
+| `boosterForce(m, P, a_máx, v)` / `boosterWork(zona, m, v_entrada)` | kg, W, m/s², m/s | Empuje del lanzador (N) / trabajo ideal (J) y rapidez de salida (m/s) |
+| `liftMetrics(config)` | Configuración | `{ length, time, power, energy }` de la subida (m, s, W, J), o `null` sin subida |
 | `makeState(...)` | Valores de estado procesados por el integrador | Objeto de estado de simulación (tiempo s, distancia m, rapidez m/s y magnitudes derivadas SI) |
 | `CRITERIA` | No aplica | Catálogo de criterios y códigos de incumplimiento (identificadores) |
 | `CSV_COLUMNS` | No aplica | Descriptores de columnas de exportación y unidades asociadas |
@@ -160,9 +170,11 @@ Parámetros (`SimulationConfig`): `mass` (kg), `gravity` (m/s²), `initialHeight
 
 | Elemento | Campos | Qué es |
 |---|---|---|
-| `{ type: "start" }` | — | A, en x = 0 y altura `initialHeight` |
+| `{ type: "start", lift? }` | `lift: { angle, efficiency, chainSpeed }` (rad, 0–1, m/s) | A, en x = 0 y altura `initialHeight`. Sin `lift` no hay subida por cadena (montaña rusa lanzada) |
 | `{ type: "point", x, y, loop?, line? }` | `loop: { height, topRadius }` | Nodo libre a cualquier altura; puede anclar un loop. `line: true` hace recto el tramo que llega a él |
 | `{ type: "hill", x, height, crestRadius }` | — | Colina con su cresta en x y ρ_c exacto |
+| `{ type: "booster", x, y, length, power, maxAcceleration }` | W, m/s² | Lanzador LSM sobre una recta horizontal de `length` m desde x, a la altura y |
+| `{ type: "trim", x, y, length, damping }` | N·s/m | Frenos de ajuste por corrientes parásitas sobre una recta horizontal |
 | `{ type: "end", x, line? }` | — | Fin de la parte libre; E está 8 m después |
 
 Si la configuración no trae `track`, se traduce de `mapId` con sus parámetros (o de `customPoints`) con las mismas fórmulas de siempre, así los escenarios y los JSON anteriores dan el mismo resultado. Si lo trae, `trackWidth` pasa a ser la x de `end`, y los parámetros de loop, colina y puntos quedan sin efecto geométrico. Hay como máximo 40 elementos.
@@ -264,7 +276,7 @@ La cobertura puede medirse mediante `npm run test:coverage`; su porcentaje debe 
 
 `npm run headless` simula el escenario `certification` (trazado del anexo) con paso de reporte de 10 ms, imprime el dictamen, los puntos críticos A–F, los extremos y las condiciones de diseño, y escribe:
 
-- `output/certification.csv` — una fila por estado con las columnas `t_s, s_m, x_m, y_m, v_mps, rapidez_mps, theta_rad, kappa_1pm, a_t_mps2, a_n_mps2, N_N, carga_g, friccion_N, resorte_N, amortiguador_N, freno_N, compresion_m, E_cinetica_J, E_potencial_J, E_elastica_J, E_mecanica_J, E_disipada_J, error_balance_J, tramo, estado` (sufijo = unidad).
+- `output/certification.csv` — una fila por estado con las columnas `t_s, s_m, x_m, y_m, v_mps, rapidez_mps, theta_rad, kappa_1pm, a_t_mps2, a_n_mps2, N_N, carga_g, friccion_N, resorte_N, amortiguador_N, freno_N, compresion_m, E_cinetica_J, E_potencial_J, E_elastica_J, E_mecanica_J, E_disipada_J, error_balance_J, tramo, estado`, y al final `aire_N, lanzador_N, frenos_ajuste_N, E_entrada_J` (sufijo = unidad). Las columnas nuevas van al final: las 25 anteriores no cambian.
 - `output/certification.summary.json` — configuración resuelta, dictamen completo, tramos y marcadores.
 
 El código de salida es 0 si el trazado aprueba, 2 si se rechaza y 1 ante una configuración inválida. La interfaz exporta exactamente el mismo CSV desde el dictamen: «Descargar → Datos de cada instante (CSV)».
@@ -284,10 +296,12 @@ La app es un **taller de una sola pantalla**: del menú se entra directo al traz
    | Círculo osculador | horizontal | R de su loop |
    | Cresta D | libre, en 2D | x y altura de la colina |
    | Pie de la colina | horizontal | ρ_c |
+   | Inicio de un lanzador o de frenos de ajuste (cuadrado) | libre, en 2D | x y altura de la recta |
+   | Fin de un lanzador o de frenos de ajuste | horizontal | su largo |
    | E | horizontal | solo el largo de la recta final: el resto del trazado queda igual |
    | F | horizontal | d_f |
 
-   - **Agregar y quitar:** doble clic sobre la vía agrega un punto. Al tocar un elemento aparece una mini barra para agregar un punto o una colina a su lado, poner o quitar su loop, o borrarlo. A y E no se borran. No hay límite de 9 puntos ni de 3 loops: el tope es de 40 elementos. Una colina nueva se achica si hace falta para entrar en el hueco.
+   - **Agregar y quitar:** doble clic sobre la vía agrega un punto. Al tocar un elemento aparece una mini barra para agregar a su lado un punto, una colina, un lanzador o unos frenos de ajuste, poner o quitar su loop, o borrarlo. A y E no se borran. No hay límite de 9 puntos ni de 3 loops: el tope es de 40 elementos. Una colina nueva se achica si hace falta para entrar en el hueco.
    - **Límites:** si la geometría no se puede construir, la manija se detiene en el último valor válido y explica por qué (p. ej. «La colina no cabe: con esa forma cada ladera mide 106,2 m y hasta su vecino hay 104,2 m»). Mientras se arrastra, una etiqueta muestra el valor.
    - **Deshacer:** cada gesto, y cada clic de la mini barra, es un paso.
    - **Letras:** cada letra va en su manija y dice qué es al pasar el puntero. «Puntos A–F», junto a la leyenda de fuerza g, lista las seis letras del anexo con las que el trazado no tiene («este trazado no tiene loop»).
@@ -310,7 +324,8 @@ La app es un **taller de una sola pantalla**: del menú se entra directo al traz
    **Deshacer / Rehacer** (Ctrl+Z / Ctrl+Shift+Z) agrupa cada gesto en un solo paso.
 3. **Paneles a pedido**, uno a la vez, que se cierran con Esc:
    - *Elemento*: un clic en un punto, un loop, una colina o la recta final, sobre su manija o sobre su tramo de vía. El panel («Loop», «Colina», «Punto N de M», «Recta final») muestra su lectura del dictamen y sus valores (x, altura, h_L y R, o h_c y ρ_c, o la x de E), cada uno con un slider y un campo que acepta coma decimal. La cámara no se mueve, salvo que la hoja del panel tape el elemento (en el teléfono).
-   - *Salida* y *Frenado*: un clic en la caída inicial o en la zona de frenado. La cámara encuadra esa parte y el panel muestra H, v₀ y μ, o el sistema de frenado.
+   - *Salida* y *Frenado*: un clic en la caída inicial o en la zona de frenado. La cámara encuadra esa parte y el panel muestra H, v₀, μ y el aire (C_dA), con la subida por cadena (ponerla o quitarla, su ángulo, la eficiencia del motor, la rapidez de la cadena y la potencia que pide), o el sistema de frenado.
+   - *Lanzador* y *Frenos de ajuste*: x, altura y largo, más la potencia y la aceleración máxima del lanzador, o el coeficiente c de los frenos con la Δv que le quitan al tren. Mientras el tren está adentro, la zona se enciende en el lienzo.
    - *Dictamen*: fuerza g máxima y mínima, rapidez máxima, distancia de frenado, incumplimientos en lenguaje claro (cada uno lleva a su pin), «Ver informe de certificación» y un menú «Descargar».
    - *Reglas y precisión*: contacto con la vía, límites de fuerza g y parámetros numéricos.
    - *Tren y pasajeros*:
@@ -336,8 +351,8 @@ La app es un **taller de una sola pantalla**: del menú se entra directo al traz
    | | Antes del rediseño | Ahora |
    |---|---|---|
    | JS + CSS que baja el menú | 178,5 KB (todo) | 30,9 KB |
-   | Al entrar al taller (escritorio, con telemetría y el worker de auditoría) | +10,4 KB (solo el worker) | +158,6 KB |
-   | Precarga en reposo (informe, guía, pasajeros, correcciones) | — | +23,6 KB |
+   | Al entrar al taller (escritorio, con telemetría y el worker de auditoría) | +10,4 KB (solo el worker) | +168,1 KB |
+   | Precarga en reposo (informe, guía, pasajeros, correcciones) | — | +23,1 KB |
    | Imágenes y video del menú | 2,7 MB (PNG de 2 MB + GIF de 712 KB) | 216 KB |
 
    CPU del hilo principal (métricas de Chrome por CDP, 1440 × 900). Antes se midió en el servidor de desarrollo; ahora da lo mismo en desarrollo y en el build de producción:
@@ -345,7 +360,7 @@ La app es un **taller de una sola pantalla**: del menú se entra directo al traz
    | | Antes del rediseño | Ahora |
    |---|---|---|
    | En reposo en el taller | 22,7 % | 0 % |
-   | Reproduciendo | 47,9 % | ≈ 34 % |
+   | Reproduciendo | 47,9 % | ≈ 30 % |
 
 ![Informe de certificación con puntos críticos y extremos del recorrido](docs/img/reporte.png)
 

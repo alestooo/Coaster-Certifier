@@ -28,7 +28,9 @@ import { legacyElements, validateElements, copyElement } from "./track/elements.
  * @property {number} loopTopRadius Radio de curvatura R en la cima del loop (m).
  * @property {number} hillHeight Altura h_c de la colina (m).
  * @property {number} hillCrestRadius Radio de curvatura ρ_c en la cresta de la colina (m).
- * @property {number} friction Coeficiente de fricción efectivo μ (adimensional).
+ * @property {number} friction Coeficiente de fricción efectivo μ (adimensional); con aire, solo rodadura.
+ * @property {number} airDragArea Área de arrastre C_dA del tren (m²); 0 = sin aire.
+ * @property {number} airDensity Densidad del aire ρ (kg/m³).
  * @property {"station"|"spring"} brakeMode Sistema de frenado.
  * @property {number} brakingLength Longitud d_f de la zona de frenado (m).
  * @property {number} brakeDeceleration Desaceleración a_f de los frenos de estación (m/s²).
@@ -37,6 +39,7 @@ import { legacyElements, validateElements, copyElement } from "./track/elements.
  * @property {number} maxCompression Compresión máxima permitida x_máx (m).
  * @property {"strict"|"safety-wheels"} contactModel Modelo de contacto con la vía.
  * @property {number} maxLoad Carga máxima admisible n_máx (g).
+ * @property {number} maxLaunchAcceleration Aceleración máxima admisible en un lanzador (g).
  * @property {number} minLoad Carga mínima admisible n_mín (g).
  * @property {number} minSpeed Umbral de detención v_mín (m/s).
  * @property {number} maxTime Tiempo máximo de observación (s).
@@ -88,12 +91,15 @@ export const CONFIG_LIMITS = Object.freeze({
   hillHeight: [0, 60],
   hillCrestRadius: [1, 200],
   friction: [0, 0.2],
+  airDragArea: [0, 20],
+  airDensity: [0, 2],
   brakingLength: [1, 150],
   brakeDeceleration: [0.1, MAX_BRAKE_DECELERATION],
   springConstant: [100, 200000],
   springDamping: [0, 50000],
   maxCompression: [0.1, 60],
   maxLoad: [1, 10],
+  maxLaunchAcceleration: [0.5, 5],
   minLoad: [-3, 1],
   minSpeed: [0, 5],
   maxTime: [1, 600],
@@ -116,6 +122,8 @@ export const DEFAULT_CONFIG = Object.freeze(/** @type {SimulationConfig} */ ({
   hillCrestRadius: 25,
 
   friction: 0.01,
+  airDragArea: 0,
+  airDensity: 1.2,
 
   brakeMode: "station",
   brakingLength: 80,
@@ -126,6 +134,7 @@ export const DEFAULT_CONFIG = Object.freeze(/** @type {SimulationConfig} */ ({
 
   contactModel: "strict",
   maxLoad: DEFAULT_MAX_LOAD,
+  maxLaunchAcceleration: 1.5,
   minLoad: DEFAULT_MIN_LOAD,
   minSpeed: DEFAULT_MIN_SPEED,
 

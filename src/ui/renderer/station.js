@@ -2,7 +2,7 @@ import { PALETTE } from "./palette.js";
 import { box, circle, hash } from "./draw.js";
 import { drawPerson } from "./scenery.js";
 import { drawRails } from "./track.js";
-import { liftHeightAt, liftLength, pointFromBase, CHAIN_SPEED_MPS, LIFT_LEAD_IN_M } from "./lift.js";
+import { liftHeightAt, liftLength, pointFromBase, LIFT_LEAD_IN_M } from "./lift.js";
 import { stationSpan } from "./camera.js";
 
 /**
@@ -251,6 +251,9 @@ export function drawChainLift({ ctx, camera }) {
   // Rieles de la subida, con el mismo estilo que la vía.
   drawRails(ctx, camera, liftPoints(lift.points), { spine: PALETTE.lift, rail: PALETTE.liftStructure });
 
+  // Sin subida (lanzada) el andén no lleva cadena, trinquetes ni casa de máquinas.
+  if (!lift.chain) return;
+
   // Cadena estática bajo el riel.
   ctx.strokeStyle = PALETTE.chain;
   ctx.lineWidth = m(0.09);
@@ -306,8 +309,8 @@ export function drawChainLift({ ctx, camera }) {
 export function drawChainLinks({ ctx, camera, scene }) {
   const { scale, lift } = camera;
   const length = liftLength(lift);
-  if (length <= 0) return;
-  const offset = ((scene.state.time * CHAIN_SPEED_MPS) % LIFT.linkSpacing + LIFT.linkSpacing) % LIFT.linkSpacing;
+  if (length <= 0 || !lift.chain) return;
+  const offset = ((scene.state.time * lift.chainSpeed) % LIFT.linkSpacing + LIFT.linkSpacing) % LIFT.linkSpacing;
   const radius = 0.12 * scale;
 
   ctx.fillStyle = PALETTE.chainLink;

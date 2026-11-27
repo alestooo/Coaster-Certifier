@@ -1,6 +1,9 @@
 import { CRITERIA } from "../evaluation/criteria.js";
 import { MAX_BRAKE_DECELERATION } from "../constants.js";
 import { CONFIG_LIMITS } from "../config.js";
+import { ZONE_LIMITS } from "../track/elements.js";
+import { boosterWork } from "../dynamics/booster.js";
+import { geometryAt } from "../track/geometry.js";
 import { maxOf } from "../utils.js";
 import { loopElements, loopElementForSection, crestElementNear, patchElement, scaleLoop, stretchTrack } from "./element-patches.js";
 
@@ -173,6 +176,29 @@ export function targetedPatches(config, run) {
       break;
     }
 
+    case CRITERIA.LAUNCH: {
+      // El lanzador empuja más de lo permitido: su aceleración máxima baja por debajo del límite.
+      const zone = zoneOfViolation(run.track, violation);
+      if (zone) {
+        const allowed = config.maxLaunchAcceleration * g;
+        patches.push(patchElement(config, zone.element, { maxAcceleration: round(allowed / MARGIN) }));
+        patches.push(patchElement(config, zone.element, { maxAcceleration: round(allowed / MARGIN ** 2) }));
+      }
+      break;
+    }
+
+    case CRITERIA.TRIM: {
+      // F = c·v: con c más chico la desaceleración c·v/m queda por debajo de 1 g a la misma rapidez.
+      const zone = zoneOfViolation(run.track, violation);
+      const element = zone ? config.track[zone.element] : null;
+      if (zone && element?.type === "trim" && violation.value > 0) {
+        const factor = MAX_BRAKE_DECELERATION / (violation.value * g);
+        patches.push(patchElement(config, zone.element, { damping: round((element.damping * factor) / MARGIN, 0) }));
+        patches.push(patchElement(config, zone.element, { damping: round((element.damping * factor) / MARGIN ** 2, 0) }));
+      }
+      break;
+    }
+
     case CRITERIA.TIMEOUT: {
       if (config.brakeMode === "spring") {
         // Por debajo del crítico el resorte lo devuelve y puede quedar antes de E (fuera de la zona):
@@ -187,6 +213,80 @@ export function targetedPatches(config, run) {
 
     default:
       break;
+  }
+
+  patches.push(...boosterPowerPatches(config, run, violation, head, lossHead));
+  return patches;
+}
+
+/**
+ * Zona (lanzador o frenos de ajuste) donde ocurrió el incumplimiento.
+ * @param {import("../track/builder.js").Track} track
+ * @param {{position: number, section: string}} violation
+ */
+function zoneOfViolation(track, violation) {
+  return track.zones.find(zone => zone.name === violation.section) ?? track.zones.find(zone => violation.position >= zone.start && violation.position <= zone.end) ?? null;
+}
+
+/** Incumplimientos que se arreglan con más energía. */
+const NEEDS_ENERGY = new Set([CRITERIA.CONTACT, CRITERIA.LOOP_CONTACT, CRITERIA.MIN_SPEED, "incomplete"]);
+
+/**
+ * Si al tren le falta energía y hay un lanzador antes del fallo, su potencia
+ * (y, si hace falta, su aceleración hasta el límite de la regla) para que
+ * salga con la altura que pide el obstáculo más las pérdidas.
+ * @param {import("../config.js").SimulationConfig} config
+ * @param {import("../run.js").SimulationRun} run
+ * @param {any} violation
+ * @param {number} head Altura disponible inicial (m).
+ * @param {number} lossHead Pérdidas del recorrido como altura (m).
+ * @returns {Record<string, unknown>[]}
+ */
+function boosterPowerPatches(config, run, violation, head, lossHead) {
+  if (!violation || !NEEDS_ENERGY.has(violation.code)) return [];
+
+  const zone = [...run.track.zones].reverse().find(candidate => candidate.kind === "booster" && candidate.end <= violation.position);
+  if (!zone) return [];
+
+  const g = config.gravity;
+  const loop = run.track.loops.find(candidate => candidate.section === violation.section);
+  const obstacle = loop
+    ? loop.y + loop.height + loop.topRadius / 2
+    : Math.max(...run.track.nodes.filter(node => node.y !== undefined && (node.element ?? 0) > zone.element).map(node => node.y), 0);
+  const height = geometryAt(run.track, zone.start).y;
+  const required = (obstacle + lossHead + CLEARANCE_M) * MARGIN;
+  const entrySpeed = Math.sqrt(Math.max(0, 2 * g * (head - height)));
+  const neededExit = Math.sqrt(Math.max(0, 2 * g * (required - height)));
+  /** @type {number} */
+  const maxPower = ZONE_LIMITS.power[1];
+  const acceleration = Math.max(zone.maxAcceleration ?? 0, Math.min(config.maxLaunchAcceleration * g / MARGIN, ZONE_LIMITS.maxAcceleration[1]));
+  const exitWith = (/** @type {number} */ power, /** @type {number} */ maxAcceleration) =>
+    boosterWork({ ...zone, power, maxAcceleration }, config.mass, entrySpeed).exitSpeed;
+
+  /** Potencia mínima (W) con esa aceleración para salir a la rapidez necesaria, o null si no alcanza. */
+  const powerFor = (/** @type {number} */ maxAcceleration) => {
+    if (exitWith(maxPower, maxAcceleration) < neededExit) return null;
+    let low = zone.power ?? 0;
+    /** @type {number} */
+    let high = maxPower;
+    for (let step = 0; step < 40; step++) {
+      const middle = (low + high) / 2;
+      if (exitWith(middle, maxAcceleration) >= neededExit) high = middle;
+      else low = middle;
+    }
+    return high;
+  };
+
+  /** @type {Record<string, unknown>[]} */
+  const patches = [];
+  const sameAcceleration = powerFor(zone.maxAcceleration ?? 0);
+  if (sameAcceleration !== null && sameAcceleration > (zone.power ?? 0)) {
+    patches.push(patchElement(config, zone.element, { power: Math.min(maxPower, round(sameAcceleration * MARGIN, 0)) }));
+  }
+
+  const stronger = acceleration > (zone.maxAcceleration ?? 0) ? powerFor(acceleration) : null;
+  if (stronger !== null) {
+    patches.push(patchElement(config, zone.element, { power: Math.min(maxPower, round(stronger * MARGIN, 0)), maxAcceleration: round(acceleration) }));
   }
 
   return patches;

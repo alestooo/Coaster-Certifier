@@ -12,7 +12,10 @@ export const RECOMMENDATION_FIELDS = Object.freeze({
   brakeDeceleration: ["Desaceleración del freno", "m/s²"],
   springConstant: ["Rigidez del resorte", "N/m"],
   springDamping: ["Amortiguamiento del resorte", "N·s/m"],
-  maxCompression: ["Compresión máxima", "m"]
+  maxCompression: ["Compresión máxima", "m"],
+  boosterPower: ["Potencia del lanzador", "kW"],
+  boosterAcceleration: ["Aceleración máxima del lanzador", "m/s²"],
+  trimDamping: ["Coeficiente de los frenos de ajuste", "N·s/m"]
 });
 
 /** Parámetros globales (no de un elemento) que se comparan directamente. */
@@ -54,8 +57,12 @@ function elementChanges(before, after) {
   const changes = [];
   const loopCount = before.filter(element => element.type === "point" && element.loop).length;
   const hillCount = before.filter(element => element.type === "hill").length;
+  const boosterCount = before.filter(element => element.type === "booster").length;
+  const trimCount = before.filter(element => element.type === "trim").length;
   let loopOrdinal = 0;
   let hillOrdinal = 0;
+  let boosterOrdinal = 0;
+  let trimOrdinal = 0;
   let heightsChanged = before.length !== after.length;
 
   before.forEach((element, index) => {
@@ -75,6 +82,26 @@ function elementChanges(before, after) {
       }
       if (loopBefore && loopAfter && loopBefore.topRadius !== loopAfter.topRadius) {
         changes.push({ key: "loopTopRadius", element: index, label: numbered("Radio en la cima del loop", loopOrdinal, loopCount), unit: "m", before: loopBefore.topRadius, after: loopAfter.topRadius });
+      }
+      if (element.y !== next.y) heightsChanged = true;
+    }
+
+    if (element.type === "booster" && next.type === "booster") {
+      boosterOrdinal += 1;
+      const label = (/** @type {string} */ base) => numbered(base, boosterOrdinal, boosterCount);
+      if (element.power !== next.power) {
+        changes.push({ key: "boosterPower", element: index, label: label("Potencia del lanzador"), unit: "kW", before: element.power / 1000, after: next.power / 1000 });
+      }
+      if (element.maxAcceleration !== next.maxAcceleration) {
+        changes.push({ key: "boosterAcceleration", element: index, label: label("Aceleración máxima del lanzador"), unit: "m/s²", before: element.maxAcceleration, after: next.maxAcceleration });
+      }
+      if (element.y !== next.y) heightsChanged = true;
+    }
+
+    if (element.type === "trim" && next.type === "trim") {
+      trimOrdinal += 1;
+      if (element.damping !== next.damping) {
+        changes.push({ key: "trimDamping", element: index, label: numbered("Coeficiente de los frenos de ajuste", trimOrdinal, trimCount), unit: "N·s/m", before: element.damping, after: next.damping });
       }
       if (element.y !== next.y) heightsChanged = true;
     }

@@ -32,7 +32,12 @@ export const CSV_COLUMNS = Object.freeze([
   { key: "dissipated", header: "E_disipada_J", read: state => state.energies.dissipated },
   { key: "balanceError", header: "error_balance_J", read: state => state.energies.balanceError },
   { key: "section", header: "tramo", read: state => state.section },
-  { key: "status", header: "estado", read: state => state.status }
+  { key: "status", header: "estado", read: state => state.status },
+  // Columnas nuevas siempre al final: las anteriores quedan idénticas.
+  { key: "air", header: "aire_N", read: state => state.forces.air ?? 0 },
+  { key: "booster", header: "lanzador_N", read: state => state.forces.booster ?? 0 },
+  { key: "trim", header: "frenos_ajuste_N", read: state => state.forces.trim ?? 0 },
+  { key: "input", header: "E_entrada_J", read: state => state.energies.input ?? 0 }
 ]);
 
 /**

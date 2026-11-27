@@ -18,6 +18,7 @@ export { hillHalfWidth } from "./elements.js";
  * @property {"start"|"valley"|"crest"|"end"|"plain"} [role]
  * @property {number} [element] Índice del elemento del trazado que generó el nodo.
  * @property {boolean} [line] El tramo que llega a este nodo es recto.
+ * @property {"booster"|"trim"} [zone] El tramo recto que llega a este nodo es un lanzador o unos frenos de ajuste.
  */
 
 /**

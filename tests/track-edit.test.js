@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { buildTrack, resolveConfig, geometryAt, MAX_TRACK_ELEMENTS } from "../src/physics/index.js";
+import { buildTrack, resolveConfig, geometryAt, MAX_TRACK_ELEMENTS, DEFAULT_LIFT } from "../src/physics/index.js";
 import {
   EDIT_MIN_GAP_M,
   moveElement,
@@ -11,7 +11,8 @@ import {
   removeElement,
   elementLimits,
   elementHandles,
-  proposeElementHandle
+  proposeElementHandle,
+  setZone
 } from "../src/lib/track-edit.ts";
 import { mapTemplate } from "../src/game/maps.ts";
 
@@ -277,8 +278,8 @@ describe("Edición de elementos", () => {
   });
 
   test("borrar un punto que deja un trazado no construible no lo borra y explica por qué", () => {
-    // A a 20 m; sin el punto 2, el primer tramo subiría hasta el punto 3 (22 m).
-    const config = withTrack([start, point(40, 5), point(80, 22), point(120, 0), end(200)], { initialHeight: 20 });
+    // A (con subida) a 20 m; sin el punto 2, el primer tramo subiría hasta el punto 3 (22 m).
+    const config = withTrack([{ type: "start", lift: DEFAULT_LIFT }, point(40, 5), point(80, 22), point(120, 0), end(200)], { initialHeight: 20 });
 
     const result = removeElement(config, 1);
 
@@ -321,5 +322,68 @@ describe("Edición de elementos", () => {
     const moved = moveElement(grown, 3, endX - 1);
 
     expect(moved.track[3].x).toBeLessThanOrEqual(endX);
+  });
+
+  test("«Agregar lanzador» después del loop del anexo lo pone entre el loop y la colina, recto y construible", () => {
+    const config = annex();
+
+    const added = insertAfter(config, 1, "booster");
+
+    expect(added).not.toHaveProperty("error");
+    const zone = "track" in added ? added.track[added.index] : null;
+    expect(zone).toMatchObject({ type: "booster", length: 30, power: 300_000, maxAcceleration: 12 });
+    expect(zone.x).toBeGreaterThan(80);
+    expect(zone.x + zone.length).toBeLessThan(config.track[2].x);
+    expect(() => builds(config, added.track)).not.toThrow();
+  });
+
+  test("agregar un lanzador sin lugar explica por qué", () => {
+    // Con subida: ni entre A y el punto 1 ni entre los puntos queda un hueco recto de 6 m.
+    const tight = withTrack([{ type: "start", lift: DEFAULT_LIFT }, point(5, 0), point(7.5, 0), end(9.6)]);
+
+    const result = insertAfter(tight, 1, "booster");
+
+    expect(result).toHaveProperty("error");
+    expect(result.error).toMatch(/lanzador/i);
+  });
+
+  test("unos frenos de ajuste se agregan con su c por defecto y se achican si el hueco es corto", () => {
+    const config = withTrack([start, point(60, 0), point(75, 0), end(300)]);
+
+    const added = insertAfter(config, 1, "trim");
+
+    const zone = "track" in added ? added.track[added.index] : null;
+    expect(zone).toMatchObject({ type: "trim", damping: 100 });
+    expect(zone.length).toBeLessThan(20);
+    expect(zone.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("el largo de una zona se arrastra desde su fin y el inicio se mueve en 2D", () => {
+    const config = withTrack([start, point(60, 0), { type: "booster", x: 80, y: 0, length: 30, power: 300_000, maxAcceleration: 12 }, end(300)]);
+    const handles = elementHandles(buildTrack(config), config);
+    const tail = handles.find(handle => handle.kind === "zoneEnd");
+    const head = handles.find(handle => handle.kind === "zoneStart");
+
+    const longer = proposeElementHandle(config, tail, { x: tail.x + 10, y: tail.y });
+    const moved = proposeElementHandle(config, head, { x: head.x + 5, y: 3 });
+
+    expect(tail.x).toBeCloseTo(110, 9);
+    expect(longer.track[2].length).toBeCloseTo(40, 6);
+    expect(moved.track[2]).toMatchObject({ x: 85, y: 3, length: 30 });
+    expect(setZone(config, 2, { power: 1 }).track[2].power).toBe(1000);
+  });
+
+  test("sin subida, «Agregar lanzador» después de A lo pone en A, a su altura", () => {
+    const config = withTrack([start, point(80, 0), end(240)], { initialHeight: 1.5, initialSpeed: 0 });
+
+    const added = insertAfter(config, 0, "booster");
+
+    const zone = "track" in added ? added.track[1] : null;
+    expect(zone).toMatchObject({ type: "booster", x: 0, y: 1.5 });
+    expect(() => builds(config, added.track)).not.toThrow();
+    // Su inicio es A: no tiene manija propia que tape la de A.
+    const handles = elementHandles(buildTrack(withTrack(added.track, { initialHeight: 1.5 })), withTrack(added.track, { initialHeight: 1.5 }));
+    expect(handles.some(handle => handle.kind === "zoneStart")).toBe(false);
+    expect(handles.some(handle => handle.kind === "zoneEnd")).toBe(true);
   });
 });

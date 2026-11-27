@@ -102,9 +102,21 @@ export const FIELD_GROUPS: FieldGroup[] = [
         label: "Fricción (rodadura y aire)",
         unit: "",
         step: 0.001,
-        help: "Coeficiente efectivo: la fricción vale f = μ·N y se opone al movimiento.",
+        help: "Coeficiente efectivo: la fricción vale f = μ·N y se opone al movimiento. Si el aire está en 0 (C_dA = 0), μ también lo representa; con aire, μ queda solo como rodadura.",
         hint: config =>
           config.friction === 0 ? "Sin pérdidas: caso ideal" : `Se opone con el ${formatNumber(100 * config.friction, 1)} % de la fuerza normal`
+      },
+      {
+        key: "airDragArea",
+        symbol: "C_dA",
+        label: "Área de arrastre (aire)",
+        unit: "m²",
+        step: 0.1,
+        help: "Resistencia del aire F = ½·ρ·C_dA·v², con ρ = 1,2 kg/m³: crece con el cuadrado de la rapidez. Un tren de varios carros ronda 2 a 4 m². En 0 no hay aire.",
+        hint: config =>
+          config.airDragArea === 0
+            ? "Sin aire: μ representa todas las pérdidas"
+            : `A 20 m/s el aire empuja con ${formatNumber((0.5 * config.airDensity * config.airDragArea * 400) / 1000, 2)} kN en contra`
       }
     ]
   },
@@ -175,6 +187,14 @@ export const FIELD_GROUPS: FieldGroup[] = [
         unit: "g",
         step: 0.1,
         help: "Lo más fuerte que puede sentir un pasajero, n = N/(m·g). 1 g es estar sentado en reposo; el anexo fija +5 g."
+      },
+      {
+        key: "maxLaunchAcceleration",
+        symbol: "a_L",
+        label: "Aceleración máxima de un lanzador",
+        unit: "g",
+        step: 0.1,
+        help: "Lo más que puede empujar un lanzador hacia adelante, en g. Los lanzamientos reales rondan 1 a 1,5 g; por defecto 1,5 g."
       },
       {
         key: "minLoad",

@@ -3,7 +3,7 @@
   import type { Passenger } from "../../game/passengers";
   import { visibleFields } from "../../lib/field-definitions";
   import { formatNumber, formatScientific, formatSeconds, kmh } from "../../ui/format";
-  import { resultLines, elementRows } from "../../lib/report-text";
+  import { resultLines, elementRows, liftText, energyRows } from "../../lib/report-text";
   import { Printer } from "lucide-svelte";
   import { designCheckText } from "../../lib/design-checks-text";
   import Dialog from "../ui/Dialog.svelte";
@@ -144,9 +144,10 @@
             <tr><th>Fuerza normal máxima</th><td class="num">{formatNumber(summary.maxNormal.value, 0)} N</td><td>{summary.maxNormal.section}</td></tr>
             <tr><th>Aceleración tangencial máxima</th><td class="num">{formatNumber(summary.maxTangentialAcceleration.value)} m/s²</td><td>{summary.maxTangentialAcceleration.section}</td></tr>
             <tr><th>Aceleración normal máxima</th><td class="num">{formatNumber(summary.maxNormalAcceleration.value)} m/s²</td><td>{summary.maxNormalAcceleration.section}</td></tr>
-            <tr><th>Energía inicial</th><td class="num">{formatNumber(summary.initialEnergy, 0)} J</td><td>m·g·H + ½·m·v₀²</td></tr>
-            <tr><th>Energía disipada</th><td class="num">{formatNumber(summary.dissipatedEnergy, 0)} J</td><td>{formatNumber((100 * summary.dissipatedEnergy) / summary.initialEnergy, 1)} % de la inicial</td></tr>
-            <tr><th>Error máximo de balance</th><td class="num">{formatScientific(summary.maxBalanceError.value, 2)} J</td><td>{formatScientific((100 * summary.maxBalanceError.value) / summary.initialEnergy, 2)} % de la inicial</td></tr>
+            {#each energyRows(summary) as row (row.label)}
+              <tr><th>{row.label}</th><td class="num">{row.value}</td><td>{row.detail}</td></tr>
+            {/each}
+            <tr><th>Error máximo de balance</th><td class="num">{formatScientific(summary.maxBalanceError.value, 2)} J</td><td>{formatScientific((100 * summary.maxBalanceError.value) / (summary.initialEnergy + Math.max(0, summary.inputEnergy ?? 0)), 2)} % de la energía disponible</td></tr>
             <tr><th>Duración</th><td class="num">{formatSeconds(summary.duration)}</td><td>{formatNumber(summary.samples, 0)} muestras</td></tr>
           </tbody>
         </table>
@@ -232,6 +233,7 @@
             <tr><th>Trazado</th><td>{mapName} · {config.track.length} elementos</td><th>Frenado</th><td>{config.brakeMode === "station" ? "frenos en la recta final" : "resorte de tope"}</td></tr>
             <tr><th>Contacto</th><td>{config.contactModel === "strict" ? "siempre apoyado (N > 0)" : "ruedas anti-levantamiento"}</td><th>m</th><td>{formatNumber(config.mass, 1)} kg</td></tr>
             <tr><th><Sym symbol="W" /> · Ancho del trazado (derivado: x del final)</th><td>{formatNumber(config.trackWidth, 1)} m</td><th></th><td></td></tr>
+            <tr><th>Subida por cadena</th><td colspan="3">{liftText(config)}</td></tr>
             {#each Array.from({ length: Math.ceil(parameterRows.length / 2) }, (_, index) => parameterRows.slice(index * 2, index * 2 + 2)) as pair}
               <tr>
                 {#each pair as row}

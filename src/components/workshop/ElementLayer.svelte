@@ -1,16 +1,18 @@
 <script lang="ts">
   import { tick, untrack } from "svelte";
-  import { CircleDot, CircleOff, Mountain, Plus, Trash2 } from "lucide-svelte";
+  import { CircleDot, CircleOff, Magnet, Mountain, Plus, Trash2, Zap } from "lucide-svelte";
   import {
     proposeElementHandle,
     moveElement,
     setPointLoop,
     setHill,
+    setZone,
     toggleLoop,
     removeElement,
     insertAfter,
     type ElementHandle,
     type ElementDragStart,
+    type InsertKind,
     type TrackEdit
   } from "../../lib/track-edit";
   import { loopHandleLayout, type ScreenPoint } from "../../lib/loop-handle-layout";
@@ -47,7 +49,7 @@
   const BIG_STEP = 10;
   const KEY_MOVES: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
   /** Pasos de las manijas de un eje: h_L de a 0,5 m, R de a 0,25 m, ρ_c de a 1 m y E de a 1 m. */
-  const AXIS_STEP = { loopTop: 0.5, loopRadius: 0.25, hillRadius: 1, end: 1 } as const;
+  const AXIS_STEP = { loopTop: 0.5, loopRadius: 0.25, hillRadius: 1, end: 1, zoneEnd: 1 } as const;
   /** Como en cualquier slider: arriba o a la derecha sube; abajo o a la izquierda baja. */
   const AXIS_DIRECTION: Record<string, number> = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 };
   /** Altura mínima que se pide con el teclado: 0 significaría quitar el loop. */
@@ -60,14 +62,19 @@
   let toolbarHeight = $state(0);
 
   let shown = $derived(hidden ? [] : handles);
-  /** Manijas que se arrastran en 2D: puntos y crestas de colina. */
-  let free = $derived(shown.filter(handle => handle.kind === "point" || handle.kind === "hillCrest"));
+  /** Manijas que se arrastran en 2D: puntos, crestas de colina e inicios de zona. */
+  let free = $derived(shown.filter(handle => handle.kind === "point" || handle.kind === "hillCrest" || handle.kind === "zoneStart"));
   let loopTops = $derived(shown.filter(handle => handle.kind === "loopTop"));
-  let ends = $derived(shown.filter(handle => handle.kind === "end"));
+  /** E y el fin de cada zona (su largo): se mueven en horizontal. */
+  let ends = $derived(shown.filter(handle => handle.kind === "end" || handle.kind === "zoneEnd"));
   /** El radio del loop y el de la cresta aparecen con su elemento elegido. */
   let secondary = $derived(shown.filter(handle => (handle.kind === "loopRadius" || handle.kind === "hillRadius") && handle.index === selected));
   let selectedElement = $derived(selected === null ? null : (config.track[selected] ?? null));
-  let anchor = $derived(shown.find(handle => handle.index === selected && (handle.kind === "point" || handle.kind === "hillCrest" || handle.kind === "end")) ?? null);
+  let anchor = $derived(
+    shown.find(handle => handle.index === selected && (handle.kind === "point" || handle.kind === "hillCrest" || handle.kind === "zoneStart" || handle.kind === "end")) ??
+      shown.find(handle => handle.index === selected && handle.kind === "zoneEnd") ??
+      null
+  );
   let selectedLoop = $derived(selectedElement?.type === "point" ? (selectedElement.loop ?? null) : null);
   let labelled = $derived(handles.find(handle => handle.id === active) ?? null);
   /** El motivo de un recorte solo se muestra para el elemento al que corresponde. */
@@ -99,6 +106,11 @@
     if (!selectedElement || selected === null) return "";
     if (selectedElement.type === "hill") return `Colina ${config.track.slice(0, selected + 1).filter(element => element.type === "hill").length}`;
     if (selectedElement.type === "end") return "Final del trazado";
+    if (selectedElement.type === "booster" || selectedElement.type === "trim") {
+      const kind = selectedElement.type;
+      const ordinal = config.track.slice(0, selected + 1).filter(element => element.type === kind).length;
+      return `${kind === "booster" ? "Lanzador" : "Frenos de ajuste"} ${ordinal}`;
+    }
     return `Punto ${selected + 1}`;
   });
 
@@ -201,6 +213,9 @@
   function axisValue(handle: ElementHandle): { value: number; text: string } {
     const element = config.track[handle.index];
     if (handle.kind === "end") return { value: handle.x, text: `E en x = ${formatNumber(handle.x, 1)} m` };
+    if (handle.kind === "zoneEnd" && (element?.type === "booster" || element?.type === "trim")) {
+      return { value: element.length, text: `Largo: ${formatNumber(element.length, 1)} m` };
+    }
     if (element?.type === "hill") return { value: element.crestRadius, text: `Radio de la cresta: ${formatNumber(element.crestRadius, 1)} m` };
     const loop = element?.type === "point" ? element.loop : undefined;
     if (handle.kind === "loopTop") return { value: loop?.height ?? 0, text: `Altura del loop: ${formatNumber(loop?.height ?? 0, 1)} m` };
@@ -211,13 +226,14 @@
   function axisKey(event: KeyboardEvent, handle: ElementHandle) {
     const direction = AXIS_DIRECTION[event.key];
     const element = config.track[handle.index];
-    if (!direction || !element || handle.kind === "point" || handle.kind === "hillCrest") return;
+    if (!direction || !element || handle.kind === "point" || handle.kind === "hillCrest" || handle.kind === "zoneStart") return;
 
     event.preventDefault();
     const step = AXIS_STEP[handle.kind] * (event.shiftKey ? BIG_STEP : 1) * direction;
     let next: TrackEdit;
 
     if (handle.kind === "end" && element.type === "end") next = moveElement(config, handle.index, element.x + step);
+    else if (handle.kind === "zoneEnd" && (element.type === "booster" || element.type === "trim")) next = setZone(config, handle.index, { length: element.length + step });
     else if (handle.kind === "hillRadius" && element.type === "hill") next = setHill(config, handle.index, { crestRadius: element.crestRadius + step });
     else if (element.type === "point" && element.loop) {
       next =
@@ -230,7 +246,7 @@
     onSelect(handle.index);
   }
 
-  function addAfter(kind: "point" | "hill") {
+  function addAfter(kind: InsertKind) {
     if (selected === null) return;
 
     const result = insertAfter(config, selected, kind);
@@ -290,6 +306,7 @@
       type="button"
       class="point"
       class:crest={handle.kind === "hillCrest"}
+      class:zone={handle.kind === "zoneStart"}
       class:selected={handle.index === selected}
       class:active={active === handle.id}
       data-handle={handle.id}
@@ -346,14 +363,23 @@
     >
       <button type="button" onclick={() => addAfter("point")}><Plus size={14} /> Agregar punto</button>
       <button type="button" onclick={() => addAfter("hill")}><Mountain size={14} /> Agregar colina</button>
+      <button type="button" onclick={() => addAfter("booster")}><Zap size={14} /> Agregar lanzador</button>
+      <button type="button" onclick={() => addAfter("trim")}><Magnet size={14} /> Agregar frenos de ajuste</button>
       {#if selectedElement.type === "point"}
         <button type="button" onclick={switchLoop}>
           {#if selectedLoop}<CircleOff size={14} /> Quitar loop{:else}<CircleDot size={14} /> Agregar loop{/if}
         </button>
       {/if}
-      {#if selectedElement.type === "point" || selectedElement.type === "hill"}
+      {#if selectedElement.type !== "start" && selectedElement.type !== "end"}
         <button type="button" class="danger" onclick={() => selected !== null && remove(selected)}>
-          <Trash2 size={14} /> {selectedElement.type === "hill" ? "Borrar colina" : "Borrar punto"}
+          <Trash2 size={14} />
+          {selectedElement.type === "hill"
+            ? "Borrar colina"
+            : selectedElement.type === "booster"
+              ? "Borrar lanzador"
+              : selectedElement.type === "trim"
+                ? "Borrar frenos de ajuste"
+                : "Borrar punto"}
         </button>
       {/if}
       {#if reason}<em role="status">{reason}</em>{/if}
@@ -372,6 +398,10 @@
           <Sym symbol="ρ_c" /> = {formatNumber(element.crestRadius, 1)} m
         {:else if labelled.kind === "end"}
           E en x = {formatNumber(labelled.x, 1)} m
+        {:else if labelled.kind === "zoneStart"}
+          x {formatNumber(labelled.x, 1)} m · altura {formatNumber(labelled.y, 1)} m
+        {:else if labelled.kind === "zoneEnd" && (element?.type === "booster" || element?.type === "trim")}
+          Largo {formatNumber(element.length, 1)} m
         {:else if element?.type === "point" && element.loop}
           <Sym symbol="h_L" /> = {formatNumber(element.loop.height, 1)} m · R = {formatNumber(element.loop.topRadius, 2)} m
         {/if}
@@ -439,6 +469,11 @@
     border-color: var(--handle);
   }
 
+  /* Inicio de un lanzador o de unos frenos de ajuste: cuadrado, como el tramo recto que empieza ahí. */
+  .point.zone {
+    border-radius: 4px;
+  }
+
   .point::before,
   .axis-handle::before {
     content: "";
@@ -497,7 +532,8 @@
   }
 
   .axis-handle.loopRadius,
-  .axis-handle.hillRadius {
+  .axis-handle.hillRadius,
+  .axis-handle.zoneEnd {
     cursor: ew-resize;
   }
 

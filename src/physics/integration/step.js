@@ -1,6 +1,6 @@
 import { resolveConfig } from "../config.js";
 import { buildTrack } from "../track/builder.js";
-import { calculateForces } from "../dynamics/forces.js";
+import { calculateForces, zoneAt } from "../dynamics/forces.js";
 import { calculateEnergies } from "../dynamics/energy.js";
 import { evaluateState } from "../evaluation/criteria.js";
 import { rk4 } from "./rk4.js";
@@ -26,15 +26,16 @@ import {
  * @property {"running"|"finished"|"stopped"|"stalled"|"rejected"|"lost-contact"|"timeout"} status
  * @property {import("../evaluation/criteria.js").ViolationEvent[]} events Incumplimientos registrados.
  * @property {number} springCompression Compresión x (m).
+ * @property {"booster"|"trim"|null} zoneKind Zona en la que está el tren (lanzador o frenos de ajuste), si está en una.
  * @property {number} load Carga n (g).
  * @property {number} tangentialAcceleration a_t (m/s²).
  * @property {number} normalAcceleration a_n (m/s²).
- * @property {{normal: number, tangential: number, friction: number, brake: number, spring: number, damper: number, gravity: number}} forces (N)
+ * @property {{normal: number, tangential: number, friction: number, brake: number, spring: number, damper: number, gravity: number, air: number, booster: number, trim: number}} forces (N)
  * @property {import("../dynamics/energy.js").Energies} energies
  */
 
 /**
- * Construye un estado completo a partir de (t, s, v, E_disipada).
+ * Construye un estado completo a partir de (t, s, v, E_disipada, W_entrada).
  * @param {number} time
  * @param {number} distance
  * @param {number} velocity
@@ -42,9 +43,10 @@ import {
  * @param {import("../config.js").SimulationConfig} config
  * @param {import("../track/builder.js").Track} track
  * @param {import("../evaluation/criteria.js").ViolationEvent[]} events
+ * @param {number} [input] Trabajo de entrada acumulado (J).
  * @returns {SimulationState}
  */
-export function makeState(time, distance, velocity, dissipated, config, track, events = []) {
+export function makeState(time, distance, velocity, dissipated, config, track, events = [], input = 0) {
   const forces = calculateForces(track, config, distance, velocity);
   const { geometry } = forces;
 
@@ -62,6 +64,7 @@ export function makeState(time, distance, velocity, dissipated, config, track, e
     status: "running",
     events,
     springCompression: forces.compression,
+    zoneKind: forces.zone?.kind ?? null,
     load: forces.load,
     tangentialAcceleration: forces.acceleration,
     normalAcceleration: forces.normalAcceleration,
@@ -72,9 +75,12 @@ export function makeState(time, distance, velocity, dissipated, config, track, e
       brake: forces.brake,
       spring: forces.spring,
       damper: forces.damper,
-      gravity: forces.gravity
+      gravity: forces.gravity,
+      air: forces.air,
+      booster: forces.booster,
+      trim: forces.trim
     },
-    energies: calculateEnergies(config, velocity, geometry.y, forces.compression, dissipated)
+    energies: calculateEnergies(config, velocity, geometry.y, forces.compression, dissipated, input)
   };
 }
 
@@ -111,22 +117,24 @@ function restingStatus(distance, config, track) {
 }
 
 /**
- * Derivada del vector de estado [s, v, E_disipada].
+ * Derivada del vector de estado [s, v, E_disipada, W_entrada].
  * @param {import("../track/builder.js").Track} track
  * @param {import("../config.js").SimulationConfig} config
+ * @param {import("../track/builder.js").TrackZone | null} [zone] Zona fija (paso que llega a un borde de zona).
  */
-function derivativeFor(track, config) {
+function derivativeFor(track, config, zone) {
+  const options = zone === undefined ? {} : { zone };
   return (/** @type {number[]} */ values) => {
-    const forces = calculateForces(track, config, values[0], values[1]);
+    const forces = calculateForces(track, config, values[0], values[1], options);
 
     // Los frenos de estación se integran de forma cerrada (MRUA) a partir
     // de la entrada exacta a la zona; aquí se excluyen para que las etapas
     // de RK4 que asoman más allá del límite no vean su discontinuidad.
     const acceleration = forces.acceleration - forces.brake / config.mass;
     const dissipationRate =
-      Math.abs(forces.friction * values[1]) + Math.abs(forces.damper * values[1]);
+      Math.abs(forces.friction * values[1]) + Math.abs(forces.damper * values[1]) + Math.abs(forces.air * values[1]) + Math.abs(forces.trim * values[1]);
 
-    return [values[1], acceleration, dissipationRate];
+    return [values[1], acceleration, dissipationRate, forces.booster * values[1]];
   };
 }
 
@@ -143,9 +151,46 @@ export function createInitialState(input = {}) {
   return checked(makeState(0, 0, config.initialSpeed, 0, config, track), config, track);
 }
 
+/** Aire despreciable frente a los frenos de estación: k·v² por debajo de esta fracción de a. */
+const NEGLIGIBLE_DRAG = 1e-8;
+
 /**
- * Avance analítico dentro de la zona de frenado de estación (MRUA):
- * desaceleración constante a_f + μ·g sobre vía horizontal.
+ * Movimiento cerrado sobre vía horizontal con dv/dt = −(a + k·v²), v > 0:
+ * frenos de estación y rodadura (a) más el aire (k = ρ·C_dA/(2m)). Con k = 0
+ * es el MRUA de siempre.
+ */
+const brakeMotion = {
+  /** Tiempo hasta detenerse (s). @param {number} speed @param {number} a @param {number} k */
+  stopTime(speed, a, k) {
+    if (k <= 0) return speed / a;
+    return Math.atan(speed * Math.sqrt(k / a)) / Math.sqrt(a * k);
+  },
+  /**
+   * Posición y rapidez tras `time` s (antes de detenerse), desde `start`.
+   * Sin aire repite la aritmética de siempre, en el mismo orden (el CSV no cambia ni en el último dígito).
+   * @param {number} start @param {number} speed @param {number} a @param {number} k @param {number} time
+   */
+  after(start, speed, a, k, time) {
+    if (k <= 0) return { distance: start + speed * time - 0.5 * a * time * time, speed: Math.max(0, speed - a * time) };
+
+    const w = Math.sqrt(a * k);
+    const phase = Math.atan(speed * Math.sqrt(k / a));
+    const angle = phase - w * time;
+    return { distance: start + Math.log(Math.cos(angle) / Math.cos(phase)) / k, speed: Math.max(0, Math.sqrt(a / k) * Math.tan(angle)) };
+  },
+  /** Tiempo hasta recorrer `gap` m, o null si se detiene antes. @param {number} speed @param {number} a @param {number} k @param {number} gap */
+  timeTo(speed, a, k, gap) {
+    if (k <= 0) return (speed - Math.sqrt(Math.max(0, speed ** 2 - 2 * a * gap))) / a;
+
+    const phase = Math.atan(speed * Math.sqrt(k / a));
+    const cosine = Math.cos(phase) * Math.exp(k * gap);
+    return cosine > 1 ? null : (phase - Math.acos(cosine)) / Math.sqrt(a * k);
+  }
+};
+
+/**
+ * Avance analítico dentro de la zona de frenado de estación: desaceleración
+ * constante a_f + μ·g sobre vía horizontal, más el aire si lo hay.
  *
  * @param {SimulationState} current
  * @param {number[]} values
@@ -156,32 +201,34 @@ export function createInitialState(input = {}) {
  */
 function advanceInBrakeZone(current, values, substep, config, track) {
   const deceleration = config.brakeDeceleration + config.friction * config.gravity;
-  const [distance0, velocity0, dissipated0] = values;
+  const [distance0, velocity0, dissipated0, input] = values;
+  // Con un aire despreciable frente a los frenos (k·v² < 1e-8·a), la fórmula con ln(cos/cos) pierde toda la
+  // precisión por cancelación: se usa el MRUA, cuyo error relativo es de ese mismo orden.
+  const airDrag = (config.airDensity * config.airDragArea) / (2 * config.mass);
+  const drag = airDrag * velocity0 ** 2 < NEGLIGIBLE_DRAG * deceleration ? 0 : airDrag;
 
   if (velocity0 <= 0) {
     // Sin avance dentro de la zona: el freno retiene al tren donde está.
-    const held = makeState(current.time, distance0, 0, dissipated0, config, track, current.events);
+    const held = makeState(current.time, distance0, 0, dissipated0, config, track, current.events, input);
     return { state: { ...held, status: "finished" }, elapsed: 0 };
   }
 
-  const stopTime = Math.abs(velocity0) / deceleration;
-  const direction = Math.sign(velocity0);
+  const stopTime = brakeMotion.stopTime(velocity0, deceleration, drag);
   let elapsed = Math.min(substep, stopTime);
-
-  let distance =
-    distance0 + velocity0 * elapsed - direction * 0.5 * deceleration * elapsed * elapsed;
+  let motion = brakeMotion.after(distance0, velocity0, deceleration, drag, elapsed);
+  let distance = motion.distance;
 
   if (distance > track.totalLength) {
-    // Instante exacto en que se agota la zona de frenado: s₀ + v₀t − ½at² = s_F.
-    const gap = track.totalLength - distance0;
-    elapsed = (velocity0 - Math.sqrt(Math.max(0, velocity0 ** 2 - 2 * deceleration * gap))) / deceleration;
+    // Instante exacto en que se agota la zona de frenado.
+    elapsed = brakeMotion.timeTo(velocity0, deceleration, drag, track.totalLength - distance0) ?? elapsed;
+    motion = brakeMotion.after(distance0, velocity0, deceleration, drag, elapsed);
     distance = track.totalLength;
   }
-  const velocity = direction * Math.max(0, Math.abs(velocity0) - deceleration * elapsed);
+  const velocity = elapsed >= stopTime ? 0 : motion.speed;
   const dissipated = dissipated0 + 0.5 * config.mass * (velocity0 ** 2 - velocity ** 2);
 
   const state = checked(
-    makeState(current.time + elapsed, distance, velocity, dissipated, config, track, current.events),
+    makeState(current.time + elapsed, distance, velocity, dissipated, config, track, current.events, input),
     config,
     track
   );
@@ -190,6 +237,15 @@ function advanceInBrakeZone(current, values, substep, config, track) {
   if (stopTime <= substep) return { state: { ...state, status: "finished" }, elapsed };
 
   return { state, elapsed };
+}
+
+/**
+ * Coordenadas s de los bordes de las zonas (lanzadores y frenos de ajuste).
+ * @param {import("../track/builder.js").Track} track
+ * @returns {number[]}
+ */
+function zoneBoundaries(track) {
+  return (track.zones ?? []).flatMap(zone => [zone.start, zone.end]);
 }
 
 /**
@@ -238,7 +294,7 @@ function advanceFree(current, values, h, config, track) {
   const finish = (elapsed, result) => ({
     elapsed,
     state: checked(
-      makeState(current.time + elapsed, result[0], result[1], result[2], config, track, current.events),
+      makeState(current.time + elapsed, result[0], result[1], result[2], config, track, current.events, result[3]),
       config,
       track
     )
@@ -270,38 +326,45 @@ function advanceFree(current, values, h, config, track) {
   // Con |v| < |a|·h, la fuerza que se opone al movimiento lo detiene dentro del paso. RK4 no
   // sirve ahí: sus etapas cambian el signo de la fricción (Coulomb) y se anulan, y v quedaría
   // fija para siempre. El tramo hasta v = 0 se integra en forma cerrada (aceleración constante).
-  const [, acceleration, dissipationRate] = derivative(values);
+  const [, acceleration, dissipationRate, inputRate] = derivative(values);
 
   if (values[1] * acceleration < 0 && Math.abs(values[1]) < Math.abs(acceleration) * h) {
     const tau = Math.abs(values[1] / acceleration);
-    return settle(tau, [values[0] + (values[1] * tau) / 2, 0, values[2] + (dissipationRate * tau) / 2]);
+    return settle(tau, [values[0] + (values[1] * tau) / 2, 0, values[2] + (dissipationRate * tau) / 2, values[3] + (inputRate * tau) / 2]);
   }
 
   if (values[1] * next[1] < 0) {
     const tau = locateEvent(derivative, values, h, candidate => values[1] * candidate[1] <= 0);
     const turning = rk4(derivative, values, tau);
-    return settle(tau, [turning[0], 0, turning[2]]);
+    return settle(tau, [turning[0], 0, turning[2], turning[3]]);
   }
 
+  // Bordes donde la fuerza cambia de golpe: la entrada al frenado, el final, A y los bordes de cada zona
+  // (estos, en los dos sentidos: un tren puede volver a cruzar una zona hacia atrás).
   const crossings = [
-    { active: values[0] < track.brakeStart && next[0] >= track.brakeStart, boundary: track.brakeStart },
-    { active: values[0] < track.totalLength && next[0] >= track.totalLength, boundary: track.totalLength },
-    { active: values[0] > 0 && next[0] <= 0, boundary: 0 }
+    { active: values[0] < track.brakeStart && next[0] >= track.brakeStart, boundary: track.brakeStart, forward: true },
+    { active: values[0] < track.totalLength && next[0] >= track.totalLength, boundary: track.totalLength, forward: true },
+    { active: values[0] > 0 && next[0] <= 0, boundary: 0, forward: false },
+    ...zoneBoundaries(track).flatMap(boundary => [
+      { active: values[0] < boundary && next[0] >= boundary, boundary, forward: true },
+      { active: values[0] > boundary && next[0] <= boundary, boundary, forward: false }
+    ])
   ].filter(crossing => crossing.active);
 
   if (crossings.length) {
+    // Hasta el borde rige la fuerza del lado donde está el tren: las etapas de RK4 que asoman del otro lado
+    // no deben ver el empuje (o el frenado) de una zona en la que todavía no entró.
+    const before = derivativeFor(track, config, zoneAt(track, values[0]));
     const located = crossings
       .map(crossing => ({
         boundary: crossing.boundary,
-        tau: locateEvent(derivative, values, h, candidate =>
-          crossing.boundary === 0 ? candidate[0] <= 0 : candidate[0] >= crossing.boundary
-        )
+        tau: locateEvent(before, values, h, candidate => (crossing.forward ? candidate[0] >= crossing.boundary : candidate[0] <= crossing.boundary))
       }))
       .sort((first, second) => first.tau - second.tau)[0];
 
-    const crossing = rk4(derivative, values, located.tau);
+    const crossing = rk4(before, values, located.tau);
 
-    return finish(located.tau, [located.boundary, crossing[1], crossing[2]]);
+    return finish(located.tau, [located.boundary, crossing[1], crossing[2], crossing[3]]);
   }
 
   return finish(h, next);
@@ -339,7 +402,7 @@ export function step(state, input, dt) {
 
   while (remaining > 1e-12) {
     const h = Math.min(substep, remaining);
-    const values = [current.distance, current.velocity, current.energies.dissipated];
+    const values = [current.distance, current.velocity, current.energies.dissipated, current.energies.input ?? 0];
     const forces = calculateForces(track, config, values[0], values[1]);
 
     if (

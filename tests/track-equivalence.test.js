@@ -40,7 +40,7 @@ describe("config.track como fuente única de la geometría", () => {
   test("resolveConfig deriva track de una configuración vieja y trackWidth de end.x", () => {
     const config = resolveConfig({ mapId: "reference", trackWidth: 320 });
 
-    expect(config.track[0]).toEqual({ type: "start" });
+    expect(config.track[0]).toEqual({ type: "start", lift: { angle: Math.atan2(1, 1.35), efficiency: 0.8, chainSpeed: 2 } });
     expect(config.track.at(-1)).toEqual({ type: "end", x: 320 });
 
     const explicit = resolveConfig({ track: [{ type: "start" }, { type: "point", x: 40, y: 0 }, { type: "end", x: 210 }] });

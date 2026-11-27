@@ -1,4 +1,5 @@
 import { geometryAt } from "../track/geometry.js";
+import { boosterForce } from "./booster.js";
 import { REST_SPEED_EPSILON } from "../constants.js";
 
 import {
@@ -9,7 +10,8 @@ import {
   gravityTangential,
   frictionMagnitude,
   springForce,
-  damperForce
+  damperForce,
+  airDragForce
 } from "./kinematics.js";
 
 /**
@@ -23,6 +25,10 @@ import {
  * @property {number} damper Fuerza del amortiguador (N).
  * @property {number} friction Fuerza de fricción con signo (N).
  * @property {number} brake Fuerza de los frenos de estación con signo (N).
+ * @property {number} air Resistencia del aire con signo (N).
+ * @property {number} booster Empuje del lanzador (N), hacia adelante.
+ * @property {number} trim Fuerza de los frenos de ajuste con signo (N).
+ * @property {import("../track/builder.js").TrackZone | null} zone Zona en la que está el tren, si está en una.
  * @property {number} tangential Suma de fuerzas tangenciales (N).
  * @property {number} acceleration Aceleración tangencial a_t (m/s²).
  * @property {number} normalAcceleration Aceleración normal a_n = κ·v² (m/s²).
@@ -47,6 +53,19 @@ export function resistiveForce(velocity, drive, limit) {
 }
 
 /**
+ * Zona (lanzador o frenos de ajuste) que contiene la coordenada s: [inicio, fin).
+ * @param {import("../track/builder.js").Track} track
+ * @param {number} distance
+ * @returns {import("../track/builder.js").TrackZone | null}
+ */
+export function zoneAt(track, distance) {
+  for (const zone of track.zones ?? []) {
+    if (distance >= zone.start && distance < zone.end) return zone;
+  }
+  return null;
+}
+
+/**
  * Calcula todas las fuerzas tangenciales y la normal en la posición s
  * con velocidad v. Es una función pura: no modifica sus argumentos.
  *
@@ -54,9 +73,11 @@ export function resistiveForce(velocity, drive, limit) {
  * @param {import("../config.js").SimulationConfig} config Configuración resuelta.
  * @param {number} distance Coordenada s (m).
  * @param {number} velocity Velocidad tangencial v (m/s), positiva en el sentido de avance.
+ * @param {{zone?: import("../track/builder.js").TrackZone | null}} [options] `zone` fija la zona en lugar de
+ *   buscarla por s: el paso que llega a un borde integra con la fuerza del lado donde está el tren.
  * @returns {Forces}
  */
-export function calculateForces(track, config, distance, velocity) {
+export function calculateForces(track, config, distance, velocity, options = {}) {
   const geometry = geometryAt(track, distance);
   const normal = normalForce(config.mass, config.gravity, geometry.angle, geometry.curvature, velocity);
 
@@ -69,7 +90,13 @@ export function calculateForces(track, config, distance, velocity) {
   const gravity = gravityTangential(config.mass, config.gravity, geometry.angle);
   const spring = springForce(config.springConstant, compression);
   const damper = damperForce(config.springDamping, velocity, compression);
-  const drive = gravity + spring + damper;
+  const air = airDragForce(config.airDensity, config.airDragArea, velocity);
+  const zone = options.zone === undefined ? zoneAt(track, distance) : options.zone;
+  const booster =
+    zone?.kind === "booster" ? boosterForce(config.mass, zone.power ?? 0, zone.maxAcceleration ?? 0, velocity) : 0;
+  // Frenos de ajuste por corrientes parásitas: F = −c·v, suave en v (se integra con RK4).
+  const trim = zone?.kind === "trim" ? -(zone.damping ?? 0) * velocity : 0;
+  const drive = gravity + spring + damper + air + booster + trim;
 
   const friction = resistiveForce(
     velocity,
@@ -95,6 +122,10 @@ export function calculateForces(track, config, distance, velocity) {
     damper,
     friction,
     brake,
+    air,
+    booster,
+    trim,
+    zone,
     tangential,
     acceleration: tangentialAcceleration(tangential, config.mass),
     normalAcceleration: normalAcceleration(velocity, geometry.curvature),
