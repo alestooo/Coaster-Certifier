@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { formatNumber, parseDecimal } from "../../ui/format";
-  import { decimalsFor, stepFrom } from "../../lib/ui/slider-scale";
+  import { formatSigned, parseDecimal } from "../../ui/format";
+  import { decimalsFor, stepFrom, shownDecimals } from "../../lib/ui/slider-scale";
 
   /**
    * Campo numérico de la app: texto con teclado decimal, muestra y acepta
@@ -31,7 +31,8 @@
   let input: HTMLInputElement;
   /** Texto mientras se escribe; null cuando el campo muestra el valor vigente. */
   let draft = $state<string | null>(null);
-  let shown = $derived(formatNumber(value, decimalsFor(step)));
+  // Con los decimales del paso, o los del valor si tiene más (lo escrito se usa tal cual y se ve tal cual).
+  let shown = $derived(formatSigned(value, shownDecimals(value, step)));
 
   $effect(() => {
     if (!autofocus) return;

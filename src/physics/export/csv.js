@@ -37,7 +37,8 @@ export const CSV_COLUMNS = Object.freeze([
   { key: "air", header: "aire_N", read: state => state.forces.air ?? 0 },
   { key: "booster", header: "lanzador_N", read: state => state.forces.booster ?? 0 },
   { key: "trim", header: "frenos_ajuste_N", read: state => state.forces.trim ?? 0 },
-  { key: "input", header: "E_entrada_J", read: state => state.energies.input ?? 0 }
+  // Trabajo externo: lanzadores y, con el tren articulado, la cadena que sostiene a los carros de la subida.
+  { key: "input", header: "E_entrada_J", read: state => (state.energies.input ?? 0) + (state.energies.chainWork ?? 0) }
 ]);
 
 /**

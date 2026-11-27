@@ -41,6 +41,7 @@ const armMemory = new Map();
  * @property {number} [speed] Rapidez (m/s).
  * @property {number} [time] Tiempo (s).
  * @property {boolean} [inLoop] Verdadero dentro de un loop.
+ * @property {number} [wheelAngle] Ángulo de giro de las ruedas, s/r (rad).
  */
 
 /**

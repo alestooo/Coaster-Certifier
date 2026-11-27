@@ -5,7 +5,8 @@
  * acá se escriben a partir de los mismos datos con `formatNumber`.
  */
 import { formatNumber } from "../ui/format";
-import { liftMetrics } from "../physics/index.js";
+import { liftMetrics, resolveConfig, SCENARIOS } from "../physics/index.js";
+import { mapName, mapTemplate } from "../game/maps";
 import type { SimulationConfig, Verdict } from "./types";
 
 /** Un límite de la regla: sin decimales si es entero (-1, 5), con ellos si no (4,5). */
@@ -92,7 +93,10 @@ export function liftText(config: SimulationConfig): string {
   const metrics = liftMetrics(config);
   const start = config.track[0];
   const lift = start?.type === "start" ? start.lift : undefined;
-  if (!metrics || !lift) return "Sin subida por cadena (montaña rusa lanzada)";
+  if (!metrics || !lift) {
+    const launched = config.track.some(element => element.type === "booster");
+    return launched ? "Sin subida por cadena (montaña rusa lanzada)" : "Sin subida por cadena";
+  }
 
   const degrees = (lift.angle * 180) / Math.PI;
   return (
@@ -112,15 +116,45 @@ export interface EnergyRow {
  * (si hubo) y la disipada y el error de balance como fracción de la energía
  * disponible E₀ + W_entrada.
  */
-export function energyRows(summary: Verdict["summary"]): EnergyRow[] {
+export function energyRows(summary: Verdict["summary"], trainCars = 1): EnergyRow[] {
   const input = Math.max(0, summary.inputEnergy ?? 0);
-  const available = summary.initialEnergy + input;
-  const base = input > 0 ? "de la disponible (E₀ + W_entrada)" : "de la inicial";
+  const chain = summary.chainEnergy ?? 0;
+  const available = summary.initialEnergy + input + chain;
+  const base = input + chain !== 0 ? "de la disponible (E₀ + W_entrada)" : "de la inicial";
   const share = (value: number) => (available > 0 ? (100 * value) / available : 0);
 
   return [
-    { label: "Energía inicial", value: `${formatNumber(summary.initialEnergy, 0)} J`, detail: "m·g·H + ½·m·v₀²" },
+    {
+      label: "Energía inicial",
+      value: `${formatNumber(summary.initialEnergy, 0)} J`,
+      detail: trainCars > 1 ? "m·g·ȳ₀ + ½·m·v₀² (centro de masa al salir)" : "m·g·H + ½·m·v₀²"
+    },
     ...(input > 0 ? [{ label: "Energía de entrada (lanzadores)", value: `${formatNumber(input, 0)} J`, detail: "W_entrada = ∫F_lanzador·v dt" }] : []),
+    ...(chain !== 0 ? [{ label: "Trabajo de la cadena (carros en la subida)", value: `${formatNumber(chain, 0)} J`, detail: "la cadena sostiene al tren a v_c mientras tiene carros" }] : []),
     { label: "Energía disipada", value: `${formatNumber(summary.dissipatedEnergy, 0)} J`, detail: `${formatNumber(share(summary.dissipatedEnergy), 1)} % ${base}` }
   ];
 }
+
+/** Elementos de un diseño, para compararlos; null si la entrada no es válida. */
+function trackKey(input: Parameters<typeof resolveConfig>[0]): string | null {
+  try {
+    return JSON.stringify(resolveConfig(input).track);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Nombre del diseño para el informe y las descargas: el del trazado si sus
+ * elementos son los de la plantilla, el del escenario de referencia si es uno
+ * sin tocar, o «Diseño basado en …» si se editaron.
+ */
+export function designName(config: SimulationConfig): string {
+  const base = mapName(config.mapId);
+  const key = JSON.stringify(config.track);
+  if (trackKey(mapTemplate(config.mapId)) === key) return base;
+
+  const scenario = SCENARIOS.find(item => item.config.mapId === config.mapId && trackKey(item.config) === key);
+  return scenario ? scenario.title : `Diseño basado en «${base}»`;
+}
+

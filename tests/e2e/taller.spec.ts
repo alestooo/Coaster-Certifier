@@ -651,6 +651,54 @@ test.describe("Taller de diseño", () => {
     expect(after).not.toBe(before);
   });
 
+  test("la estimación muestra el ciclo y los pasajeros por hora y cambia con el tiempo en la estación", async ({ page }) => {
+    await openWorkshop(page);
+    await page.getByRole("button", { name: /Estimación/ }).click();
+    const panel = page.getByRole("complementary", { name: "Estimación" });
+    const capacity = panel.getByText(/pasajeros\/h/);
+    await expect(capacity).toBeVisible();
+    await expect(panel).toContainText(/kWh/);
+    await expect(panel).toContainText(/Columnas/);
+    const before = await capacity.textContent();
+
+    const station = panel.getByRole("textbox", { name: "Tiempo en la estación" });
+    await station.fill("120");
+    await station.press("Enter");
+
+    await expect(capacity).not.toHaveText(before ?? "");
+    const value = (text: string | null) => Number((text ?? "").replace(/\D/g, ""));
+    expect(value(await capacity.textContent())).toBeLessThan(value(before));
+  });
+
+  test("con tres pasajeros el tren tiene dos carros y el informe lo dice", async ({ page }) => {
+    await openWorkshop(page);
+    await page.getByRole("button", { name: /2 pasajeros, 582 kg/ }).click();
+    await page.getByRole("complementary", { name: "Tren y pasajeros" }).getByRole("radio", { name: "3 pasajeros" }).click();
+    await expect(page.getByRole("button", { name: /3 pasajeros, 1\s?071 kg/ })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(verdict(page)).toContainText(/Aprobado|Rechazado/);
+
+    await verdict(page).click();
+    await page.getByRole("complementary", { name: "Dictamen" }).getByRole("button", { name: "Ver informe de certificación" }).click();
+    await expect(page.getByRole("dialog", { name: /Informe de certificación/ })).toContainText(/2 carros · criterios sobre el peor carro/);
+  });
+
+  test("se eligen cinco carros con dos pasajeros: los vacíos suman su masa y el informe lo dice", async ({ page }) => {
+    await openWorkshop(page);
+    await page.getByRole("button", { name: /2 pasajeros, 582 kg/ }).click();
+    const panel = page.getByRole("complementary", { name: "Tren y pasajeros" });
+    await panel.getByRole("radio", { name: "5 carros" }).click();
+    // 5 × 425 kg más 75 + 82 kg.
+    await expect(page.getByRole("button", { name: /2 pasajeros, 2\s?282 kg/ })).toBeVisible();
+    await expect(panel).toContainText(/5 carritos/);
+    await page.keyboard.press("Escape");
+    await expect(verdict(page)).toContainText(/Aprobado|Rechazado/);
+
+    await verdict(page).click();
+    await page.getByRole("complementary", { name: "Dictamen" }).getByRole("button", { name: "Ver informe de certificación" }).click();
+    await expect(page.getByRole("dialog", { name: /Informe de certificación/ })).toContainText(/5 carros · criterios sobre el peor carro/);
+  });
+
   test("quitar la subida desde «Salida» deja A sin cadena y un Ctrl+Z la devuelve", async ({ page }) => {
     await openWorkshop(page);
     const a = await center(page.getByRole("slider", { name: /Cima de la subida A/ }));

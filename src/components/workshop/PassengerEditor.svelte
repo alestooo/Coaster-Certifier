@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Shuffle, RotateCcw, User } from "lucide-svelte";
+  import { formatNumber } from "../../ui/format";
+  import { Shuffle, RotateCcw, User, TramFront } from "lucide-svelte";
   import Avatar, { type Reaction } from "../Avatar.svelte";
   import ColorPicker from "../ColorPicker.svelte";
   import NumberField from "../ui/NumberField.svelte";
@@ -8,6 +9,8 @@
   import Button from "../ui/Button.svelte";
   import {
     MAX_PASSENGERS,
+    MAX_TRAIN_CARS,
+    SEATS_PER_CART,
     MIN_PASSENGER_MASS,
     MAX_PASSENGER_MASS,
     SKIN_COLORS,
@@ -27,13 +30,16 @@
   interface Props {
     passengers: Passenger[];
     cartMass: number;
+    /** Carros del tren (los elegidos, o los que piden los pasajeros). */
+    trainCars: number;
     /** Error de masas de la sesión (pasajero o carrito fuera de rango). */
     error?: string;
     onChange: (passengers: Passenger[]) => void;
     onCartMass: (value: number) => void;
+    onTrainCars: (value: number) => void;
   }
 
-  let { passengers, cartMass, error = "", onChange, onCartMass }: Props = $props();
+  let { passengers, cartMass, trainCars, error = "", onChange, onCartMass, onTrainCars }: Props = $props();
 
   type TabId = "face" | "hair" | "clothes" | "accessories";
 
@@ -55,6 +61,14 @@
     const number = position + 1;
     return { value: String(number), label: String(number), icon: User, ariaLabel: `${number} ${number === 1 ? "pasajero" : "pasajeros"}` };
   });
+
+  const CAR_OPTIONS = Array.from({ length: MAX_TRAIN_CARS }, (_, position) => {
+    const number = position + 1;
+    return { value: String(number), label: String(number), ariaLabel: `${number} ${number === 1 ? "carro" : "carros"}` };
+  });
+
+  /** Carros que piden los pasajeros: menos no se puede. */
+  let neededCars = $derived(Math.max(1, Math.ceil(passengers.length / SEATS_PER_CART)));
 
   let selected = $state(0);
   let tab = $state<TabId>("face");
@@ -83,6 +97,14 @@
 <div class="editor">
   <Segmented label="Cantidad de pasajeros" block value={String(passengers.length)} options={COUNT_OPTIONS} onChange={value => changeCount(Number(value))} />
 
+  <div class="cars">
+    <span class="cars-label"><TramFront size={14} aria-hidden="true" /> Carros del tren</span>
+    <Segmented label="Carros del tren" size="sm" block value={String(trainCars)} options={CAR_OPTIONS} onChange={value => onTrainCars(Number(value))} />
+    <small>
+      {neededCars > 1 ? `Con ${passengers.length} pasajeros, al menos ${neededCars}. ` : ""}Los carros vacíos suman su masa; con más carros, cada uno siente su propia fuerza g.
+    </small>
+  </div>
+
   <div class="row">
     <span>Masa por carrito (vacío)</span>
     <NumberField value={cartMass} step={1} unit="kg" label="Masa por carrito (vacío)" onCommit={onCartMass} />
@@ -92,7 +114,7 @@
     {#each passengers as person, position (person.id)}
       <button type="button" class="seat" class:active={position === index} aria-pressed={position === index} onclick={() => (selected = position)}>
         <Avatar passenger={person} size={40} />
-        <span>{person.name}<small>{person.mass} kg</small></span>
+        <span>{person.name}<small>{formatNumber(person.mass, Number.isInteger(person.mass) ? 0 : 1)} kg</small></span>
       </button>
     {/each}
   </div>
@@ -196,6 +218,25 @@
   .editor {
     display: grid;
     gap: 12px;
+  }
+
+  .cars {
+    display: grid;
+    gap: 6px;
+  }
+
+  .cars-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 800;
+  }
+
+  .cars small {
+    color: var(--muted);
+    font-size: 11.5px;
+    line-height: 1.4;
   }
 
   .row,

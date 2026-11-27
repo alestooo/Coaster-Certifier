@@ -229,7 +229,15 @@ function zoneOfViolation(track, violation) {
 }
 
 /** Incumplimientos que se arreglan con más energía. */
-const NEEDS_ENERGY = new Set([CRITERIA.CONTACT, CRITERIA.LOOP_CONTACT, CRITERIA.MIN_SPEED, "incomplete"]);
+const NEEDS_ENERGY = new Set([CRITERIA.LOOP_CONTACT, CRITERIA.MIN_SPEED, "incomplete"]);
+
+/**
+ * Verdadero si el incumplimiento se arregla con más energía. Un despegue
+ * (`contact`, modo estricto) solo dentro de un loop: en una cresta se pierde
+ * el contacto por exceso de rapidez.
+ * @param {{code: string, section: string}} violation
+ */
+const needsEnergy = violation => NEEDS_ENERGY.has(violation.code) || (violation.code === CRITERIA.CONTACT && /^Loop/.test(violation.section));
 
 /**
  * Si al tren le falta energía y hay un lanzador antes del fallo, su potencia
@@ -243,7 +251,7 @@ const NEEDS_ENERGY = new Set([CRITERIA.CONTACT, CRITERIA.LOOP_CONTACT, CRITERIA.
  * @returns {Record<string, unknown>[]}
  */
 function boosterPowerPatches(config, run, violation, head, lossHead) {
-  if (!violation || !NEEDS_ENERGY.has(violation.code)) return [];
+  if (!violation || !needsEnergy(violation)) return [];
 
   const zone = [...run.track.zones].reverse().find(candidate => candidate.kind === "booster" && candidate.end <= violation.position);
   if (!zone) return [];

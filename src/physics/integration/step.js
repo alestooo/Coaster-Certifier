@@ -1,6 +1,7 @@
 import { resolveConfig } from "../config.js";
 import { buildTrack } from "../track/builder.js";
 import { calculateForces, zoneAt } from "../dynamics/forces.js";
+import { trainStartHeight, trainStartSpeed } from "../dynamics/train.js";
 import { calculateEnergies } from "../dynamics/energy.js";
 import { evaluateState } from "../evaluation/criteria.js";
 import { rk4 } from "./rk4.js";
@@ -27,6 +28,10 @@ import {
  * @property {import("../evaluation/criteria.js").ViolationEvent[]} events Incumplimientos registrados.
  * @property {number} springCompression Compresión x (m).
  * @property {"booster"|"trim"|null} zoneKind Zona en la que está el tren (lanzador o frenos de ajuste), si está en una.
+ * @property {number} [minCarLoad] Tren articulado: la fuerza g del carro más liviano (`load` es la del más cargado).
+ * @property {number} [minNormal] Tren articulado: la normal más chica entre los carros (N).
+ * @property {number | null} [minLoopNormal] Tren articulado: la normal más chica entre los carros que están en un loop (N).
+ * @property {{distance: number, load: number}[]} [cars] Tren articulado: posición y fuerza g de cada carro.
  * @property {number} load Carga n (g).
  * @property {number} tangentialAcceleration a_t (m/s²).
  * @property {number} normalAcceleration a_n (m/s²).
@@ -46,8 +51,42 @@ import {
  * @param {number} [input] Trabajo de entrada acumulado (J).
  * @returns {SimulationState}
  */
-export function makeState(time, distance, velocity, dissipated, config, track, events = [], input = 0) {
+export function makeState(time, distance, velocity, dissipated, config, track, events = [], input = 0, chainWork = 0) {
   const forces = calculateForces(track, config, distance, velocity);
+  const { geometry } = forces;
+  const state = particleState(time, distance, velocity, dissipated, config, track, events, input, forces);
+  if (config.trainCars <= 1) return state;
+
+  // Tren articulado: la carga es la del peor carro, la energía potencial la del centro de masa, y la inicial la de
+  // los carros en sus lugares al salir (los de atrás todavía en la subida).
+  const train = /** @type {any} */ (forces);
+  return {
+    ...state,
+    zoneKind: train.zoneKind,
+    minCarLoad: train.minLoad,
+    minNormal: train.minNormal,
+    minLoopNormal: train.minLoopNormal,
+    cars: train.cars.map((/** @type {any} */ car) => ({ distance: car.distance, load: car.load })),
+    energies: {
+      ...calculateEnergies(config, velocity, train.meanHeight, forces.compression, dissipated, input + chainWork, trainStartHeight(track, config), trainStartSpeed(track, config)),
+      // Lo que entregaron los lanzadores y, aparte, lo que hizo la cadena sosteniendo a los carros de la subida.
+      input,
+      chainWork
+    }
+  };
+}
+
+/**
+ * Estado de la partícula (y base del tren articulado).
+ * @param {number} time @param {number} distance @param {number} velocity @param {number} dissipated
+ * @param {import("../config.js").SimulationConfig} config
+ * @param {import("../track/builder.js").Track} track
+ * @param {import("../evaluation/criteria.js").ViolationEvent[]} events
+ * @param {number} input
+ * @param {import("../dynamics/forces.js").Forces} forces
+ * @returns {SimulationState}
+ */
+function particleState(time, distance, velocity, dissipated, config, track, events, input, forces) {
   const { geometry } = forces;
 
   return {
@@ -117,14 +156,17 @@ function restingStatus(distance, config, track) {
 }
 
 /**
- * Derivada del vector de estado [s, v, E_disipada, W_entrada].
+ * Derivada del vector de estado [s, v, E_disipada, W_lanzadores, W_cadena].
  * @param {import("../track/builder.js").Track} track
  * @param {import("../config.js").SimulationConfig} config
  * @param {import("../track/builder.js").TrackZone | null} [zone] Zona fija (paso que llega a un borde de zona).
+ * @param {number} [membershipAt] Tren articulado: posición con que se decide la zona de cada carro.
  */
-function derivativeFor(track, config, zone) {
+function derivativeFor(track, config, zone, membershipAt) {
   const options = zone === undefined ? {} : { zone };
+  const articulated = config.trainCars > 1;
   return (/** @type {number[]} */ values) => {
+    if (articulated) return trainDerivative(track, config, values, membershipAt);
     const forces = calculateForces(track, config, values[0], values[1], options);
 
     // Los frenos de estación se integran de forma cerrada (MRUA) a partir
@@ -134,8 +176,26 @@ function derivativeFor(track, config, zone) {
     const dissipationRate =
       Math.abs(forces.friction * values[1]) + Math.abs(forces.damper * values[1]) + Math.abs(forces.air * values[1]) + Math.abs(forces.trim * values[1]);
 
-    return [values[1], acceleration, dissipationRate, forces.booster * values[1]];
+    return [values[1], acceleration, dissipationRate, forces.booster * values[1], 0];
   };
+}
+
+/**
+ * Derivada del tren articulado: los frenos de estación actúan carro por carro
+ * (se integran con RK4, no en forma cerrada) y la cadena aporta trabajo
+ * mientras sostiene a los carros que siguen en la subida.
+ * @param {import("../track/builder.js").Track} track
+ * @param {import("../config.js").SimulationConfig} config
+ * @param {number[]} values
+ * @param {number} [membershipAt]
+ */
+function trainDerivative(track, config, values, membershipAt) {
+  const forces = /** @type {any} */ (calculateForces(track, config, values[0], values[1], membershipAt === undefined ? LEAN : { membershipAt, lean: true }));
+  const velocity = values[1];
+  const dissipationRate =
+    Math.abs(forces.friction * velocity) + Math.abs(forces.damper * velocity) + Math.abs(forces.air * velocity) + Math.abs(forces.trim * velocity) + Math.abs(forces.brake * velocity);
+
+  return [velocity, forces.acceleration, dissipationRate, forces.booster * velocity, forces.chain * velocity];
 }
 
 /**
@@ -148,7 +208,8 @@ export function createInitialState(input = {}) {
   const config = resolveConfig(input);
   const track = buildTrack(config);
 
-  return checked(makeState(0, 0, config.initialSpeed, 0, config, track), config, track);
+  // Con varios carros y subida, el tren sale de A a la rapidez de la cadena como mínimo (los de atrás siguen en ella).
+  return checked(makeState(0, 0, trainStartSpeed(track, config), 0, config, track), config, track);
 }
 
 /** Aire despreciable frente a los frenos de estación: k·v² por debajo de esta fracción de a. */
@@ -201,7 +262,7 @@ const brakeMotion = {
  */
 function advanceInBrakeZone(current, values, substep, config, track) {
   const deceleration = config.brakeDeceleration + config.friction * config.gravity;
-  const [distance0, velocity0, dissipated0, input] = values;
+  const [distance0, velocity0, dissipated0, input, chainWork] = values;
   // Con un aire despreciable frente a los frenos (k·v² < 1e-8·a), la fórmula con ln(cos/cos) pierde toda la
   // precisión por cancelación: se usa el MRUA, cuyo error relativo es de ese mismo orden.
   const airDrag = (config.airDensity * config.airDragArea) / (2 * config.mass);
@@ -209,7 +270,7 @@ function advanceInBrakeZone(current, values, substep, config, track) {
 
   if (velocity0 <= 0) {
     // Sin avance dentro de la zona: el freno retiene al tren donde está.
-    const held = makeState(current.time, distance0, 0, dissipated0, config, track, current.events, input);
+    const held = makeState(current.time, distance0, 0, dissipated0, config, track, current.events, input, chainWork);
     return { state: { ...held, status: "finished" }, elapsed: 0 };
   }
 
@@ -228,7 +289,7 @@ function advanceInBrakeZone(current, values, substep, config, track) {
   const dissipated = dissipated0 + 0.5 * config.mass * (velocity0 ** 2 - velocity ** 2);
 
   const state = checked(
-    makeState(current.time + elapsed, distance, velocity, dissipated, config, track, current.events, input),
+    makeState(current.time + elapsed, distance, velocity, dissipated, config, track, current.events, input, chainWork),
     config,
     track
   );
@@ -247,6 +308,38 @@ function advanceInBrakeZone(current, values, substep, config, track) {
 function zoneBoundaries(track) {
   return (track.zones ?? []).flatMap(zone => [zone.start, zone.end]);
 }
+
+/**
+ * Coordenadas del carro delantero en que algún carro cruza un borde donde la
+ * fuerza cambia de golpe: los bordes de las zonas y, con varios carros, la
+ * entrada al frenado y A (el carro deja la subida). Con un carro, solo las zonas.
+ * @param {import("../track/builder.js").Track} track
+ * @param {import("../config.js").SimulationConfig} config
+ * @returns {number[]}
+ */
+function trainBoundaries(track, config) {
+  const zones = zoneBoundaries(track);
+  if (config.trainCars <= 1) return zones;
+
+  // Se calculan una vez por trazado y tren (cada subpaso las consulta).
+  const key = `${config.trainCars}:${config.carSpacing}`;
+  const cached = BOUNDARY_CACHE.get(track)?.get(key);
+  if (cached) return cached;
+
+  const offsets = Array.from({ length: config.trainCars }, (_, index) => index * config.carSpacing);
+  const perCar = [...zones, track.brakeStart, 0];
+  const boundaries = offsets.flatMap(offset => perCar.map(boundary => boundary + offset)).filter(boundary => boundary > 0 || zones.includes(boundary));
+  const forTrack = BOUNDARY_CACHE.get(track) ?? new Map();
+  forTrack.set(key, boundaries);
+  BOUNDARY_CACHE.set(track, forTrack);
+  return boundaries;
+}
+
+/** Bordes por trazado (los trazados se memorizan y no cambian) y por tren. */
+const BOUNDARY_CACHE = new WeakMap();
+
+/** Opciones de la derivada del tren articulado: solo escalares. */
+const LEAN = Object.freeze({ lean: true });
 
 /**
  * Bisección temporal para localizar el instante τ ∈ (0, h] en el que
@@ -294,7 +387,7 @@ function advanceFree(current, values, h, config, track) {
   const finish = (elapsed, result) => ({
     elapsed,
     state: checked(
-      makeState(current.time + elapsed, result[0], result[1], result[2], config, track, current.events, result[3]),
+      makeState(current.time + elapsed, result[0], result[1], result[2], config, track, current.events, result[3], result[4]),
       config,
       track
     )
@@ -326,17 +419,17 @@ function advanceFree(current, values, h, config, track) {
   // Con |v| < |a|·h, la fuerza que se opone al movimiento lo detiene dentro del paso. RK4 no
   // sirve ahí: sus etapas cambian el signo de la fricción (Coulomb) y se anulan, y v quedaría
   // fija para siempre. El tramo hasta v = 0 se integra en forma cerrada (aceleración constante).
-  const [, acceleration, dissipationRate, inputRate] = derivative(values);
+  const [, acceleration, dissipationRate, inputRate, chainRate] = derivative(values);
 
   if (values[1] * acceleration < 0 && Math.abs(values[1]) < Math.abs(acceleration) * h) {
     const tau = Math.abs(values[1] / acceleration);
-    return settle(tau, [values[0] + (values[1] * tau) / 2, 0, values[2] + (dissipationRate * tau) / 2, values[3] + (inputRate * tau) / 2]);
+    return settle(tau, [values[0] + (values[1] * tau) / 2, 0, values[2] + (dissipationRate * tau) / 2, values[3] + (inputRate * tau) / 2, values[4] + (chainRate * tau) / 2]);
   }
 
   if (values[1] * next[1] < 0) {
     const tau = locateEvent(derivative, values, h, candidate => values[1] * candidate[1] <= 0);
     const turning = rk4(derivative, values, tau);
-    return settle(tau, [turning[0], 0, turning[2], turning[3]]);
+    return settle(tau, [turning[0], 0, turning[2], turning[3], turning[4]]);
   }
 
   // Bordes donde la fuerza cambia de golpe: la entrada al frenado, el final, A y los bordes de cada zona
@@ -345,7 +438,7 @@ function advanceFree(current, values, h, config, track) {
     { active: values[0] < track.brakeStart && next[0] >= track.brakeStart, boundary: track.brakeStart, forward: true },
     { active: values[0] < track.totalLength && next[0] >= track.totalLength, boundary: track.totalLength, forward: true },
     { active: values[0] > 0 && next[0] <= 0, boundary: 0, forward: false },
-    ...zoneBoundaries(track).flatMap(boundary => [
+    ...trainBoundaries(track, config).flatMap(boundary => [
       { active: values[0] < boundary && next[0] >= boundary, boundary, forward: true },
       { active: values[0] > boundary && next[0] <= boundary, boundary, forward: false }
     ])
@@ -354,7 +447,7 @@ function advanceFree(current, values, h, config, track) {
   if (crossings.length) {
     // Hasta el borde rige la fuerza del lado donde está el tren: las etapas de RK4 que asoman del otro lado
     // no deben ver el empuje (o el frenado) de una zona en la que todavía no entró.
-    const before = derivativeFor(track, config, zoneAt(track, values[0]));
+    const before = config.trainCars > 1 ? derivativeFor(track, config, undefined, values[0]) : derivativeFor(track, config, zoneAt(track, values[0]));
     const located = crossings
       .map(crossing => ({
         boundary: crossing.boundary,
@@ -364,7 +457,7 @@ function advanceFree(current, values, h, config, track) {
 
     const crossing = rk4(before, values, located.tau);
 
-    return finish(located.tau, [located.boundary, crossing[1], crossing[2], crossing[3]]);
+    return finish(located.tau, [located.boundary, crossing[1], crossing[2], crossing[3], crossing[4]]);
   }
 
   return finish(h, next);
@@ -402,7 +495,7 @@ export function step(state, input, dt) {
 
   while (remaining > 1e-12) {
     const h = Math.min(substep, remaining);
-    const values = [current.distance, current.velocity, current.energies.dissipated, current.energies.input ?? 0];
+    const values = [current.distance, current.velocity, current.energies.dissipated, current.energies.input ?? 0, current.energies.chainWork ?? 0];
     const forces = calculateForces(track, config, values[0], values[1]);
 
     if (
@@ -413,7 +506,7 @@ export function step(state, input, dt) {
     }
 
     const result =
-      config.brakeMode === "station" && values[0] >= track.brakeStart
+      config.brakeMode === "station" && values[0] >= track.brakeStart && config.trainCars <= 1
         ? advanceInBrakeZone(current, values, h, config, track)
         : advanceFree(current, values, h, config, track);
 

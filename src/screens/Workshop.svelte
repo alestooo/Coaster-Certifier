@@ -8,6 +8,9 @@
   import SelectionPanel from "../components/workshop/SelectionPanel.svelte";
   import ElementPanel from "../components/workshop/ElementPanel.svelte";
   import LiftControls from "../components/workshop/LiftControls.svelte";
+  import EstimatePanel from "../components/workshop/EstimatePanel.svelte";
+  import { designName } from "../lib/report-text";
+  import { SEATS_PER_CART } from "../game/passengers";
   import RulesPanel from "../components/workshop/RulesPanel.svelte";
   import TelemetryDrawer from "../components/workshop/TelemetryDrawer.svelte";
   import VerdictPanel from "../components/lab/VerdictPanel.svelte";
@@ -150,7 +153,7 @@
    * Configuración con su trazado por elementos (el borrador, o la vigente mientras se vuelve a derivar) y la
    * masa real del tren: la del borrador no sigue a los pasajeros (se suma recién al simular).
    */
-  let elementConfig = $derived({ ...(session.draft.track ? session.draft : runner.config), mass: runner.config.mass });
+  let elementConfig = $derived({ ...(session.draft.track ? session.draft : runner.config), mass: runner.config.mass, trainCars: runner.config.trainCars });
 
   // Un elemento que ya no existe (otro recorrido, elemento borrado o deshecho) deja de estar elegido.
   $effect(() => {
@@ -167,6 +170,7 @@
     const element = elementConfig.track[index];
     if (element?.type === "point" && element.loop) return report?.areas.loop ?? null;
     if (element?.type === "hill") return report?.areas.hill ?? null;
+    if (element?.type === "booster" || element?.type === "trim") return report?.areas.zone ?? null;
     return null;
   }
 
@@ -398,7 +402,7 @@
     const track = buildTrack(result.config);
     downloadJson(stampedName(`dictamen-${result.config.mapId}`, "json"), {
       generatedAt: new Date().toISOString(),
-      map: mapName(result.config.mapId),
+      map: designName(result.config),
       config: result.config,
       verdict: result.verdict,
       track: { sections: track.sections, markers: track.markers }
@@ -460,6 +464,7 @@
       onSelect={select}
       {selectedElement}
       sheetInset={sheetHeight}
+      panelOpen={panel !== null}
       onSelectElement={selectElement}
     />
   </div>
@@ -520,6 +525,10 @@
             onGesture={gesture}
           />
         </SidePanel>
+      {:else if panel === "estimate"}
+        <SidePanel onSheet={height => (sheetHeight = height)} title={PANEL_TITLES.estimate} subtitle="Capacidad, energía y estructura del recorrido auditado" onClose={closePanel}>
+          <EstimatePanel {result} seats={session.cartCount * SEATS_PER_CART} />
+        </SidePanel>
       {:else if panel === "passengers"}
         <SidePanel
           title={PANEL_TITLES.passengers}
@@ -534,9 +543,11 @@
             <editor.default
               passengers={session.passengers}
               cartMass={session.cartMass}
+              trainCars={session.cartCount}
               error={session.errorField === "mass" ? session.errorMessage : ""}
               onChange={next => session.setPassengers(next)}
               onCartMass={value => session.setCartMass(value)}
+              onTrainCars={value => session.setTrainCars(value)}
             />
             {/if}
           {:catch error}
@@ -563,7 +574,7 @@
       config={result.config}
       history={result.history}
       passengers={session.passengers}
-      mapName={mapName(result.config.mapId)}
+      mapName={designName(result.config)}
     />
   {/await}
 {/if}

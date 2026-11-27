@@ -16,6 +16,7 @@ import { scenarioConfig, type ScenarioId } from "../game/scenarios";
 import type { MapId } from "../game/maps";
 import {
   CART_MASS,
+  MAX_TRAIN_CARS,
   DEFAULT_PASSENGER_MASS,
   MIN_PASSENGER_MASS,
   MAX_PASSENGER_MASS,
@@ -47,6 +48,8 @@ interface Design {
   config: SimulationConfig;
   cartMass: number;
   passengers: Passenger[];
+  /** Carros elegidos (el tren tiene al menos los que piden los pasajeros). */
+  trainCars: number;
 }
 
 function copyConfig(source: SimulationConfig): SimulationConfig {
@@ -74,6 +77,8 @@ export class DesignSession {
   draft = $state.raw<SimulationConfig>(resolveConfig());
   cartMass = $state(CART_MASS);
   passengers = $state.raw<Passenger[]>([]);
+  /** Carros elegidos; los que no tienen pasajeros van vacíos (suman su masa). */
+  trainCars = $state(1);
   errorField = $state("");
   errorMessage = $state("");
 
@@ -84,14 +89,14 @@ export class DesignSession {
   preview = $derived.by((): { config: SimulationConfig; track: Track } | null => {
     try {
       this.#assertMasses();
-      const config = resolveConfig({ ...this.draft, mass: this.#totalMass() });
+      const config = resolveConfig({ ...this.draft, mass: this.#totalMass(), trainCars: this.cartCount });
       return { config, track: buildTrack(config) };
     } catch {
       return null;
     }
   });
 
-  #history = $state.raw<DesignHistory<Design>>(createHistory<Design>({ config: resolveConfig(), cartMass: CART_MASS, passengers: [] }));
+  #history = $state.raw<DesignHistory<Design>>(createHistory<Design>({ config: resolveConfig(), cartMass: CART_MASS, passengers: [], trainCars: 1 }));
   #lastValid: Design;
   #commitTimer: ReturnType<typeof setTimeout> | null = null;
   #historyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -111,8 +116,9 @@ export class DesignSession {
     return this.passengers.map(passenger => passenger.mass);
   }
 
+  /** Carros del tren: los elegidos, o más si los pasajeros no entran. */
   get cartCount(): number {
-    return calculateCartCount(this.passengers);
+    return Math.max(this.trainCars, calculateCartCount(this.passengers));
   }
 
   get canUndo(): boolean {
@@ -177,7 +183,10 @@ export class DesignSession {
     return this.#commit();
   }
 
-  /** Cambia de recorrido con su forma por defecto; conserva reglas, frenos y masas. */
+  /**
+   * Cambia de recorrido con su diseño de la miniatura: la geometría y lo que fije la plantilla (el anexo fija sus
+   * frenos y su fricción); conserva las reglas y las masas.
+   */
   loadTemplate(mapId: MapId): void {
     this.#flushPending();
     this.runner.pause();
@@ -201,6 +210,13 @@ export class DesignSession {
     this.runner.pause();
     this.draft = copyConfig(next);
     this.#commitAndRecord();
+  }
+
+  /** Elige la cantidad de carros (entero entre 1 y MAX_TRAIN_CARS). */
+  setTrainCars(value: number): void {
+    this.runner.pause();
+    this.trainCars = Number.isFinite(value) ? Math.min(MAX_TRAIN_CARS, Math.max(1, Math.round(value))) : 1;
+    this.#scheduleCommit();
   }
 
   setCartMass(value: number): void {
@@ -244,7 +260,7 @@ export class DesignSession {
   }
 
   #snapshot(config: SimulationConfig): Design {
-    return { config: copyConfig(config), cartMass: this.cartMass, passengers: copyPassengers(this.passengers) };
+    return { config: copyConfig(config), cartMass: this.cartMass, passengers: copyPassengers(this.passengers), trainCars: this.trainCars };
   }
 
   #totalMass(): number {
@@ -270,7 +286,7 @@ export class DesignSession {
     try {
       this.#assertMasses();
 
-      const next = resolveConfig({ ...this.draft, mass: this.#totalMass() });
+      const next = resolveConfig({ ...this.draft, mass: this.#totalMass(), trainCars: this.cartCount });
       buildTrack(next);
 
       this.errorField = "";
@@ -344,6 +360,7 @@ export class DesignSession {
     this.draft = copyConfig(design.config);
     this.cartMass = design.cartMass;
     this.passengers = copyPassengers(design.passengers);
+    this.trainCars = design.trainCars;
     this.commitNow();
   }
 }

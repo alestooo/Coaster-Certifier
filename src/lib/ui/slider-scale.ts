@@ -82,3 +82,19 @@ export function sliderToValue(position: number, scale: SliderScale): number {
   const snapped = Number((Math.round(raw / step) * step).toFixed(decimalsFor(step)));
   return clamp(snapped, min, max);
 }
+
+/** Decimales que se muestran como máximo para un valor con más decimales que el paso. */
+const MAX_SHOWN_DECIMALS = 6;
+
+/**
+ * Decimales con que se muestra un valor: los del paso, o los que el valor
+ * tenga si son más (lo escrito no se redondea: 30,25 se ve 30,25), hasta 6.
+ */
+export function shownDecimals(value: number, step: number): number {
+  const base = decimalsFor(step);
+  for (let digits = base; digits < MAX_SHOWN_DECIMALS; digits++) {
+    if (Math.abs(Number(value.toFixed(digits)) - value) < 1e-12) return digits;
+  }
+  return MAX_SHOWN_DECIMALS;
+}
+

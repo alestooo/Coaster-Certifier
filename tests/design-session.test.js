@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { DesignSession } from "../src/lib/design-session.svelte.ts";
-import { createPassenger, calculateTotalMass } from "../src/game/passengers.ts";
+import { createPassenger, calculateTotalMass, CART_MASS, MAX_TRAIN_CARS } from "../src/game/passengers.ts";
 import { DEFAULT_CONFIG } from "../src/physics/index.js";
 
 /** Pausa del commit (120 ms) más un margen. */
@@ -114,6 +114,39 @@ describe("Sesión de diseño", () => {
     // Assert
     expect(session.masses).toHaveLength(3);
     expect(session.runner.config.mass).toBe(calculateTotalMass(three));
+  });
+
+  test("se pueden elegir más carros que los que piden los pasajeros: los vacíos suman su masa y se deshace", () => {
+    // Act: dos pasajeros (un carro) en un tren de cinco.
+    session.setTrainCars(5);
+    vi.advanceTimersByTime(AFTER_SETTLE_MS);
+
+    // Assert
+    expect(session.cartCount).toBe(5);
+    expect(session.runner.config.trainCars).toBe(5);
+    expect(session.runner.config.mass).toBe(5 * CART_MASS + session.masses.reduce((sum, mass) => sum + mass, 0));
+
+    session.undo();
+    expect(session.runner.config.trainCars).toBe(1);
+  });
+
+  test("los pasajeros nunca quedan sin asiento: con más pasajeros el tren crece aunque se haya elegido menos", () => {
+    session.setTrainCars(1);
+    session.setPassengers([1, 2, 3].map(id => createPassenger(id)));
+    vi.advanceTimersByTime(AFTER_COMMIT_MS);
+
+    expect(session.cartCount).toBe(2);
+    expect(session.runner.config.trainCars).toBe(2);
+  });
+
+  test("la cantidad de carros elegida se recorta al rango del taller", () => {
+    session.setTrainCars(40);
+    vi.advanceTimersByTime(AFTER_COMMIT_MS);
+    expect(session.cartCount).toBe(MAX_TRAIN_CARS);
+
+    session.setTrainCars(0);
+    vi.advanceTimersByTime(AFTER_COMMIT_MS);
+    expect(session.cartCount).toBe(1);
   });
 
   test("la vista previa refleja el borrador antes del commit y es null si es inválido", () => {

@@ -1,5 +1,6 @@
 import { geometryAt } from "../track/geometry.js";
 import { boosterForce } from "./booster.js";
+import { trainForces } from "./train.js";
 import { REST_SPEED_EPSILON } from "../constants.js";
 
 import {
@@ -73,11 +74,15 @@ export function zoneAt(track, distance) {
  * @param {import("../config.js").SimulationConfig} config Configuración resuelta.
  * @param {number} distance Coordenada s (m).
  * @param {number} velocity Velocidad tangencial v (m/s), positiva en el sentido de avance.
- * @param {{zone?: import("../track/builder.js").TrackZone | null}} [options] `zone` fija la zona en lugar de
- *   buscarla por s: el paso que llega a un borde integra con la fuerza del lado donde está el tren.
+ * @param {{zone?: import("../track/builder.js").TrackZone | null, membershipAt?: number, lean?: boolean}} [options] `zone` fija la
+ *   zona en lugar de buscarla por s (y `membershipAt`, la posición con que se decide la zona de cada carro del tren
+ *   articulado): el paso que llega a un borde integra con la fuerza del lado donde está el tren.
  * @returns {Forces}
  */
 export function calculateForces(track, config, distance, velocity, options = {}) {
+  // Tren de varios carros: fuerzas por carro (con un carro, la partícula de siempre).
+  if (config.trainCars > 1) return /** @type {Forces} */ (trainForces(track, config, distance, velocity, options));
+
   const geometry = geometryAt(track, distance);
   const normal = normalForce(config.mass, config.gravity, geometry.angle, geometry.curvature, velocity);
 

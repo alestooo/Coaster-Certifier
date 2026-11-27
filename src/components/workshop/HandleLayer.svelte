@@ -5,7 +5,7 @@
   import { letterName } from "../../lib/point-legend";
   import { onPointerRelease } from "../../lib/pointer-release";
   import { proposeDrag, proposeValue, handleText, type Handle, type HandleId, type DragProposal, type DragStart } from "../../lib/handles";
-  import { fieldByKey, limitsOf } from "../../lib/field-definitions";
+  import { fieldByKey, fieldLimits, limitsOf } from "../../lib/field-definitions";
   import type { Camera } from "../../ui/renderer/camera.js";
   import type { AreaId } from "../../lib/audit";
   import type { SimulationConfig } from "../../lib/types";
@@ -181,7 +181,7 @@
   {/each}
 
   {#each visible as handle (handle.id)}
-    {@const limits = limitsOf(handle.key)}
+    {@const limits = fieldLimits(handle.key, config)}
     {@const label = handleText(handle, handle.value, config).label}
     <button
       type="button"

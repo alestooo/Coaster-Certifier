@@ -70,7 +70,7 @@ const CACHE_SIZE = 16;
  * @param {import("../config.js").SimulationConfig} config
  */
 function cacheKey(config) {
-  return JSON.stringify([config.track, config.initialHeight, config.brakingLength, config.brakeMode]);
+  return JSON.stringify([config.track, config.initialHeight, config.brakingLength, config.brakeMode, config.mapId]);
 }
 
 /**
@@ -80,7 +80,8 @@ function cacheKey(config) {
  * @param {boolean} fromLoop
  */
 function sectionName(start, end, isFirst, fromLoop) {
-  if (isFirst) return "Caída inicial";
+  // Sin subida el primer tramo puede ir en plano o subir: solo es «caída» si baja.
+  if (isFirst) return end.y < start.y ? "Caída inicial" : "Salida";
   if (end.role === "crest") return "Colina (subida)";
   if (start.role === "crest") return "Colina (bajada)";
   if (fromLoop) return "Salida del loop";
@@ -158,7 +159,8 @@ function assertLoopsFit(nodes) {
 
     if (minX < previousLimit || maxX > next.x || loop.exitX >= next.x) {
       throw new ConfigError(
-        `El loop del punto ${index + 1} necesita más espacio horizontal: ` +
+        // Se nombra por su elemento («Punto N» del panel): una colina aporta tres nodos.
+        `El loop del punto ${(node.element ?? index) + 1} necesita más espacio horizontal: ` +
           "separá los puntos vecinos o reducí la altura del loop.",
         "track"
       );

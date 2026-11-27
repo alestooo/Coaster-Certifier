@@ -113,7 +113,7 @@ function summarizeSections(history, track) {
       exitSpeed: last.speed,
       maxSpeed: maxOf(states, state => state.speed),
       maxLoad: maxOf(states, state => state.load),
-      minLoad: minOf(states, state => state.load),
+      minLoad: minOf(states, state => state.minCarLoad ?? state.load),
       minNormal: minOf(states, state => state.forces.normal),
       dissipated: last.energies.dissipated - first.energies.dissipated
     };
@@ -198,7 +198,8 @@ export function summarizeRun(history, config, track) {
     samples: history.length,
     maxSpeed: extreme(history, state => state.speed, "max"),
     maxLoad: extreme(history, state => state.load, "max"),
-    minLoad: extreme(history, state => state.load, "min"),
+    // Con el tren articulado, `load` es la del carro más cargado y `minCarLoad` la del más liviano.
+    minLoad: extreme(history, state => state.minCarLoad ?? state.load, "min"),
     maxNormal: extreme(history, state => state.forces.normal, "max"),
     minNormal: extreme(history, state => state.forces.normal, "min"),
     maxTangentialAcceleration: extreme(history, state => Math.abs(state.tangentialAcceleration), "max"),
@@ -208,6 +209,7 @@ export function summarizeRun(history, config, track) {
     finalMechanicalEnergy: final.energies.mechanical,
     dissipatedEnergy: final.energies.dissipated,
     inputEnergy: final.energies.input ?? 0,
+    chainEnergy: final.energies.chainWork ?? 0,
     braking: summarizeBraking(history, config, track),
     sections: summarizeSections(history, track),
     criticalPoints: summarizeMarkers(history, track)

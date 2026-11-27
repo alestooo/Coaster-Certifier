@@ -144,10 +144,10 @@
             <tr><th>Fuerza normal máxima</th><td class="num">{formatNumber(summary.maxNormal.value, 0)} N</td><td>{summary.maxNormal.section}</td></tr>
             <tr><th>Aceleración tangencial máxima</th><td class="num">{formatNumber(summary.maxTangentialAcceleration.value)} m/s²</td><td>{summary.maxTangentialAcceleration.section}</td></tr>
             <tr><th>Aceleración normal máxima</th><td class="num">{formatNumber(summary.maxNormalAcceleration.value)} m/s²</td><td>{summary.maxNormalAcceleration.section}</td></tr>
-            {#each energyRows(summary) as row (row.label)}
+            {#each energyRows(summary, config.trainCars) as row (row.label)}
               <tr><th>{row.label}</th><td class="num">{row.value}</td><td>{row.detail}</td></tr>
             {/each}
-            <tr><th>Error máximo de balance</th><td class="num">{formatScientific(summary.maxBalanceError.value, 2)} J</td><td>{formatScientific((100 * summary.maxBalanceError.value) / (summary.initialEnergy + Math.max(0, summary.inputEnergy ?? 0)), 2)} % de la energía disponible</td></tr>
+            <tr><th>Error máximo de balance</th><td class="num">{formatScientific(summary.maxBalanceError.value, 2)} J</td><td>{formatScientific((100 * summary.maxBalanceError.value) / (summary.initialEnergy + Math.max(0, summary.inputEnergy ?? 0) + (summary.chainEnergy ?? 0)), 2)} % de la energía disponible</td></tr>
             <tr><th>Duración</th><td class="num">{formatSeconds(summary.duration)}</td><td>{formatNumber(summary.samples, 0)} muestras</td></tr>
           </tbody>
         </table>
@@ -234,6 +234,14 @@
             <tr><th>Contacto</th><td>{config.contactModel === "strict" ? "siempre apoyado (N > 0)" : "ruedas anti-levantamiento"}</td><th>m</th><td>{formatNumber(config.mass, 1)} kg</td></tr>
             <tr><th><Sym symbol="W" /> · Ancho del trazado (derivado: x del final)</th><td>{formatNumber(config.trackWidth, 1)} m</td><th></th><td></td></tr>
             <tr><th>Subida por cadena</th><td colspan="3">{liftText(config)}</td></tr>
+            <tr>
+              <th>Tren</th>
+              <td colspan="3">
+                {config.trainCars > 1
+                  ? `${config.trainCars} carros · criterios sobre el peor carro · ${formatNumber(config.carSpacing, 2)} m entre carros`
+                  : "1 carro (partícula, como el anexo)"}
+              </td>
+            </tr>
             {#each Array.from({ length: Math.ceil(parameterRows.length / 2) }, (_, index) => parameterRows.slice(index * 2, index * 2 + 2)) as pair}
               <tr>
                 {#each pair as row}
@@ -262,7 +270,7 @@
       </section>
 
       <footer class="sheet-foot">
-        Modelo de partícula sobre vía rígida en un plano vertical, fricción efectiva μ·|N|, integración RK4 con paso ≤ {config.maxSubstep} s.
+        {config.trainCars > 1 ? `Tren articulado de ${config.trainCars} carros` : "Modelo de partícula"} sobre vía rígida en un plano vertical, fricción efectiva μ·|N|, integración RK4 con paso ≤ {formatNumber(config.maxSubstep * 1000, 2)} ms.
         Proyecto de Física I (FUN-18), Universidad CENFOTEC · Grupo A.
       </footer>
     </article>

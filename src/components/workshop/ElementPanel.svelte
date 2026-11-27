@@ -183,7 +183,7 @@
       {...DAMPING}
       value={zone.damping}
       limits={elementLimits(config, index, "damping")}
-      hint={`Sin fricción ni pendiente le quitan Δv = c·L/m = ${formatNumber((zone.damping * zone.length) / config.mass, 1)} m/s`}
+      hint={`c por carro: sin fricción ni pendiente le quitan Δv = N·c·L/m = ${formatNumber((config.trainCars * zone.damping * zone.length) / config.mass, 1)} m/s`}
       onInput={value => commit(elementLimits(config, index, "damping"), value, damping => setZone(config, index, { damping }))}
       {onGesture}
     />

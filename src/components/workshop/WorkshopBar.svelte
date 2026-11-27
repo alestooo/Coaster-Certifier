@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { RollerCoaster, Users, Undo2, Redo2, SlidersHorizontal, BookOpen, ShieldCheck, ShieldAlert, LoaderCircle, TriangleAlert } from "lucide-svelte";
+  import { RollerCoaster, Users, Undo2, Redo2, SlidersHorizontal, BookOpen, ShieldCheck, ShieldAlert, LoaderCircle, TriangleAlert, Calculator } from "lucide-svelte";
   import TemplatePicker from "./TemplatePicker.svelte";
   import type { AuditReport } from "../../lib/audit";
   import type { AuditStatus } from "../../lib/live-audit.svelte";
@@ -65,6 +65,10 @@
 
   <button type="button" class="icon labelled" class:active={panel === "rules"} aria-pressed={panel === "rules"} title="Reglas de certificación y precisión" onclick={() => onPanel("rules")}>
     <SlidersHorizontal size={16} /> <span>Reglas</span>
+  </button>
+
+  <button type="button" class="icon labelled" class:active={panel === "estimate"} aria-pressed={panel === "estimate"} title="Estimación: capacidad, energía y estructura" onclick={() => onPanel("estimate")}>
+    <Calculator size={16} /> <span>Estimación</span>
   </button>
 
   <button type="button" class="icon guide" aria-label="Guía" title="Guía: escenarios, criterios y modelo" onclick={onGuide}><BookOpen size={16} /></button>

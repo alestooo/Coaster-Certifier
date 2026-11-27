@@ -66,6 +66,19 @@ export function loadProfile(history: readonly SimulationState[], track: Track, b
   for (let index = 1; index < history.length; index++) {
     const before = history[index - 1];
     const after = history[index];
+
+    // Tren articulado: cada carro pinta su fuerza g en su propia posición (los que siguen en la subida, no).
+    if (before.cars && after.cars) {
+      before.cars.forEach((car, position) => {
+        const next = after.cars?.[position];
+        if (!next || car.distance < 0 || next.distance < 0) return;
+        const a = clampDistance(car.distance);
+        const b = clampDistance(next.distance);
+        touch(Math.min(a, b), Math.max(a, b), [car.load, next.load]);
+      });
+      continue;
+    }
+
     const a = clampDistance(before.distance);
     const b = clampDistance(after.distance);
     touch(Math.min(a, b), Math.max(a, b), [before.load, after.load]);

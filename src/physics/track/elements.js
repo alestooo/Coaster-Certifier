@@ -254,6 +254,7 @@ export function validateElements(elements) {
   if (elements.at(-1)?.type !== "end") fail("El trazado termina en el final (E).");
 
   elements.forEach((element, index) => {
+    if (!element || typeof element !== "object") fail(`Elemento ${index + 1}: no es un elemento válido.`);
     const name = () => elementName(elements, index);
     const inner = index > 0 && index < elements.length - 1;
 

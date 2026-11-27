@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { valueToSlider, sliderToValue, decimalsFor, stepFrom, SLIDER_STEPS } from "../src/lib/ui/slider-scale.ts";
+import { valueToSlider, sliderToValue, decimalsFor, stepFrom, SLIDER_STEPS, shownDecimals } from "../src/lib/ui/slider-scale.ts";
 
 const linear = { min: 0, max: 10, step: 0.5, scale: "linear" };
 const springConstant = { min: 100, max: 200000, step: 100, scale: "log" };
@@ -81,5 +81,16 @@ describe("Escala del slider de un campo", () => {
     expect(stepFrom(30, 1, height)).toBe(30.5);
     expect(stepFrom(80, 10, height)).toBe(80);
     expect(stepFrom(0.1, -1, height)).toBe(0.1);
+  });
+});
+
+describe("Decimales de un campo", () => {
+  test("se muestran los decimales del paso, o más si el valor los tiene (no se redondea lo escrito)", () => {
+    expect(shownDecimals(30, 0.5)).toBe(1);
+    expect(shownDecimals(30.25, 0.5)).toBe(2);
+    expect(shownDecimals(0.00002, 0.00001)).toBe(5);
+    expect(shownDecimals(0.00025, 0.0001)).toBe(5);
+    expect(shownDecimals(72.5, 1)).toBe(1);
+    expect(shownDecimals(1 / 3, 0.1)).toBe(6);
   });
 });

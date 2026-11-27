@@ -80,15 +80,18 @@ function createEvent(state, code, condition, value, limit, unit, comparison) {
 export function evaluateState(state, config, track) {
   const inLoop = state.kind === "loop";
   const strict = config.contactModel === "strict";
+  // Con varios carros manda el peor: la normal más chica (en toda la vía, o entre los carros que están en un loop).
+  const articulated = state.minNormal !== undefined;
+  const normal = strict ? (articulated ? /** @type {number} */ (state.minNormal) : state.forces.normal) : articulated ? state.minLoopNormal ?? null : inLoop ? state.forces.normal : null;
 
-  if (state.forces.normal <= 0 && (strict || inLoop)) {
+  if (normal !== null && normal <= 0) {
     return {
       status: "lost-contact",
       event: createEvent(
         state,
         strict ? CRITERIA.CONTACT : CRITERIA.LOOP_CONTACT,
         strict ? "Contacto con la vía: N > 0" : "Contacto en el loop: N > 0",
-        state.forces.normal,
+        normal,
         0,
         "N",
         ">"
@@ -137,14 +140,15 @@ export function evaluateState(state, config, track) {
     };
   }
 
-  if (!strict && state.load < config.minLoad) {
+  const lowestLoad = state.minCarLoad ?? state.load;
+  if (!strict && lowestLoad < config.minLoad) {
     return {
       status: "rejected",
       event: createEvent(
         state,
         CRITERIA.MIN_LOAD,
         "Fuerza g mínima sobre los pasajeros: n ≥ n_mín",
-        state.load,
+        lowestLoad,
         config.minLoad,
         "g",
         "≥"

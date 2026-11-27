@@ -33,7 +33,7 @@
     <video bind:this={video} class="menu-video" src={BACKGROUND_VIDEO} poster={BACKGROUND_POSTER} autoplay muted loop playsinline aria-hidden="true" tabindex="-1"></video>
   {/if}
 
-  <div class="version-badge">AVANCE 2 · v0.9</div>
+  <div class="version-badge">ENTREGA FINAL · v1.0</div>
 
   <div class="menu-content">
     <h1 class="menu-title">

@@ -278,7 +278,7 @@ const ELEMENT_FIELDS: FieldDefinition[] = [
     label: "Altura de la colina",
     unit: "m",
     step: 0.5,
-    help: "Altura de la cresta D. Con 0 m no hay colina."
+    help: "Altura de la cresta D sobre el suelo. Para quitar la colina, usá «Borrar colina» en la barra sobre ella."
   },
   {
     key: "hillCrestRadius",

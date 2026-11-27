@@ -57,8 +57,17 @@ export function drawZoneHardware({ ctx, camera, scene }) {
  * @param {import("./index.js").Frame} frame
  */
 export function drawZoneActivity({ ctx, camera, scene }) {
-  const { state, track } = scene;
-  if (!state?.zoneKind || !track.zones?.length) return;
+  const { state, track, config } = scene;
+  if (!state) return;
+
+  // Frenos de la recta final: se encienden mientras frenan (el tren entró y todavía se mueve).
+  if (config?.brakeMode === "station" && state.distance >= track.brakeStart && state.speed > 0.05) {
+    const height = Math.max(MIN_PX * 2, GLOW_HEIGHT_M * camera.scale);
+    ctx.fillStyle = PALETTE.brakeGlow;
+    ctx.fillRect(camera.toX(track.brakeX), camera.toY(0) - height, camera.toX(track.endX) - camera.toX(track.brakeX), height);
+  }
+
+  if (!state.zoneKind || !track.zones?.length) return;
 
   const zone = track.zones.find((/** @type {any} */ candidate) => state.distance >= candidate.start && state.distance < candidate.end);
   if (!zone) return;

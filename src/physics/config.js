@@ -40,6 +40,8 @@ import { legacyElements, validateElements, copyElement } from "./track/elements.
  * @property {"strict"|"safety-wheels"} contactModel Modelo de contacto con la vía.
  * @property {number} maxLoad Carga máxima admisible n_máx (g).
  * @property {number} maxLaunchAcceleration Aceleración máxima admisible en un lanzador (g).
+ * @property {number} trainCars Carros del tren (1 = partícula, como el anexo).
+ * @property {number} carSpacing Distancia entre carros consecutivos, de centro a centro (m).
  * @property {number} minLoad Carga mínima admisible n_mín (g).
  * @property {number} minSpeed Umbral de detención v_mín (m/s).
  * @property {number} maxTime Tiempo máximo de observación (s).
@@ -100,6 +102,8 @@ export const CONFIG_LIMITS = Object.freeze({
   maxCompression: [0.1, 60],
   maxLoad: [1, 10],
   maxLaunchAcceleration: [0.5, 5],
+  trainCars: [1, 12],
+  carSpacing: [2, 6],
   minLoad: [-3, 1],
   minSpeed: [0, 5],
   maxTime: [1, 600],
@@ -135,6 +139,8 @@ export const DEFAULT_CONFIG = Object.freeze(/** @type {SimulationConfig} */ ({
   contactModel: "strict",
   maxLoad: DEFAULT_MAX_LOAD,
   maxLaunchAcceleration: 1.5,
+  trainCars: 1,
+  carSpacing: 3.25,
   minLoad: DEFAULT_MIN_LOAD,
   minSpeed: DEFAULT_MIN_SPEED,
 
@@ -326,6 +332,10 @@ export function resolveConfig(input = {}) {
 
   if (!CONTACT_MODELS.includes(config.contactModel)) {
     throw new ConfigError("Modelo de contacto inválido.", "contactModel");
+  }
+
+  if (!Number.isInteger(config.trainCars)) {
+    throw new ConfigError("La cantidad de carros debe ser un número entero.", "trainCars");
   }
 
   if (config.minLoad >= config.maxLoad) {

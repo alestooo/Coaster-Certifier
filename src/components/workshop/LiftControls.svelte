@@ -28,6 +28,8 @@
   ];
 
   let reason = $state("");
+  /** La última subida quitada: al volver a ponerla vuelve con su ángulo, su eficiencia y su cadena. */
+  let lastLift = $state<Lift | null>(null);
   let lift = $derived(config.track[0]?.type === "start" ? (config.track[0].lift ?? null) : null);
 
   // El motivo es del cambio que lo produjo: si el trazado cambia, se descarta.
@@ -57,7 +59,16 @@
 </script>
 
 <section class="lift" aria-label="Subida por cadena">
-  <Segmented label="Subida por cadena" block value={lift ? "chain" : "none"} options={MODES} onChange={value => apply(value === "chain" ? { ...DEFAULT_LIFT } : null, true)} />
+  <Segmented
+    label="Subida por cadena"
+    block
+    value={lift ? "chain" : "none"}
+    options={MODES}
+    onChange={value => {
+      if (value === "none" && lift) lastLift = { ...lift };
+      apply(value === "chain" ? { ...(lastLift ?? DEFAULT_LIFT) } : null, true);
+    }}
+  />
 
   {#if lift}
     {@const current = lift}

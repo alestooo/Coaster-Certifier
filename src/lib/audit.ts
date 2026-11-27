@@ -88,7 +88,7 @@ export function areaForSection(section: string, code?: string): AreaId {
   if (/loop/i.test(section)) return "loop";
   if (/colina/i.test(section)) return "hill";
   if (/frenado|resorte/i.test(section)) return "braking";
-  if (/caída inicial|plano inclinado/i.test(section)) return "start";
+  if (/caída inicial|plano inclinado|^salida$/i.test(section)) return "start";
   return "layout";
 }
 
@@ -96,6 +96,9 @@ export function areaForSection(section: string, code?: string): AreaId {
 function num(value: number, digits = 1): string {
   return formatNumber(value, Number.isInteger(value) ? 0 : digits);
 }
+
+/** Un tren detenido a menos de esto de A no llegó a arrancar (m). */
+const NOT_STARTED_M = 0.5;
 
 function issueText(violation: Violation, config: SimulationConfig): { title: string; detail: string } {
   const where = violation.section;
@@ -155,6 +158,13 @@ function issueText(violation: Violation, config: SimulationConfig): { title: str
         detail: `En ${where} la rapidez baja de ${num(limit)} m/s mientras sube: le falta energía para terminar la subida.`
       };
     case "incomplete":
+      // Quieto en A: nada lo empuja (sin pendiente, sin v₀ y sin lanzador).
+      if (violation.position < NOT_STARTED_M) {
+        return {
+          title: "El tren no arranca",
+          detail: "Se queda en A: el primer tramo no baja y no tiene rapidez inicial ni un lanzador que lo empuje. Dale v₀, una bajada o un lanzador desde la estación."
+        };
+      }
       return {
         title: "No completa el recorrido",
         detail: `Se detuvo en ${where}, antes de llegar a la zona de frenado.`
@@ -338,7 +348,7 @@ function startText(verdict: Verdict, config: SimulationConfig, head: number, max
 
 /** Energía disponible: la inicial más lo que entregaron los lanzadores (J). */
 function availableEnergy(verdict: Verdict): number {
-  return verdict.summary.initialEnergy + Math.max(0, verdict.summary.inputEnergy ?? 0);
+  return verdict.summary.initialEnergy + Math.max(0, verdict.summary.inputEnergy ?? 0) + (verdict.summary.chainEnergy ?? 0);
 }
 
 /** Fracción de la energía disponible que se pierde antes de frenar (rodadura, aire y frenos de ajuste). */

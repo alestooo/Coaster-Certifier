@@ -579,7 +579,7 @@ export function elementHandles(track: Track, config: SimulationConfig): ElementH
       const top = geometryAt(track, marker.distance);
       const suffix = loopCount > 1 ? ` ${loopIndex + 1}` : "";
       handles.push(
-        { id: `loop-top-${index}`, kind: "loopTop", index, x: top.x, y: top.y, letter: loopTops[loopIndex], name: `Cima del loop ${loopTops[loopIndex] ?? ""}: altura del loop${suffix}`.replace("  ", " "), anchor: { x: top.x, y: element.y } },
+        { id: `loop-top-${index}`, kind: "loopTop", index, x: top.x, y: top.y, letter: loopTops[loopIndex], name: loopTops[loopIndex] ? `Cima del loop ${loopTops[loopIndex]}: altura del loop` : `Cima del loop${suffix}: altura del loop`, anchor: { x: top.x, y: element.y } },
         { id: `loop-radius-${index}`, kind: "loopRadius", index, x: top.x + loop.topRadius, y: top.y - loop.topRadius, name: `Radio en la cima del loop${suffix}`, anchor: { x: top.x, y: top.y } }
       );
       return;
@@ -591,7 +591,7 @@ export function elementHandles(track: Track, config: SimulationConfig): ElementH
       const letter = crestLetter(index);
       const half = hillHalfWidth(element.height, element.crestRadius);
       handles.push(
-        { id: `hill-crest-${index}`, kind: "hillCrest", index, x: element.x, y: element.height, letter, name: `Cresta de la colina ${letter ?? ""}: posición y altura${suffix}`.replace("  ", " ") },
+        { id: `hill-crest-${index}`, kind: "hillCrest", index, x: element.x, y: element.height, letter, name: letter ? `Cresta de la colina ${letter}: posición y altura` : `Cresta de la colina${suffix}: posición y altura` },
         { id: `hill-radius-${index}`, kind: "hillRadius", index, x: element.x + half, y: 0, name: `Radio de la cresta${suffix}`, anchor: { x: element.x, y: element.height } }
       );
       return;

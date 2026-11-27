@@ -2,6 +2,7 @@ import { PALETTE } from "./palette.js";
 import { box, circle, hash } from "./draw.js";
 import { drawPerson } from "./scenery.js";
 import { drawRails } from "./track.js";
+import { formatNumber } from "../format.ts";
 import { liftHeightAt, liftLength, pointFromBase, LIFT_LEAD_IN_M } from "./lift.js";
 import { stationSpan } from "./camera.js";
 
@@ -109,8 +110,8 @@ export function drawStation(frame) {
 
   const subtitle =
     scene.config.brakeMode === "spring"
-      ? `Resorte · k = ${scene.config.springConstant} N/m · x_máx = ${scene.config.maxCompression} m`
-      : `Frenos · d_f = ${scene.config.brakingLength} m · a_f = ${scene.config.brakeDeceleration} m/s²`;
+      ? `Resorte · ${formatNumber(scene.config.springConstant, 0)} N/m · hasta ${formatNumber(scene.config.maxCompression, 1)} m`
+      : `Frenos · ${formatNumber(scene.config.brakingLength, 0)} m · ${formatNumber(scene.config.brakeDeceleration, 1)} m/s²`;
   const signWidth = Math.min(width * 0.7, m(12));
   const signHeight = m(STATION.signHeight) + m(0.7);
   const signTop = roofTop - signHeight + m(0.1);

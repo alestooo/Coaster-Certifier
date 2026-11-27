@@ -1,6 +1,7 @@
 import { describe, test, expect } from "vitest";
+import { SCENARIOS } from "../src/physics/index.js";
 import { runSimulation, findScenario, resolveConfig } from "../src/physics/index.js";
-import { resultLines, elementRows } from "../src/lib/report-text.ts";
+import { resultLines, elementRows, designName } from "../src/lib/report-text.ts";
 import { mapTemplate } from "../src/game/maps.ts";
 import { formatNumber } from "../src/ui/format.ts";
 
@@ -65,3 +66,21 @@ describe("Tabla de elementos del informe", () => {
     expect(rows[3].x).toBe(`${formatNumber(config.trackWidth, 1)} m`);
   });
 });
+
+describe("Nombre del diseño", () => {
+  test("es el del trazado si no se editó, y «basado en» si se cambió algún elemento", () => {
+    const config = resolveConfig(mapTemplate("reference"));
+    const edited = resolveConfig({ ...config, track: config.track.map((element, index) => (index === 1 ? { ...element, x: element.x + 5 } : element)) });
+
+    expect(designName(config)).toBe("Trazado del anexo");
+    expect(designName(resolveConfig({ ...config, initialHeight: 25 }))).toBe("Trazado del anexo");
+    expect(designName(edited)).toBe("Diseño basado en «Trazado del anexo»");
+  });
+
+  test("un escenario de referencia sin tocar se llama como el escenario", () => {
+    const scenario = SCENARIOS.find(item => item.id === "circular-loop");
+
+    expect(designName(resolveConfig(scenario.config))).toBe(scenario.title);
+  });
+});
+

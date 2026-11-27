@@ -25,6 +25,8 @@ export type Passenger = {
 
 export const MAX_PASSENGERS = 4;
 export const SEATS_PER_CART = 2;
+/** Carros que se pueden elegir en el taller (la librería admite hasta 12; más carros, auditoría más lenta). */
+export const MAX_TRAIN_CARS = 6;
 
 /** Masa de un carrito vacío (kg). */
 export const CART_MASS = 425;

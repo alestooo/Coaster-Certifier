@@ -56,6 +56,8 @@
     selectedElement: number | null;
     /** Alto de la hoja del panel en el teléfono (0 si el panel va al costado). */
     sheetInset?: number;
+    /** Hay un panel abierto: el lienzo se angosta y la ayuda de arriba chocaría con la leyenda. */
+    panelOpen?: boolean;
     onSelectElement: (index: number | null) => void;
   }
 
@@ -76,6 +78,7 @@
     onSelect,
     selectedElement,
     sheetInset = 0,
+    panelOpen = false,
     onSelectElement
   }: Props = $props();
 
@@ -811,7 +814,7 @@
   <div class="overlay top-left">
     {#if pointMessage}
       <p class="hint warn" role="status">{pointMessage}</p>
-    {:else if showHint && !runner.running}
+    {:else if showHint && !runner.running && !panelOpen}
       <p class="hint">
         Arrastrá los círculos <span class="dot" aria-hidden="true"></span> para cambiar la forma · doble clic en la vía agrega un punto · tocá un punto para ver sus opciones
         <IconButton label="Ocultar ayuda" icon={X} size="sm" onclick={() => (showHint = false)} />

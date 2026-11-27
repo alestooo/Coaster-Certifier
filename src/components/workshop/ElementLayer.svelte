@@ -361,25 +361,26 @@
       role="toolbar"
       aria-label={toolbarName}
     >
-      <button type="button" onclick={() => addAfter("point")}><Plus size={14} /> Agregar punto</button>
-      <button type="button" onclick={() => addAfter("hill")}><Mountain size={14} /> Agregar colina</button>
-      <button type="button" onclick={() => addAfter("booster")}><Zap size={14} /> Agregar lanzador</button>
-      <button type="button" onclick={() => addAfter("trim")}><Magnet size={14} /> Agregar frenos de ajuste</button>
+      <button type="button" aria-label="Agregar punto" title="Agregar punto" onclick={() => addAfter("point")}><Plus size={14} /> <span>Agregar punto</span></button>
+      <button type="button" aria-label="Agregar colina" title="Agregar colina" onclick={() => addAfter("hill")}><Mountain size={14} /> <span>Agregar colina</span></button>
+      <button type="button" aria-label="Agregar lanzador" title="Agregar lanzador" onclick={() => addAfter("booster")}><Zap size={14} /> <span>Agregar lanzador</span></button>
+      <button type="button" aria-label="Agregar frenos de ajuste" title="Agregar frenos de ajuste" onclick={() => addAfter("trim")}><Magnet size={14} /> <span>Agregar frenos de ajuste</span></button>
       {#if selectedElement.type === "point"}
-        <button type="button" onclick={switchLoop}>
-          {#if selectedLoop}<CircleOff size={14} /> Quitar loop{:else}<CircleDot size={14} /> Agregar loop{/if}
+        <button type="button" aria-label={selectedLoop ? "Quitar loop" : "Agregar loop"} title={selectedLoop ? "Quitar loop" : "Agregar loop"} onclick={switchLoop}>
+          {#if selectedLoop}<CircleOff size={14} /> <span>Quitar loop</span>{:else}<CircleDot size={14} /> <span>Agregar loop</span>{/if}
         </button>
       {/if}
       {#if selectedElement.type !== "start" && selectedElement.type !== "end"}
-        <button type="button" class="danger" onclick={() => selected !== null && remove(selected)}>
-          <Trash2 size={14} />
-          {selectedElement.type === "hill"
+        {@const deleteLabel =
+          selectedElement.type === "hill"
             ? "Borrar colina"
             : selectedElement.type === "booster"
               ? "Borrar lanzador"
               : selectedElement.type === "trim"
                 ? "Borrar frenos de ajuste"
                 : "Borrar punto"}
+        <button type="button" class="danger" aria-label={deleteLabel} title={deleteLabel} onclick={() => selected !== null && remove(selected)}>
+          <Trash2 size={14} /> <span>{deleteLabel}</span>
         </button>
       {/if}
       {#if reason}<em role="status">{reason}</em>{/if}
@@ -560,6 +561,11 @@
     outline: none;
   }
 
+  /* E elegido: como un punto elegido. */
+  .axis-handle.end.editing {
+    background: var(--primary-soft);
+  }
+
   .axis-handle.end.active,
   .axis-handle.end:focus-visible {
     background: var(--primary-soft);
@@ -619,6 +625,13 @@
     font-size: var(--text-12);
     font-weight: var(--weight-bold);
     cursor: pointer;
+  }
+
+  /* En pantallas angostas la mini barra queda en una fila: solo íconos (cada botón conserva su nombre). */
+  @media (max-width: 700px) {
+    .toolbar button span {
+      display: none;
+    }
   }
 
   .toolbar button:hover {

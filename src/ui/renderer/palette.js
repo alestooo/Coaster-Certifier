@@ -96,6 +96,7 @@ export const PALETTE = Object.freeze({
   trimFin: "#b8692e",
   trimFinLight: "#efb07a",
   trimGlow: "rgba(240, 140, 60, 0.45)",
+  brakeGlow: "rgba(230, 70, 90, 0.4)",
   spring: "#b17e53",
   springDark: "#8f6340",
   bumper: "#8d739e",

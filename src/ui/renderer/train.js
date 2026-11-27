@@ -26,6 +26,9 @@ export const CART = Object.freeze({
   couplingY: -20
 });
 
+/** Radio real de las ruedas (m): 5 unidades de diseño a 30 por metro. */
+const WHEEL_RADIUS_M = 5 / 30;
+
 /** Altura (m) por debajo de la cual se proyecta sombra en el suelo. */
 const SHADOW_HEIGHT_M = 4;
 
@@ -50,13 +53,22 @@ export function cartCountFor(passengers) {
  * @param {boolean} isLead
  * @param {boolean} isLast
  */
-function drawCartBody(ctx, index, isLead, isLast) {
+function drawCartBody(ctx, index, isLead, isLast, wheelAngle = 0) {
   for (const bogieX of [-CART.bogieOffset, CART.bogieOffset]) {
     box(ctx, bogieX - 9, CART.wheelY - 5, 18, 7, PALETTE.bogie, 2);
 
     for (const wheelX of [bogieX - 5.5, bogieX + 5.5]) {
       circle(ctx, wheelX, CART.wheelY, CART.wheelRadius, PALETTE.wheel);
       circle(ctx, wheelX, CART.wheelY, CART.wheelRadius * 0.45, PALETTE.wheelRim);
+      // Un rayo que gira con la rueda: ángulo = s/r (rueda sin deslizar).
+      const spokeX = Math.cos(wheelAngle) * CART.wheelRadius * 0.85;
+      const spokeY = Math.sin(wheelAngle) * CART.wheelRadius * 0.85;
+      ctx.strokeStyle = PALETTE.wheelRim;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(wheelX - spokeX, CART.wheelY - spokeY);
+      ctx.lineTo(wheelX + spokeX, CART.wheelY + spokeY);
+      ctx.stroke();
     }
   }
 
@@ -142,7 +154,7 @@ function drawCart(ctx, passengers, motion, index, count) {
     drawPassenger(ctx, passenger, seat === 0 ? -CART.seatOffset : CART.seatOffset, motion);
   });
 
-  drawCartBody(ctx, index, index === 0, index === count - 1);
+  drawCartBody(ctx, index, index === 0, index === count - 1, motion.wheelAngle);
   drawLapBar(ctx);
 }
 
@@ -220,7 +232,8 @@ function attachment(cart, localX, localY, unit) {
  */
 export function drawTrain({ ctx, camera, scene }) {
   const passengers = scene.passengers ?? [];
-  const count = cartCountFor(passengers);
+  // Los carros del tren simulado (pueden ir vacíos); sin tren articulado, los que piden los pasajeros.
+  const count = Math.max(scene.state.cars?.length ?? 0, cartCountFor(passengers));
   const carts = cartPlacements(camera, scene.track, scene.state, count);
   const unit = camera.scale / DESIGN_PX_PER_METRE;
 
@@ -260,7 +273,9 @@ export function drawTrain({ ctx, camera, scene }) {
       {
         cartRotation: cart.rotation,
         tangentialAcceleration: scene.state.tangentialAcceleration,
-        load: scene.state.load,
+        // Con el tren articulado, cada carro siente su propia fuerza g.
+        load: scene.state.cars?.[index]?.load ?? scene.state.load,
+        wheelAngle: (scene.state.distance - index * (CART_LENGTH_M + CART_GAP_M)) / WHEEL_RADIUS_M,
         speed: scene.state.speed,
         time: scene.state.time,
         inLoop: cart.kind === "loop"

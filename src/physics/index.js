@@ -47,6 +47,7 @@ export { calculateForces, resistiveForce } from "./dynamics/forces.js";
 export { calculateEnergies, initialEnergy } from "./dynamics/energy.js";
 export { boosterForce, boosterWork } from "./dynamics/booster.js";
 export { liftMetrics } from "./dynamics/lift.js";
+export { estimateRide, ESTIMATE_ASSUMPTIONS } from "./estimate/index.js";
 export * from "./dynamics/kinematics.js";
 
 export { rk4 } from "./integration/rk4.js";
