@@ -29,7 +29,15 @@ export {
   loopPoint,
   loopExtent,
   hillHalfWidth,
-  layoutNodes
+  layoutNodes,
+  compileElements,
+  legacyElements,
+  validateElements,
+  withElement,
+  copyElement,
+  mergeConfigPatch,
+  LEGACY_TRACK_KEYS,
+  MAX_TRACK_ELEMENTS
 } from "./track/index.js";
 
 export { calculateForces, resistiveForce } from "./dynamics/forces.js";

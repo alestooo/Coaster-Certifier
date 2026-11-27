@@ -39,8 +39,6 @@ export interface ChoiceOption<T extends string> {
 
 const METRES_PER_FLOOR = 3;
 
-const hasLoop = (config: SimulationConfig) => ["loop", "reference"].includes(config.mapId);
-const hasHill = (config: SimulationConfig) => ["valley", "reference"].includes(config.mapId);
 const isStation = (config: SimulationConfig) => config.brakeMode === "station";
 const isSpring = (config: SimulationConfig) => config.brakeMode === "spring";
 const hasSafetyWheels = (config: SimulationConfig) => config.contactModel === "safety-wheels";
@@ -97,20 +95,6 @@ export const FIELD_GROUPS: FieldGroup[] = [
         step: 0.1,
         help: "Rapidez con la que el tren pasa por la cima A. El anexo propone entre 0,5 y 5 m/s.",
         hint: config => (config.initialSpeed === 0 ? "Parte desde el reposo" : `${formatNumber(kmh(config.initialSpeed), 1)} km/h`)
-      }
-    ]
-  },
-  {
-    id: "layout",
-    title: "Trazado y pérdidas",
-    fields: [
-      {
-        key: "trackWidth",
-        symbol: "W",
-        label: "Ancho del trazado",
-        unit: "m",
-        step: 5,
-        help: "Distancia horizontal desde A hasta la recta de llegada. Más largo = pendientes más suaves."
       },
       {
         key: "friction",
@@ -121,57 +105,6 @@ export const FIELD_GROUPS: FieldGroup[] = [
         help: "Coeficiente efectivo: la fricción vale f = μ·N y se opone al movimiento.",
         hint: config =>
           config.friction === 0 ? "Sin pérdidas: caso ideal" : `Se opone con el ${formatNumber(100 * config.friction, 1)} % de la fuerza normal`
-      }
-    ]
-  },
-  {
-    id: "loop",
-    title: "Loop",
-    points: "Puntos B y C",
-    visible: hasLoop,
-    fields: [
-      {
-        key: "loopHeight",
-        symbol: "h_L",
-        label: "Altura del loop",
-        unit: "m",
-        step: 0.5,
-        help: "Altura de la cima C sobre la entrada B."
-      },
-      {
-        key: "loopTopRadius",
-        symbol: "R",
-        label: "Radio en la cima",
-        unit: "m",
-        step: 0.25,
-        help: "Curvatura en C. Para no despegarse, el tren necesita v² ≥ g·R en la cima. Con R = h_L/2 el loop es circular; más chico, en forma de lágrima.",
-        hint: config =>
-          `Necesita ≥ ${formatNumber(Math.sqrt(config.gravity * config.loopTopRadius), 1)} m/s en la cima · radio en la base ${formatNumber(config.loopHeight - config.loopTopRadius, 1)} m`
-      }
-    ]
-  },
-  {
-    id: "hill",
-    title: "Colina",
-    points: "Punto D",
-    visible: hasHill,
-    fields: [
-      {
-        key: "hillHeight",
-        symbol: "h_c",
-        label: "Altura de la colina",
-        unit: "m",
-        step: 0.5,
-        help: "Altura de la cresta D. Con 0 m no hay colina."
-      },
-      {
-        key: "hillCrestRadius",
-        symbol: "ρ_c",
-        label: "Radio de la cresta",
-        unit: "m",
-        step: 1,
-        help: "Curvatura en D: más chico = cresta más cerrada y más sensación de flotar. n_D = 1 − v_D²/(g·ρ_c).",
-        hint: config => `Flota (0 g) si la cruza a más de ${formatNumber(Math.sqrt(config.gravity * config.hillCrestRadius), 1)} m/s`
       }
     ]
   },
@@ -296,6 +229,48 @@ export const FIELD_GROUPS: FieldGroup[] = [
   }
 ];
 
+/**
+ * Metadatos de los valores de un loop y de una colina. No forman un grupo
+ * del panel: se editan en el panel de cada elemento (ElementPanel).
+ */
+const ELEMENT_FIELDS: FieldDefinition[] = [
+  {
+    key: "loopHeight",
+    symbol: "h_L",
+    label: "Altura del loop",
+    unit: "m",
+    step: 0.5,
+    help: "Altura de la cima C sobre la entrada B."
+  },
+  {
+    key: "loopTopRadius",
+    symbol: "R",
+    label: "Radio en la cima",
+    unit: "m",
+    step: 0.25,
+    help: "Curvatura en C. Para no despegarse, el tren necesita v² ≥ g·R en la cima. Con R = h_L/2 el loop es circular; más chico, en forma de lágrima.",
+    hint: config =>
+      `Necesita ≥ ${formatNumber(Math.sqrt(config.gravity * config.loopTopRadius), 1)} m/s en la cima · radio en la base ${formatNumber(config.loopHeight - config.loopTopRadius, 1)} m`
+  },
+  {
+    key: "hillHeight",
+    symbol: "h_c",
+    label: "Altura de la colina",
+    unit: "m",
+    step: 0.5,
+    help: "Altura de la cresta D. Con 0 m no hay colina."
+  },
+  {
+    key: "hillCrestRadius",
+    symbol: "ρ_c",
+    label: "Radio de la cresta",
+    unit: "m",
+    step: 1,
+    help: "Curvatura en D: más chico = cresta más cerrada y más sensación de flotar. n_D = 1 − v_D²/(g·ρ_c).",
+    hint: config => `Flota (0 g) si la cruza a más de ${formatNumber(Math.sqrt(config.gravity * config.hillCrestRadius), 1)} m/s`
+  }
+];
+
 /** Grupos que aplican a la configuración, cada uno solo con sus campos visibles. */
 export function visibleGroups(config: SimulationConfig): FieldGroup[] {
   return FIELD_GROUPS.filter(group => !group.visible || group.visible(config)).map(group => ({
@@ -343,7 +318,7 @@ export function fieldByKey(key: string): FieldDefinition | undefined {
     if (field) return field;
   }
 
-  return undefined;
+  return ELEMENT_FIELDS.find(candidate => candidate.key === key);
 }
 
 /**

@@ -6,13 +6,14 @@
  * de PhET o Desmos). Todo se calcula en metros; la interfaz solo proyecta
  * a píxeles con la cámara.
  */
-import { buildTrack, resolveConfig, geometryAt, hillHalfWidth, APPROACH_LENGTH, ConfigError } from "../physics/index.js";
+import { buildTrack, resolveConfig, geometryAt, hillHalfWidth, APPROACH_LENGTH, ConfigError, mergeConfigPatch } from "../physics/index.js";
 import { fieldByKey, fieldLimits, friendlyConfigMessage, MIN_TOP_RADIUS_FRACTION, type NumericKey } from "./field-definitions";
 import { formatNumber } from "../ui/format";
 import type { AreaId } from "./audit";
 import type { SimulationConfig, Track } from "./types";
 
-export type HandleId = "start" | "speed" | "loopTop" | "loopRadius" | "crest" | "hillFoot" | "brakeEntry" | "brakeEnd";
+/** Manijas de los parámetros globales; las del trazado (puntos, loops, colinas, E) están en track-edit.ts. */
+export type HandleId = "start" | "speed" | "brakeEnd";
 export type HandleAxis = "x" | "y" | "tangent";
 
 interface Point {
@@ -62,17 +63,11 @@ export interface DragProposal {
 export const SPEED_ARROW_M_PER_MPS = 3;
 /** La flecha de v₀ nace un poco delante de A para no taparse con su manija (m). */
 const SPEED_ARROW_OFFSET_M = 3;
-/** Altura mínima de la colina durante un arrastre: no desaparece a mitad del gesto (m). */
-const MIN_DRAG_HILL_HEIGHT = 0.5;
-/** Ancho mínimo de media colina al arrastrar su pie (m). */
-const MIN_HILL_HALF_WIDTH = 0.1;
 /** Relación mínima R/h_L que admite la familia de loops en lágrima. */
 export { MIN_TOP_RADIUS_FRACTION };
 const BISECTION_STEPS = 12;
 const EPSILON = 1e-9;
 
-const LOOP_MAPS = new Set(["loop", "reference"]);
-const HILL_MAPS = new Set(["valley", "reference"]);
 
 /** Manijas disponibles para el trazado y la configuración actuales. */
 export function handlesFor(track: Track, config: SimulationConfig): Handle[] {
@@ -107,20 +102,6 @@ export function handlesFor(track: Track, config: SimulationConfig): Handle[] {
       anchor: arrowBase,
       direction
     },
-    ...loopHandles(track, config),
-    ...hillHandles(track, config),
-    {
-      id: "brakeEntry",
-      area: "layout",
-      axis: "x",
-      key: "trackWidth",
-      x: track.brakeX,
-      y: 0,
-      value: config.trackWidth,
-      name: "Inicio de la zona de frenado E: ancho del trazado",
-      primary: true,
-      letter: "E"
-    },
     {
       id: "brakeEnd",
       area: "braking",
@@ -139,113 +120,25 @@ export function handlesFor(track: Track, config: SimulationConfig): Handle[] {
   return handles;
 }
 
-function loopHandles(track: Track, config: SimulationConfig): Handle[] {
-  const loop = track.loops[0];
-  const marker = track.markers.find(candidate => candidate.role === "loop-top");
-
-  if (!LOOP_MAPS.has(config.mapId) || !loop || !marker) return [];
-
-  const top = geometryAt(track, marker.distance);
-  const radius = config.loopTopRadius;
-
-  return [
-    {
-      id: "loopTop",
-      area: "loop",
-      axis: "y",
-      key: "loopHeight",
-      x: top.x,
-      y: top.y,
-      value: config.loopHeight,
-      name: "Cima del loop C: altura del loop",
-      primary: true,
-      letter: "C",
-      anchor: { x: top.x, y: loop.y }
-    },
-    {
-      id: "loopRadius",
-      area: "loop",
-      axis: "x",
-      key: "loopTopRadius",
-      x: top.x + radius,
-      y: top.y - radius,
-      value: radius,
-      name: "Radio en la cima del loop",
-      primary: false,
-      anchor: { x: top.x, y: top.y }
-    }
-  ];
-}
-
-function hillHandles(track: Track, config: SimulationConfig): Handle[] {
-  const marker = track.markers.find(candidate => candidate.role === "crest");
-
-  if (!HILL_MAPS.has(config.mapId) || config.hillHeight <= 0 || !marker) return [];
-
-  const crest = geometryAt(track, marker.distance);
-  const halfWidth = hillHalfWidth(config.hillHeight, config.hillCrestRadius);
-
-  return [
-    {
-      id: "crest",
-      area: "hill",
-      axis: "y",
-      key: "hillHeight",
-      x: crest.x,
-      y: crest.y,
-      value: config.hillHeight,
-      name: "Cresta de la colina D: altura de la colina",
-      primary: true,
-      letter: "D"
-    },
-    {
-      id: "hillFoot",
-      area: "hill",
-      axis: "x",
-      key: "hillCrestRadius",
-      x: crest.x + halfWidth,
-      y: 0,
-      value: config.hillCrestRadius,
-      name: "Radio de la cresta",
-      primary: false,
-      anchor: { x: crest.x, y: 0 }
-    }
-  ];
-}
-
 /** Valor que pide el puntero (m), sin límites ni redondeo. */
 function requestedValue(handle: Handle, point: Point, config: SimulationConfig, start?: DragStart): number {
   const anchor = handle.anchor ?? { x: 0, y: 0 };
 
-  // La cima C se corre cuando cambia R: el radio se mide desde el inicio del gesto, no desde C.
-  if (handle.id === "loopRadius" && start) return start.handle.value + (point.x - start.point.x);
-
   switch (handle.id) {
     case "start":
-    case "crest":
       return point.y;
     case "speed": {
       const direction = handle.direction ?? { x: 1, y: 0 };
       return ((point.x - anchor.x) * direction.x + (point.y - anchor.y) * direction.y) / SPEED_ARROW_M_PER_MPS;
     }
-    case "loopTop":
-      return point.y - anchor.y;
-    case "loopRadius":
     case "brakeEnd":
       return point.x - anchor.x;
-    case "hillFoot": {
-      const halfWidth = Math.max(MIN_HILL_HALF_WIDTH, point.x - anchor.x);
-      return (halfWidth * halfWidth) / (6 * config.hillHeight);
-    }
-    case "brakeEntry":
-      return point.x - APPROACH_LENGTH;
   }
 }
 
 /** Rango admisible del parámetro de la manija, incluida la forma del loop. */
-function rangeOf(handle: Handle, config: SimulationConfig, dragging: boolean): [number, number] {
-  const [min, max] = fieldLimits(handle.key, config);
-  return handle.key === "hillHeight" && dragging ? [Math.max(min, MIN_DRAG_HILL_HEIGHT), max] : [min, max];
+function rangeOf(handle: Handle, config: SimulationConfig): [number, number] {
+  return fieldLimits(handle.key, config);
 }
 
 function decimalsOf(step: number): number {
@@ -265,7 +158,7 @@ function snap(value: number, step: number, [min, max]: [number, number]): number
 /** Error de construcción del trazado con ese valor, o null si es construible. */
 function buildError(config: SimulationConfig, key: NumericKey, value: number): unknown {
   try {
-    buildTrack(resolveConfig({ ...config, [key]: value }));
+    buildTrack(resolveConfig(mergeConfigPatch(config, { [key]: value })));
     return null;
   } catch (error) {
     return error;
@@ -296,7 +189,7 @@ export function proposeValue(
   options: { dragging?: boolean } = {}
 ): DragProposal {
   const step = fieldByKey(handle.key)?.step ?? 0.1;
-  const range = rangeOf(handle, config, options.dragging ?? false);
+  const range = rangeOf(handle, config);
   const clamped = Math.min(range[1], Math.max(range[0], value));
   const wanted = snap(clamped, step, range);
   const limited = Math.abs(clamped - value) > EPSILON;

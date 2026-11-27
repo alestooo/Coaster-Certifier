@@ -6,7 +6,7 @@
   import Stage from "../components/workshop/Stage.svelte";
   import SidePanel from "../components/workshop/SidePanel.svelte";
   import SelectionPanel from "../components/workshop/SelectionPanel.svelte";
-  import PointPanel from "../components/workshop/PointPanel.svelte";
+  import ElementPanel from "../components/workshop/ElementPanel.svelte";
   import RulesPanel from "../components/workshop/RulesPanel.svelte";
   import TelemetryDrawer from "../components/workshop/TelemetryDrawer.svelte";
   import VerdictPanel from "../components/lab/VerdictPanel.svelte";
@@ -49,7 +49,7 @@
   let panel = $state<PanelMode | null>(null);
   let selectedArea = $state<AreaId | null>(null);
   /** Punto elegido del trazado personalizado (se edita en el lienzo y en el panel). */
-  let selectedPoint = $state<number | null>(null);
+  let selectedElement = $state<number | null>(null);
   /** Alto con el que la hoja del panel tapa el lienzo en el teléfono. */
   let sheetHeight = $state(0);
   let telemetryOpen = $state(typeof window === "undefined" || window.matchMedia(`(min-width: ${WIDE_LAYOUT_MIN_PX}px)`).matches);
@@ -145,16 +145,41 @@
   );
   let selectionGroup = $derived(FIELD_GROUPS.find(group => group.id === selectedArea));
 
-  // Un punto que ya no existe (otro recorrido, punto borrado o deshecho) deja de estar elegido.
+  /** Configuración con su trazado por elementos (el borrador, o la vigente mientras se vuelve a derivar). */
+  let elementConfig = $derived(session.draft.track ? session.draft : runner.config);
+
+  // Un elemento que ya no existe (otro recorrido, elemento borrado o deshecho) deja de estar elegido.
   $effect(() => {
-    const index = selectedPoint;
+    const index = selectedElement;
     if (index === null) return;
 
-    const points = session.draft.customPoints;
-    if (session.draft.mapId !== "custom" || index <= 0 || index >= points.length - 1) {
-      untrack(() => selectPoint(null));
+    if (index <= 0 || index >= elementConfig.track.length) {
+      untrack(() => selectElement(null));
     }
   });
+
+  /** Lectura del dictamen para un loop o una colina elegidos. */
+  function elementInsight(index: number) {
+    const element = elementConfig.track[index];
+    if (element?.type === "point" && element.loop) return report?.areas.loop ?? null;
+    if (element?.type === "hill") return report?.areas.hill ?? null;
+    return null;
+  }
+
+  /** Título del panel de un elemento: «Loop», «Punto 3 de 6», «Colina», «Recta final». */
+  function elementTitle(index: number): string {
+    const track = elementConfig.track;
+    const element = track[index];
+    const ordinal = (match: (candidate: (typeof track)[number]) => boolean, base: string) => {
+      const all = track.filter(match);
+      return all.length > 1 ? `${base} ${track.slice(0, index + 1).filter(match).length}` : base;
+    };
+
+    if (element?.type === "point" && element.loop) return ordinal(candidate => candidate.type === "point" && !!candidate.loop, "Loop");
+    if (element?.type === "hill") return ordinal(candidate => candidate.type === "hill", "Colina");
+    if (element?.type === "end") return "Recta final";
+    return `Punto ${index + 1} de ${track.length}`;
+  }
 
   // Una selección que el recorrido nuevo ya no tiene (p. ej. el loop en «Línea») se descarta.
   $effect(() => {
@@ -227,18 +252,18 @@
 
   function clearSelection() {
     selectedArea = null;
-    selectedPoint = null;
+    selectedElement = null;
     if (panel === "selection") panel = null;
   }
 
-  function selectPoint(index: number | null) {
+  function selectElement(index: number | null) {
     if (index === null) {
-      if (selectedPoint !== null) clearSelection();
+      if (selectedElement !== null) clearSelection();
       return;
     }
 
     selectedArea = null;
-    selectedPoint = index;
+    selectedElement = index;
     panel = "selection";
   }
 
@@ -249,7 +274,7 @@
     }
 
     selectedArea = area;
-    selectedPoint = null;
+    selectedElement = null;
     panel = "selection";
   }
 
@@ -261,7 +286,7 @@
 
     if (panel === "selection") stage.leaveFocus();
     selectedArea = null;
-    selectedPoint = null;
+    selectedElement = null;
     if (mode === "passengers") void passengerEditor.load();
     panel = mode;
   }
@@ -269,7 +294,7 @@
   function closePanel() {
     if (panel === "selection") {
       selectedArea = null;
-      selectedPoint = null;
+      selectedElement = null;
       stage.leaveFocus();
     }
 
@@ -345,12 +370,12 @@
    * los puntos de otro paso del historial esa posición es otro punto.
    */
   function undo() {
-    selectPoint(null);
+    selectElement(null);
     session.undo();
   }
 
   function redo() {
-    selectPoint(null);
+    selectElement(null);
     session.redo();
   }
 
@@ -427,9 +452,9 @@
       onApplyFix={config => session.applyRecommendation(config)}
       {selectedArea}
       onSelect={select}
-      {selectedPoint}
+      {selectedElement}
       sheetInset={sheetHeight}
-      onSelectPoint={selectPoint}
+      onSelectElement={selectElement}
     />
   </div>
 
@@ -439,13 +464,14 @@
 
   {#if panel}
     <div class="panel-area">
-      {#if panel === "selection" && selectedPoint !== null}
-        <SidePanel onSheet={height => (sheetHeight = height)} title={`Punto ${selectedPoint + 1} de ${session.draft.customPoints.length}`} onClose={closePanel}>
-          <PointPanel
-            index={selectedPoint}
-            config={session.draft}
-            onPoints={points => session.patch({ customPoints: points }, { discardInvalid: true })}
-            onSelectPoint={selectPoint}
+      {#if panel === "selection" && selectedElement !== null}
+        <SidePanel onSheet={height => (sheetHeight = height)} title={elementTitle(selectedElement)} onClose={closePanel}>
+          <ElementPanel
+            index={selectedElement}
+            config={elementConfig}
+            insight={elementInsight(selectedElement)}
+            onTrack={track => session.setTrack(track)}
+            onGesture={gesture}
           />
         </SidePanel>
       {:else if panel === "selection" && selectedArea}

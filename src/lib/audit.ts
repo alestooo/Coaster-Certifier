@@ -363,13 +363,12 @@ function buildAreas(
   const maxSpeed = verdict.summary.maxSpeed.value;
 
   const areas: Partial<Record<AreaId, AreaInsight>> = {
+    // μ se edita en la salida: su lectura suma cuánto disipa la fricción antes de frenar.
     start: {
       tone: "ok",
-      text: `Puede subir hasta ${formatNumber(head, 1)} m · rapidez máx. ${formatNumber(maxSpeed, 1)} m/s`
-    },
-    layout: {
-      tone: "ok",
-      text: `La fricción disipa ${formatNumber(100 * frictionShare(verdict), 0)} % de la energía antes de frenar`
+      text:
+        `Puede subir hasta ${formatNumber(head, 1)} m · rapidez máx. ${formatNumber(maxSpeed, 1)} m/s` +
+        (config.friction > 0 ? ` · la fricción disipa ${formatNumber(100 * frictionShare(verdict), 0)} % antes de frenar` : "")
     },
     loop: loopInsight(verdict, config),
     hill: hillInsight(verdict, config),

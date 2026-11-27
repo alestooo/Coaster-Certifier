@@ -6,27 +6,27 @@
 │   lib/design-session.svelte.ts   borrador, commit ≤ 120 ms, deshacer, masas  │
 │     ├─ lib/simulation-runner     reproducción (historial a ≤ 10 Hz)          │
 │     └─ lib/live-audit ─────────► ui/audit.worker.js (Web Worker)             │
-│   components/ui/  controles comunes (SliderField, NumberField, Select,       │
-│     Segmented, Tabs, Disclosure, Dialog, ActionMenu, Button, IconButton,     │
+│   components/ui/  controles comunes (ParamSlider, SliderField, NumberField,  │
+│     Select, Segmented, Tabs, Disclosure, Dialog, ActionMenu, Button, ...     │
 │     Meter, CheckMark, Sym) ◄── lib/ui/* (escala del slider, teclado, menús)  │
 │   components/workshop/                                                       │
 │     ├─ WorkshopBar + TemplatePicker   trazados, escenarios, dictamen         │
 │     ├─ Stage ──────────────────► ui/renderer/* (Canvas 2D, bajo demanda)     │
 │     │    ├─ (subida) ──────────► ui/renderer/lift (una polilínea hasta A)    │
-│     │    ├─ HandleLayer ───────► lib/handles (manijas puras, en metros)      │
+│     │    ├─ HandleLayer ───────► lib/handles (A, v₀ y F, en metros)          │
 │     │    ├─ LoadLegend · franja ► lib/load-profile (fuerza g por tramo)      │
 │     │    │    └─ PointLegend ──► lib/point-legend (qué es cada letra A–F)    │
 │     │    ├─ IssuePins ··· FixPopover ► lib/fix-search ► recommendation.worker│
 │     │    ├─ TrackProbe ────────► lib/probe (v, g, N en un punto)             │
-│     │    └─ PointLayer ────────► lib/custom-points (trazado personalizado)   │
-│     ├─ SidePanel: Selection · Point · Rules · VerdictPanel · PassengerEditor │
+│     │    └─ ElementLayer ──────► lib/track-edit (puntos, loops, colinas, E)  │
+│     ├─ SidePanel: Selection · Element · Rules · Verdict · PassengerEditor    │
 │     └─ TelemetryDrawer ··· ChartCard ► ui/charts/* (Chart.js)                │
 │   lab/ReportDialog ············► ui/export (CSV/JSON/PDF)                    │
 │   ··· = se descarga la primera vez que se pide (lib/lazy-module)             │
 └──────────────────────────────────────────┬───────────────────────────────────┘
                                            ▼
 ┌──────────────────────── Librería de física (src/physics) ───────────────────┐
-│ config ─► track/{layouts,builder,hermite,loop,line,geometry}                 │
+│ config ─► track/{elements,layouts,builder,hermite,loop,line,geometry}        │
 │        ─► dynamics/{kinematics,forces,energy}                                │
 │        ─► integration/{rk4,step}   ─► evaluation/{criteria,summary,verdict}  │
 │        ─► run.js  ─► export/csv.js ─► recommendations/*  ─► scenarios.js     │
@@ -46,10 +46,11 @@
 ## Flujo de datos en la interfaz
 
 ```
-manija (arrastre) ─► proposeDrag ─► límites + forma del loop + bisección al último trazado construible
+manija de A, v₀, F ─► proposeDrag ─────────┐
+manija de un elemento ─► proposeElementHandle ─► límites + forma del loop + bisección al último trazado construible
 campo del panel ─────────────────┐                              │
                                  ▼                              ▼
-              DesignSession.patch(borrador) ──► preview = buildTrack(borrador)  (pista y manijas al instante)
+   DesignSession.patch / setTrack(borrador) ──► preview = buildTrack(borrador)  (pista y manijas al instante)
                                  │ ≤ 120 ms
                                  ▼
                 resolveConfig ──► buildTrack ──válido──► runner.apply + LiveAudit ──► audit.worker: runSimulation
@@ -63,7 +64,7 @@ campo del panel ─────────────────┐          
 createFrameLoop: requestAnimationFrame solo mientras se reproduce, se arrastra o se anima la cámara;
 cualquier otro cambio pide un único cuadro ─► renderSimulation(canvas, escena) ─► Camera
                                                                                       │
-                     HandleLayer (DOM) ◄── toX/toY · fromX/fromY ◄────────────────────┘
+        HandleLayer · ElementLayer (DOM) ◄── toX/toY · fromX/fromY ◄──────────────────┘
 ```
 
 ## Decisiones
@@ -73,7 +74,9 @@ cualquier otro cambio pide un único cuadro ─► renderSimulation(canvas, esce
 - **Colina construida a partir de (h_c, ρ_c)**: el radio en la cresta es exacto (`ρ_c = w²/6h_c`), por lo que `n_D = 1 − v_D²/(g·ρ_c)` se puede comprobar analíticamente.
 - **Dos reglas de contacto**: «siempre apoyado» (`N > 0`, plan del Avance 1) y «ruedas anti-levantamiento» (anexo: `N` puede ser negativa fuera del loop, `n ≥ −1 g`).
 - **Auditoría en vivo en lugar de «Aplicar»**: un recorrido completo tarda 30–45 ms, así que cada cambio se simula entero en un Web Worker (solo uno en curso; los cambios intermedios se descartan). El dictamen, el informe y las exportaciones salen siempre del recorrido completo, no de lo que alcanzó a reproducir la animación.
-- **Edición sobre el lienzo con manijas DOM**: cada parámetro geométrico tiene una manija con un solo grado de libertad, como en los simuladores de PhET o Desmos. Son botones con `role="slider"`, así que se enfocan, se mueven con el teclado y se prueban con Playwright sin hacer pruebas de impacto en el canvas. La conversión arrastre → parámetro (`lib/handles.ts`) es pura y tiene pruebas.
+- **Trazado por elementos** (`track/elements.js`): la geometría es una lista de elementos en metros (`start`, `point` con loop opcional, `hill`, `end`) que se compila a los nodos que ya usaba el constructor. Una configuración sin `track` se traduce con las fórmulas de antes (`legacyElements`), y una prueba de equivalencia contra un fixture capturado antes del cambio (24 casos, a 1e-9) garantiza que los escenarios, los JSON y el CSV de `npm run headless` dan lo mismo. Cada tramo construido sabe a qué elemento pertenece (`section.element`): así un clic en la vía elige el elemento y las correcciones apuntan al loop o la colina que falla.
+- **Edición sobre el lienzo con manijas DOM**: A, v₀ y F tienen una manija de un solo grado de libertad (`lib/handles.ts`); los elementos, manijas libres en 2D (puntos y crestas) o de un eje (cima y radio del loop, radio de la cresta, E), todas de `lib/track-edit.ts`. Las ediciones son funciones puras sobre la lista: cada una devuelve una lista nueva y, si la geometría no se puede construir, busca por bisección el último valor construible y explica por qué. Son botones (los de un eje, con `role="slider"`), así que se enfocan, se mueven con el teclado y se prueban con Playwright sin pruebas de impacto en el canvas. Mover E solo cambia la x del final: el resto del trazado queda igual. Agregar, borrar o poner un loop es un paso de deshacer propio (`setTrack(…, { step: true })`).
+- **Cámara quieta al editar** (`lib/view-fit.ts`): al soltar una manija la vista no cambia mientras el trazado siga entrando en ella (`needsReframe`); si ya no entra, o si después se abre un panel y el trazado queda afuera, se vuelve a encuadrar.
 - **Auditoría dibujada sobre la vía**: el perfil de fuerza g se calcula por tramos de 0,5 m a partir del recorrido auditado. Cada par de muestras cubre todos los tramos que recorre, así no quedan huecos a alta rapidez. El motor detiene el recorrido en el primer incumplimiento, así que la franja termina ahí y el pin lo señala. Las correcciones son las mismas alternativas verificadas de `recommendations/`; se buscan una vez por diseño y se previsualizan como pista fantasma antes de aplicarlas.
 - **Redibujo bajo demanda**: el lienzo no tiene bucle continuo; `createFrameLoop` dibuja un cuadro por cambio y solo anima mientras se reproduce, se arrastra o se mueve la cámara. En reposo la CPU queda en 0 %. Mientras la escala cambia en cada cuadro (animación de zoom, pellizco o rueda, hasta 200 ms después del último evento) se estira la última capa estática del mismo trazado en lugar de crear una por cuadro; la capa a la escala nueva se crea al terminar el gesto.
 - **Carga bajo demanda** (`lib/lazy-module.svelte.ts`, `lib/workshop-parts.ts`):

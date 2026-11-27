@@ -39,3 +39,40 @@ export function resultLines(verdict: Verdict, finalDistance: number, config: Sim
       `en ${violation.section}, s = ${formatNumber(violation.position, 2)} m, t = ${formatNumber(violation.time, 3)} s.`
   );
 }
+
+export interface ElementRow {
+  type: string;
+  x: string;
+  height: string;
+  /** Loop o colina, en palabras (sin símbolos con guion bajo). */
+  detail: string;
+}
+
+/** Número compacto: sin decimales si es entero, si no con 1 o 2. */
+function compact(value: number): string {
+  const digits = Number.isInteger(value) ? 0 : Number.isInteger(Math.round(value * 1e6) / 1e5) ? 1 : 2;
+  return formatNumber(value, digits);
+}
+
+const metres = (value: number) => `${formatNumber(value, 1)} m`;
+
+/** Filas de la tabla de elementos del informe: tipo, x, altura y su loop o colina. */
+export function elementRows(config: SimulationConfig): ElementRow[] {
+  return config.track.map(element => {
+    switch (element.type) {
+      case "start":
+        return { type: "Inicio A", x: metres(0), height: metres(config.initialHeight), detail: "" };
+      case "point":
+        return {
+          type: "Punto",
+          x: metres(element.x),
+          height: metres(element.y),
+          detail: element.loop ? `loop de ${compact(element.loop.height)} m · radio en la cima ${compact(element.loop.topRadius)} m` : ""
+        };
+      case "hill":
+        return { type: "Colina", x: metres(element.x), height: metres(element.height), detail: `radio de la cresta ${compact(element.crestRadius)} m` };
+      case "end":
+        return { type: "Final", x: metres(element.x), height: metres(0), detail: "" };
+    }
+  });
+}

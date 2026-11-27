@@ -1,0 +1,2534 @@
+{
+ "escenario certification": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 30,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 80,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 21.5,
+    "loopTopRadius": 5
+   },
+   {
+    "x": 156.38645241369036,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 213.83207887907065,
+    "y": 10,
+    "crest": true,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 271.27770534445096,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 320,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "B",
+    "role": "loop-entry",
+    "distance": 86.08342837262484
+   },
+   {
+    "label": "C",
+    "role": "loop-top",
+    "distance": 119.85554939871511
+   },
+   {
+    "label": "D",
+    "role": "crest",
+    "distance": 270.4268617923611
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 385.62605315991675
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 445.62605315991675
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 86.08342837262484
+   },
+   {
+    "name": "Loop 1",
+    "kind": "loop",
+    "length": 67.54424205218055
+   },
+   {
+    "name": "Salida del loop",
+    "kind": "curve",
+    "length": 58.32229465554906
+   },
+   {
+    "name": "Colina (subida)",
+    "kind": "curve",
+    "length": 58.476896712006656
+   },
+   {
+    "name": "Colina (bajada)",
+    "kind": "curve",
+    "length": 58.476896712006656
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 48.722294655549035
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 60
+   }
+  ],
+  "totalLength": 445.62605315991675,
+  "brakeStart": 385.62605315991675,
+  "brakeX": 328,
+  "endX": 388,
+  "verdict": {
+   "approved": true,
+   "status": "finished",
+   "distance": 425.21900985693395,
+   "time": 24.622026771526787,
+   "maxLoad": 4.534192059604919,
+   "minLoad": 0.4261151498951457,
+   "maxSpeed": 23.92757830741747,
+   "violations": []
+  }
+ },
+ "escenario circular-loop": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 30,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 67.2,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 21.5,
+    "loopTopRadius": 10.75
+   },
+   {
+    "x": 172.79999999999998,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 240,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "B",
+    "role": "loop-entry",
+    "distance": 74.31541677816737
+   },
+   {
+    "label": "C",
+    "role": "loop-top",
+    "distance": 108.08753780425765
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 322.6596588303479
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 412.6596588303479
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 74.31541677816737
+   },
+   {
+    "name": "Loop 1",
+    "kind": "loop",
+    "length": 67.54424205218055
+   },
+   {
+    "name": "Salida del loop",
+    "kind": "curve",
+    "length": 105.59999999999998
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 67.20000000000002
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 90
+   }
+  ],
+  "totalLength": 412.6596588303479,
+  "brakeStart": 322.6596588303479,
+  "brakeX": 248,
+  "endX": 338,
+  "verdict": {
+   "approved": false,
+   "status": "rejected",
+   "distance": 74.33236341814121,
+   "time": 5.339000000000118,
+   "maxLoad": 6.619319979249991,
+   "minLoad": 0.8184022857440616,
+   "maxSpeed": 24.343368044497847,
+   "violations": [
+    {
+     "code": "max-load",
+     "position": 74.33236341814121
+    }
+   ]
+  }
+ },
+ "escenario teardrop-loop": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 30,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 67.2,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 21.5,
+    "loopTopRadius": 5
+   },
+   {
+    "x": 172.79999999999998,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 240,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "B",
+    "role": "loop-entry",
+    "distance": 74.31541677816737
+   },
+   {
+    "label": "C",
+    "role": "loop-top",
+    "distance": 108.08753780425765
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 304.5955010722066
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 394.5955010722066
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 74.31541677816737
+   },
+   {
+    "name": "Loop 1",
+    "kind": "loop",
+    "length": 67.54424205218055
+   },
+   {
+    "name": "Salida del loop",
+    "kind": "curve",
+    "length": 87.53584224185866
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 67.20000000000002
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 90
+   }
+  ],
+  "totalLength": 394.5955010722066,
+  "brakeStart": 304.5955010722066,
+  "brakeX": 248,
+  "endX": 338,
+  "verdict": {
+   "approved": true,
+   "status": "finished",
+   "distance": 353.97882053578434,
+   "time": 19.622226490629416,
+   "maxLoad": 4.661069148289198,
+   "minLoad": 0.8184022857440616,
+   "maxSpeed": 24.343373504150694,
+   "violations": []
+  }
+ },
+ "escenario loop-contact": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 12,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 61.60000000000001,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 16,
+    "loopTopRadius": 4
+   },
+   {
+    "x": 158.4,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 220,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "B",
+    "role": "loop-entry",
+    "distance": 62.90711929672827
+   },
+   {
+    "label": "C",
+    "role": "loop-top",
+    "distance": 88.03986052544661
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 267.0062311398058
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 347.0062311398058
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 62.90711929672827
+   },
+   {
+    "name": "Loop 1",
+    "kind": "loop",
+    "length": 50.26548245743669
+   },
+   {
+    "name": "Salida del loop",
+    "kind": "curve",
+    "length": 84.23362938564082
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 61.599999999999994
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 80
+   }
+  ],
+  "totalLength": 347.0062311398058,
+  "brakeStart": 267.0062311398058,
+  "brakeX": 228,
+  "endX": 308,
+  "verdict": {
+   "approved": false,
+   "status": "lost-contact",
+   "distance": 80.83631243624124,
+   "time": 9.393000000000233,
+   "maxLoad": 2.9998282323857404,
+   "minLoad": -0.000610546922540221,
+   "maxSpeed": 15.344053459781474,
+   "violations": [
+    {
+     "code": "contact",
+     "position": 80.83631243624124
+    }
+   ]
+  }
+ },
+ "escenario line": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 20,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 143,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 220,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 229.57410374096654
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 309.5741037409665
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 144.57410374096654
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 77
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 80
+   }
+  ],
+  "totalLength": 309.5741037409665,
+  "brakeStart": 229.57410374096654,
+  "brakeX": 228,
+  "endX": 308,
+  "verdict": {
+   "approved": true,
+   "status": "finished",
+   "distance": 263.5586871644483,
+   "time": 22.377828896582816,
+   "maxLoad": 1.1447316338166396,
+   "minLoad": 0.977822035150923,
+   "maxSpeed": 19.0662364426907,
+   "violations": []
+  }
+ },
+ "escenario valley": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 25,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 78,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 109,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 169,
+    "y": 10,
+    "crest": true,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 229,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 260,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "D",
+    "role": "crest",
+    "distance": 174.37338768309974
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 274.3617797013802
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 354.3617797013802
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 82.38499566481923
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 31
+   },
+   {
+    "name": "Colina (subida)",
+    "kind": "curve",
+    "length": 60.988392018280514
+   },
+   {
+    "name": "Colina (bajada)",
+    "kind": "curve",
+    "length": 60.988392018280514
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 31
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 80
+   }
+  ],
+  "totalLength": 354.3617797013802,
+  "brakeStart": 274.3617797013802,
+  "brakeX": 268,
+  "endX": 348,
+  "verdict": {
+   "approved": true,
+   "status": "finished",
+   "distance": 316.8360122832155,
+   "time": 21.077057300268674,
+   "maxLoad": 1.7902709583268326,
+   "minLoad": 0.5642699659227514,
+   "maxSpeed": 21.7276358774549,
+   "violations": []
+  }
+ },
+ "escenario airtime": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 30,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 90,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 162.13664654969003,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 195,
+    "y": 6,
+    "crest": true,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 227.86335345030997,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 300,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "D",
+    "role": "crest",
+    "distance": 201.1059791093788
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 314.75413716599655
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 404.75413716599655
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 95.45782105276102
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 72.13664654969003
+   },
+   {
+    "name": "Colina (subida)",
+    "kind": "curve",
+    "length": 33.51151150692774
+   },
+   {
+    "name": "Colina (bajada)",
+    "kind": "curve",
+    "length": 33.51151150692773
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 72.13664654969003
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 90
+   }
+  ],
+  "totalLength": 404.75413716599655,
+  "brakeStart": 314.75413716599655,
+  "brakeX": 308,
+  "endX": 398,
+  "verdict": {
+   "approved": true,
+   "status": "finished",
+   "distance": 357.5665171188472,
+   "time": 20.865166230183693,
+   "maxLoad": 2.87770368451393,
+   "minLoad": -0.4518996780814648,
+   "maxSpeed": 23.813125668704668,
+   "violations": []
+  }
+ },
+ "escenario stall": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 10,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 78,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 118.80039840795547,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 169,
+    "y": 14,
+    "crest": true,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 219.19960159204453,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 260,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "D",
+    "role": "crest",
+    "distance": 171.99204325185977
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 273.26182876036495
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 353.26182876036495
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 78.7222577433546
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 40.80039840795547
+   },
+   {
+    "name": "Colina (subida)",
+    "kind": "curve",
+    "length": 52.46938710054969
+   },
+   {
+    "name": "Colina (bajada)",
+    "kind": "curve",
+    "length": 52.46938710054971
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 40.80039840795547
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 80
+   }
+  ],
+  "totalLength": 353.26182876036495,
+  "brakeStart": 273.26182876036495,
+  "brakeX": 268,
+  "endX": 348,
+  "verdict": {
+   "approved": false,
+   "status": "stalled",
+   "distance": 145.6688445648496,
+   "time": 18.292999999999374,
+   "maxLoad": 1.5036593781560654,
+   "minLoad": 0.9225348175650077,
+   "maxSpeed": 12.859545079060764,
+   "violations": [
+    {
+     "code": "min-speed",
+     "position": 145.6688445648496
+    }
+   ]
+  }
+ },
+ "escenario brake-short": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 30,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 143,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 220,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 231.51185879070073
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 251.51185879070073
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 146.51185879070073
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 77
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 20
+   }
+  ],
+  "totalLength": 251.51185879070073,
+  "brakeStart": 231.51185879070073,
+  "brakeX": 228,
+  "endX": 248,
+  "verdict": {
+   "approved": false,
+   "status": "rejected",
+   "distance": 251.51185879070073,
+   "time": 15.747562661645247,
+   "maxLoad": 1.3512360211285541,
+   "minLoad": 0.951036207046152,
+   "maxSpeed": 24.261078971532573,
+   "violations": [
+    {
+     "code": "overrun",
+     "position": 251.51185879070073
+    }
+   ]
+  }
+ },
+ "escenario spring-ideal": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 20,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 143,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 220,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 229.57410374096654
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 309.5741037409665
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 144.57410374096654
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 77
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Resorte de tope",
+    "kind": "flat",
+    "length": 80
+   }
+  ],
+  "totalLength": 309.5741037409665,
+  "brakeStart": 229.57410374096654,
+  "brakeX": 228,
+  "endX": 308,
+  "verdict": {
+   "approved": false,
+   "status": "timeout",
+   "distance": 218.68429218233985,
+   "time": 120.00000000020893,
+   "maxLoad": 1.1447316338166396,
+   "minLoad": 0.977822035150923,
+   "maxSpeed": 19.0662364426907,
+   "violations": [
+    {
+     "code": "timeout",
+     "position": 218.68429218233985
+    }
+   ]
+  }
+ },
+ "escenario spring-damped": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 20,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 143,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 220,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 229.57410374096654
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 289.5741037409665
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 144.57410374096654
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 77
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Resorte de tope",
+    "kind": "flat",
+    "length": 60
+   }
+  ],
+  "totalLength": 289.5741037409665,
+  "brakeStart": 229.57410374096654,
+  "brakeX": 228,
+  "endX": 288,
+  "verdict": {
+   "approved": true,
+   "status": "stopped",
+   "distance": 229.5822787410162,
+   "time": 31.35200000001533,
+   "maxLoad": 1.1447316338166396,
+   "minLoad": 0.977822035150923,
+   "maxSpeed": 19.0662364426907,
+   "violations": []
+  }
+ },
+ "escenario three-loops": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 35,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 75,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 24,
+    "loopTopRadius": 4
+   },
+   {
+    "x": 150,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 24,
+    "loopTopRadius": 4
+   },
+   {
+    "x": 225,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 24,
+    "loopTopRadius": 4
+   },
+   {
+    "x": 300,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "B",
+    "role": "loop-entry",
+    "distance": 83.63119436622544
+   },
+   {
+    "label": "C",
+    "role": "loop-top",
+    "distance": 121.33030620930296
+   },
+   {
+    "label": "B2",
+    "role": "loop-entry",
+    "distance": 208.89667682366215
+   },
+   {
+    "label": "C2",
+    "role": "loop-top",
+    "distance": 246.59578866673968
+   },
+   {
+    "label": "B3",
+    "role": "loop-entry",
+    "distance": 334.16215928109887
+   },
+   {
+    "label": "C3",
+    "role": "loop-top",
+    "distance": 371.86127112417637
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 467.4276417385355
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 557.4276417385355
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 83.63119436622544
+   },
+   {
+    "name": "Loop 1",
+    "kind": "loop",
+    "length": 75.39822368615503
+   },
+   {
+    "name": "Salida del loop",
+    "kind": "curve",
+    "length": 49.867258771281655
+   },
+   {
+    "name": "Loop 2",
+    "kind": "loop",
+    "length": 75.39822368615503
+   },
+   {
+    "name": "Salida del loop",
+    "kind": "curve",
+    "length": 49.867258771281655
+   },
+   {
+    "name": "Loop 3",
+    "kind": "loop",
+    "length": 75.39822368615503
+   },
+   {
+    "name": "Salida del loop",
+    "kind": "curve",
+    "length": 49.867258771281655
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 90
+   }
+  ],
+  "totalLength": 557.4276417385355,
+  "brakeStart": 467.4276417385355,
+  "brakeX": 308,
+  "endX": 398,
+  "verdict": {
+   "approved": true,
+   "status": "finished",
+   "distance": 524.6526267641842,
+   "time": 27.169901099301526,
+   "maxLoad": 4.499997396625066,
+   "minLoad": 0.8073309045925069,
+   "maxSpeed": 26.204957933708013,
+   "violations": []
+  }
+ },
+ "plantilla reference": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 30,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 80,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 21.5,
+    "loopTopRadius": 5
+   },
+   {
+    "x": 156.38645241369036,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 213.83207887907065,
+    "y": 10,
+    "crest": true,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 271.27770534445096,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 320,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "B",
+    "role": "loop-entry",
+    "distance": 86.08342837262484
+   },
+   {
+    "label": "C",
+    "role": "loop-top",
+    "distance": 119.85554939871511
+   },
+   {
+    "label": "D",
+    "role": "crest",
+    "distance": 270.4268617923611
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 385.62605315991675
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 445.62605315991675
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 86.08342837262484
+   },
+   {
+    "name": "Loop 1",
+    "kind": "loop",
+    "length": 67.54424205218055
+   },
+   {
+    "name": "Salida del loop",
+    "kind": "curve",
+    "length": 58.32229465554906
+   },
+   {
+    "name": "Colina (subida)",
+    "kind": "curve",
+    "length": 58.476896712006656
+   },
+   {
+    "name": "Colina (bajada)",
+    "kind": "curve",
+    "length": 58.476896712006656
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 48.722294655549035
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 60
+   }
+  ],
+  "totalLength": 445.62605315991675,
+  "brakeStart": 385.62605315991675,
+  "brakeX": 328,
+  "endX": 388,
+  "verdict": {
+   "approved": true,
+   "status": "finished",
+   "distance": 425.21900985693395,
+   "time": 24.622026771526787,
+   "maxLoad": 4.534192059604919,
+   "minLoad": 0.4261151498951457,
+   "maxSpeed": 23.92757830741747,
+   "violations": []
+  }
+ },
+ "plantilla loop": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 30,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 67.2,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 21.5,
+    "loopTopRadius": 5
+   },
+   {
+    "x": 172.79999999999998,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 240,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "B",
+    "role": "loop-entry",
+    "distance": 74.31541677816737
+   },
+   {
+    "label": "C",
+    "role": "loop-top",
+    "distance": 108.08753780425765
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 304.5955010722066
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 394.5955010722066
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 74.31541677816737
+   },
+   {
+    "name": "Loop 1",
+    "kind": "loop",
+    "length": 67.54424205218055
+   },
+   {
+    "name": "Salida del loop",
+    "kind": "curve",
+    "length": 87.53584224185866
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 67.20000000000002
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 90
+   }
+  ],
+  "totalLength": 394.5955010722066,
+  "brakeStart": 304.5955010722066,
+  "brakeX": 248,
+  "endX": 338,
+  "verdict": {
+   "approved": true,
+   "status": "finished",
+   "distance": 353.21337744789076,
+   "time": 21.254873841612007,
+   "maxLoad": 4.52147138107567,
+   "minLoad": 0.8206844611823576,
+   "maxSpeed": 23.881224144764452,
+   "violations": []
+  }
+ },
+ "plantilla valley": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 25,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 78,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 109,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 169,
+    "y": 10,
+    "crest": true,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 229,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 260,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "D",
+    "role": "crest",
+    "distance": 174.37338768309974
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 274.3617797013802
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 354.3617797013802
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 82.38499566481923
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 31
+   },
+   {
+    "name": "Colina (subida)",
+    "kind": "curve",
+    "length": 60.988392018280514
+   },
+   {
+    "name": "Colina (bajada)",
+    "kind": "curve",
+    "length": 60.988392018280514
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 31
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 80
+   }
+  ],
+  "totalLength": 354.3617797013802,
+  "brakeStart": 274.3617797013802,
+  "brakeX": 268,
+  "endX": 348,
+  "verdict": {
+   "approved": true,
+   "status": "finished",
+   "distance": 316.8360122832155,
+   "time": 21.077057300268674,
+   "maxLoad": 1.7902709583268326,
+   "minLoad": 0.5642699659227514,
+   "maxSpeed": 21.7276358774549,
+   "violations": []
+  }
+ },
+ "plantilla slope": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 20,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 143,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 220,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 229.57410374096654
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 309.5741037409665
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 144.57410374096654
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 77
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 80
+   }
+  ],
+  "totalLength": 309.5741037409665,
+  "brakeStart": 229.57410374096654,
+  "brakeX": 228,
+  "endX": 308,
+  "verdict": {
+   "approved": true,
+   "status": "finished",
+   "distance": 263.5586871644483,
+   "time": 22.377828896582816,
+   "maxLoad": 1.1447316338166396,
+   "minLoad": 0.977822035150923,
+   "maxSpeed": 19.0662364426907,
+   "violations": []
+  }
+ },
+ "plantilla incline": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 20,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 60,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 1,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 71.24555320336759
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 131.2455532033676
+   }
+  ],
+  "sections": [
+   {
+    "name": "Plano inclinado",
+    "kind": "line",
+    "length": 63.24555320336759
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 60
+   }
+  ],
+  "totalLength": 131.2455532033676,
+  "brakeStart": 71.24555320336759,
+  "brakeX": 68,
+  "endX": 128,
+  "verdict": {
+   "approved": true,
+   "status": "finished",
+   "distance": 108.42593575733432,
+   "time": 10.713115263532217,
+   "maxLoad": 1,
+   "minLoad": 0.9486832980505137,
+   "maxSpeed": 19.51008306678599,
+   "violations": []
+  }
+ },
+ "plantilla custom": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 20,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 40,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 80,
+    "y": 7,
+    "crest": true,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 120,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 160,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "D",
+    "role": "crest",
+    "distance": 85.96187682953573
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 174.68749500807178
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 254.68749500807178
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 45.236258650999666
+   },
+   {
+    "name": "Colina (subida)",
+    "kind": "curve",
+    "length": 40.72561817853605
+   },
+   {
+    "name": "Colina (bajada)",
+    "kind": "curve",
+    "length": 40.72561817853605
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 40
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 80
+   }
+  ],
+  "totalLength": 254.68749500807178,
+  "brakeStart": 174.68749500807178,
+  "brakeX": 168,
+  "endX": 248,
+  "verdict": {
+   "approved": true,
+   "status": "finished",
+   "distance": 209.44415993398303,
+   "time": 15.32064125283531,
+   "maxLoad": 2.9329787752095218,
+   "minLoad": 0.3737250196358149,
+   "maxSpeed": 19.51402762522873,
+   "violations": []
+  }
+ },
+ "por defecto incline": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 20,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 160,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 1,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 169.24515496597098
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 249.24515496597098
+   }
+  ],
+  "sections": [
+   {
+    "name": "Plano inclinado",
+    "kind": "line",
+    "length": 161.24515496597098
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 80
+   }
+  ],
+  "totalLength": 249.24515496597098,
+  "brakeStart": 169.24515496597098,
+  "brakeX": 168,
+  "endX": 248,
+  "verdict": {
+   "approved": true,
+   "status": "finished",
+   "distance": 204.4966535690964,
+   "time": 21.11326943939639,
+   "maxLoad": 1,
+   "minLoad": 0.9922778767136676,
+   "maxSpeed": 18.999336415665155,
+   "violations": []
+  }
+ },
+ "por defecto slope": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 20,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 104,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 160,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 170.15131811905096
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 250.15131811905096
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 106.15131811905096
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 56
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 80
+   }
+  ],
+  "totalLength": 250.15131811905096,
+  "brakeStart": 170.15131811905096,
+  "brakeX": 168,
+  "endX": 248,
+  "verdict": {
+   "approved": true,
+   "status": "finished",
+   "distance": 205.2465577874686,
+   "time": 17.412497157367593,
+   "maxLoad": 1.2786823773025602,
+   "minLoad": 0.9589639512883616,
+   "maxSpeed": 19.25129538748595,
+   "violations": []
+  }
+ },
+ "por defecto valley": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 20,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 48,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 67.25765385825233,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 104,
+    "y": 9,
+    "crest": true,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 140.74234614174767,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 160,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "D",
+    "role": "crest",
+    "distance": 109.75169944027121
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 175.0421993472195
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 255.0421993472195
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 52.461199533322905
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 19.257653858252326
+   },
+   {
+    "name": "Colina (subida)",
+    "kind": "curve",
+    "length": 38.03284604869597
+   },
+   {
+    "name": "Colina (bajada)",
+    "kind": "curve",
+    "length": 38.03284604869598
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 19.257653858252326
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 80
+   }
+  ],
+  "totalLength": 255.0421993472195,
+  "brakeStart": 175.0421993472195,
+  "brakeX": 168,
+  "endX": 248,
+  "verdict": {
+   "approved": true,
+   "status": "finished",
+   "distance": 209.7689311014036,
+   "time": 15.834607704891043,
+   "maxLoad": 2.5203891536949796,
+   "minLoad": 0.22250129624105333,
+   "maxSpeed": 19.488079746341388,
+   "violations": []
+  }
+ },
+ "por defecto loop": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 20,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 44.800000000000004,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 14,
+    "loopTopRadius": 3.5
+   },
+   {
+    "x": 115.19999999999999,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 160,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "B",
+    "role": "loop-entry",
+    "distance": 49.5436111854449
+   },
+   {
+    "label": "C",
+    "role": "loop-top",
+    "distance": 71.53475976057345
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 205.73033404813773
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 285.7303340481377
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 49.5436111854449
+   },
+   {
+    "name": "Loop 1",
+    "kind": "loop",
+    "length": 43.982297150257104
+   },
+   {
+    "name": "Salida del loop",
+    "kind": "curve",
+    "length": 59.40442571243571
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 44.80000000000001
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 80
+   }
+  ],
+  "totalLength": 285.7303340481377,
+  "brakeStart": 205.73033404813773,
+  "brakeX": 168,
+  "endX": 248,
+  "verdict": {
+   "approved": true,
+   "status": "finished",
+   "distance": 238.0332989695029,
+   "time": 17.456692175235503,
+   "maxLoad": 4.687609514850717,
+   "minLoad": 0.8206834852686561,
+   "maxSpeed": 19.49894148520608,
+   "violations": []
+  }
+ },
+ "por defecto reference": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 20,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 40,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 14,
+    "loopTopRadius": 3.5
+   },
+   {
+    "x": 71.15544100203446,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 107.89778714378214,
+    "y": 9,
+    "crest": true,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 144.64013328552983,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 160,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "B",
+    "role": "loop-entry",
+    "distance": 45.236258650999666
+   },
+   {
+    "label": "C",
+    "role": "loop-top",
+    "distance": 67.22740722612822
+   },
+   {
+    "label": "D",
+    "role": "crest",
+    "distance": 147.4112685644229
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 208.80398132758904
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 288.80398132758904
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 45.236258650999666
+   },
+   {
+    "name": "Loop 1",
+    "kind": "loop",
+    "length": 43.982297150257104
+   },
+   {
+    "name": "Salida del loop",
+    "kind": "curve",
+    "length": 20.15986671447019
+   },
+   {
+    "name": "Colina (subida)",
+    "kind": "curve",
+    "length": 38.03284604869595
+   },
+   {
+    "name": "Colina (bajada)",
+    "kind": "curve",
+    "length": 38.03284604869596
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 15.359866714470172
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 80
+   }
+  ],
+  "totalLength": 288.80398132758904,
+  "brakeStart": 208.80398132758904,
+  "brakeX": 168,
+  "endX": 248,
+  "verdict": {
+   "approved": true,
+   "status": "finished",
+   "distance": 240.86736041965193,
+   "time": 18.217925599970645,
+   "maxLoad": 4.694366058981166,
+   "minLoad": 0.33643741473185673,
+   "maxSpeed": 19.51402762522873,
+   "violations": []
+  }
+ },
+ "por defecto custom": {
+  "nodes": [
+   {
+    "x": 0,
+    "y": 20,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 40,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 80,
+    "y": 7,
+    "crest": true,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 120,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   },
+   {
+    "x": 160,
+    "y": 0,
+    "crest": false,
+    "loopHeight": 0,
+    "loopTopRadius": 0
+   }
+  ],
+  "lineSegments": 0,
+  "markers": [
+   {
+    "label": "A",
+    "role": "start",
+    "distance": 0
+   },
+   {
+    "label": "D",
+    "role": "crest",
+    "distance": 85.96187682953573
+   },
+   {
+    "label": "E",
+    "role": "brake-entry",
+    "distance": 174.68749500807178
+   },
+   {
+    "label": "F",
+    "role": "end",
+    "distance": 254.68749500807178
+   }
+  ],
+  "sections": [
+   {
+    "name": "Caída inicial",
+    "kind": "curve",
+    "length": 45.236258650999666
+   },
+   {
+    "name": "Colina (subida)",
+    "kind": "curve",
+    "length": 40.72561817853605
+   },
+   {
+    "name": "Colina (bajada)",
+    "kind": "curve",
+    "length": 40.72561817853605
+   },
+   {
+    "name": "Recta",
+    "kind": "curve",
+    "length": 40
+   },
+   {
+    "name": "Aproximación",
+    "kind": "flat",
+    "length": 8
+   },
+   {
+    "name": "Zona de frenado",
+    "kind": "flat",
+    "length": 80
+   }
+  ],
+  "totalLength": 254.68749500807178,
+  "brakeStart": 174.68749500807178,
+  "brakeX": 168,
+  "endX": 248,
+  "verdict": {
+   "approved": true,
+   "status": "finished",
+   "distance": 209.44415993398303,
+   "time": 15.32064125283531,
+   "maxLoad": 2.9329787752095218,
+   "minLoad": 0.3737250196358149,
+   "maxSpeed": 19.51402762522873,
+   "violations": []
+  }
+ }
+}

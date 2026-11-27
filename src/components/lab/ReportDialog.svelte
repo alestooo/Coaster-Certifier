@@ -3,7 +3,7 @@
   import type { Passenger } from "../../game/passengers";
   import { visibleFields } from "../../lib/field-definitions";
   import { formatNumber, formatScientific, formatSeconds, kmh } from "../../ui/format";
-  import { resultLines } from "../../lib/report-text";
+  import { resultLines, elementRows } from "../../lib/report-text";
   import { Printer } from "lucide-svelte";
   import { designCheckText } from "../../lib/design-checks-text";
   import Dialog from "../ui/Dialog.svelte";
@@ -41,6 +41,7 @@
     }))
   );
 
+  let elements = $derived(elementRows(config));
   let summary = $derived(verdict?.summary ?? null);
 
   function print() {
@@ -228,8 +229,9 @@
         <div class="table-scroll">
         <table class="parameters">
           <tbody>
-            <tr><th>Trazado</th><td>{mapName}</td><th>Frenado</th><td>{config.brakeMode === "station" ? "frenos en la recta final" : "resorte de tope"}</td></tr>
+            <tr><th>Trazado</th><td>{mapName} · {config.track.length} elementos</td><th>Frenado</th><td>{config.brakeMode === "station" ? "frenos en la recta final" : "resorte de tope"}</td></tr>
             <tr><th>Contacto</th><td>{config.contactModel === "strict" ? "siempre apoyado (N > 0)" : "ruedas anti-levantamiento"}</td><th>m</th><td>{formatNumber(config.mass, 1)} kg</td></tr>
+            <tr><th><Sym symbol="W" /> · Ancho del trazado (derivado: x del final)</th><td>{formatNumber(config.trackWidth, 1)} m</td><th></th><td></td></tr>
             {#each Array.from({ length: Math.ceil(parameterRows.length / 2) }, (_, index) => parameterRows.slice(index * 2, index * 2 + 2)) as pair}
               <tr>
                 {#each pair as row}
@@ -237,6 +239,20 @@
                   <td>{row.value}</td>
                 {/each}
               </tr>
+            {/each}
+          </tbody>
+        </table>
+        </div>
+
+        <h3>Elementos del trazado</h3>
+        <div class="table-scroll">
+        <table class="elements">
+          <thead>
+            <tr><th>Elemento</th><th>x</th><th>Altura</th><th>Loop o colina</th></tr>
+          </thead>
+          <tbody>
+            {#each elements as row, index (index)}
+              <tr><td>{index + 1}. {row.type}</td><td>{row.x}</td><td>{row.height}</td><td>{row.detail || "—"}</td></tr>
             {/each}
           </tbody>
         </table>
@@ -308,6 +324,12 @@
     margin: 0 0 8px;
     font-size: 14px;
     color: var(--primary-strong);
+  }
+
+  .report-sheet h3 {
+    margin: 14px 0 6px;
+    font-size: 12.5px;
+    color: var(--text-soft);
   }
 
   /* En el teléfono la tabla se desplaza dentro de su caja; la página no se desborda. */

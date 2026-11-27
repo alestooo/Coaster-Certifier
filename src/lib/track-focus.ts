@@ -38,3 +38,14 @@ export function focusRanges(track: Track, area: AreaId | null): DistanceRange[] 
 
   return mergeRanges(sections.map(section => ({ from: section.start, to: section.end })));
 }
+
+/** Tramos de la vía de un elemento del trazado (su loop incluido), para resaltarlo mientras está elegido. */
+export function elementRanges(track: Track, index: number | null): DistanceRange[] {
+  if (index === null) return [];
+
+  return mergeRanges(
+    track.sections
+      .filter(section => section.element === index && section.end <= track.stationStart + 1e-6)
+      .map(section => ({ from: section.start, to: section.end }))
+  );
+}

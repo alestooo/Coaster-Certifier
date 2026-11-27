@@ -9,13 +9,13 @@ Proyecto de Simulación · Física I (FUN-18) · Universidad CENFOTEC · 2026-C3
 
 ![Taller de diseño: el trazado del anexo aprobado, con manijas A–F sobre la vía, franja de fuerza g, lectura v/g/N al pasar el cursor y telemetría](docs/img/taller.png)
 
-| Correcciones verificadas sobre la vía | Trazado personalizado |
+| Correcciones verificadas sobre la vía | Edición por elementos |
 | --- | --- |
-| ![Loop circular rechazado: el pin abre las correcciones y «Mostrar en la pista» dibuja la pista corregida punteada en verde](docs/img/correcciones.png) | ![Punto con un loop agregado desde la mini barra, con sus manijas de altura y radio](docs/img/personalizado.png) |
+| ![Loop circular rechazado: el pin abre las correcciones y «Mostrar en la pista» dibuja la pista corregida punteada en verde](docs/img/correcciones.png) | ![En el trazado del anexo, una colina agregada desde la mini barra del punto del loop, con su panel de x, altura y radio de la cresta](docs/img/edicion.png) |
 
 | Tren y pasajeros | En el teléfono |
 | --- | --- |
-| ![Panel de pasajeros con avatares, peinados, masa y reacción](docs/img/pasajeros.png) | ![Zona de frenado elegida en un teléfono: la hoja inferior muestra sus valores](docs/img/telefono.png) |
+| ![Panel de pasajeros con avatares, peinados, masa y reacción](docs/img/pasajeros.png) | ![El loop elegido en un teléfono: su mini barra sobre la vía y la hoja inferior con x, altura, h_L y R](docs/img/telefono.png) |
 
 ---
 
@@ -130,6 +130,12 @@ El punto de entrada `src/physics/index.js` también exporta los siguientes símb
 | `segmentPoint(segment, s)` | Segmento de vía y distancia local `s` (m) | Geometría evaluada en el segmento (posición m, inclinación rad, curvatura 1/m) |
 | `loopExtent(loop)` | Objeto geométrico de loop | Extremos espaciales de la geometría (m) |
 | `layoutNodes(config)` | Configuración de trazado | Nodos geométricos y disposición del recorrido (coordenadas m) |
+| `compileElements(track, H)` | Elementos del trazado y altura inicial (m) | Nodos que usa el constructor; cada uno lleva el índice de su `element` |
+| `legacyElements(config)` | Configuración sin `track` (`mapId` y parámetros, o `customPoints`) | Elementos equivalentes en metros (misma geometría que antes) |
+| `validateElements(track)` | Lista de elementos | Lanza `ConfigError` (campo `track`) si el orden, las alturas, los loops o la cantidad no valen |
+| `withElement(track, i, cambios)` / `copyElement(e)` | Elementos, índice y cambios / un elemento | Copia nueva con el elemento cambiado / copia profunda; nunca modifican la entrada |
+| `mergeConfigPatch(config, patch)` | Configuración y cambios | Configuración nueva; si el cambio toca parámetros de geometría heredados (`LEGACY_TRACK_KEYS`) sin `track`, el trazado se vuelve a derivar |
+| `MAX_TRACK_ELEMENTS` | No aplica | Tope de elementos del trazado (40) |
 | `makeState(...)` | Valores de estado procesados por el integrador | Objeto de estado de simulación (tiempo s, distancia m, rapidez m/s y magnitudes derivadas SI) |
 | `CRITERIA` | No aplica | Catálogo de criterios y códigos de incumplimiento (identificadores) |
 | `CSV_COLUMNS` | No aplica | Descriptores de columnas de exportación y unidades asociadas |
@@ -148,13 +154,24 @@ El punto de entrada `src/physics/index.js` también exporta los siguientes símb
 | `resolveConfig(input?)` | objeto parcial con cualquier subconjunto de parámetros | configuración completa y validada; lanza `ConfigError` (con `.field`) si algo es inválido |
 | `assertLoopShape(h_L, R)` | altura del loop (m), radio en la cima (m) | lanza `ConfigError` si `h_L < 2R` o la forma es demasiado extrema |
 
-Parámetros (`SimulationConfig`): `mass` (kg), `gravity` (m/s²), `initialHeight` H (m), `initialSpeed` v₀ (m/s), `trackWidth` W (m), `mapId` (`incline`·`slope`·`valley`·`loop`·`reference`·`custom`), `loopHeight` h_L (m), `loopTopRadius` R (m), `hillHeight` h_c (m), `hillCrestRadius` ρ_c (m), `friction` μ, `brakeMode` (`station`·`spring`), `brakingLength` d_f (m), `brakeDeceleration` a_f (m/s²), `springConstant` k (N/m), `springDamping` c (N·s/m), `maxCompression` x_máx (m), `contactModel` (`strict`·`safety-wheels`), `maxLoad` n_máx (g), `minLoad` n_mín (g), `minSpeed` v_mín (m/s), `maxTime` (s), `timeStep` dt (s), `maxSubstep` Δt (s), `customPoints` (`{x, y}` relativos 0–1, `loopHeight`, `loopTopRadius` en m).
+Parámetros (`SimulationConfig`): `mass` (kg), `gravity` (m/s²), `initialHeight` H (m), `initialSpeed` v₀ (m/s), `trackWidth` W (m), `mapId` (`incline`·`slope`·`valley`·`loop`·`reference`·`custom`), `loopHeight` h_L (m), `loopTopRadius` R (m), `hillHeight` h_c (m), `hillCrestRadius` ρ_c (m), `friction` μ, `brakeMode` (`station`·`spring`), `brakingLength` d_f (m), `brakeDeceleration` a_f (m/s²), `springConstant` k (N/m), `springDamping` c (N·s/m), `maxCompression` x_máx (m), `contactModel` (`strict`·`safety-wheels`), `maxLoad` n_máx (g), `minLoad` n_mín (g), `minSpeed` v_mín (m/s), `maxTime` (s), `timeStep` dt (s), `maxSubstep` Δt (s), `track` (lista de elementos en metros, ver abajo), `customPoints` (heredado: `{x, y}` relativos 0–1, `loopHeight`, `loopTopRadius` en m).
+
+**Geometría por elementos (`track`).** El trazado es una lista de elementos en metros, en orden de avance, y es la única fuente de la geometría:
+
+| Elemento | Campos | Qué es |
+|---|---|---|
+| `{ type: "start" }` | — | A, en x = 0 y altura `initialHeight` |
+| `{ type: "point", x, y, loop?, line? }` | `loop: { height, topRadius }` | Nodo libre a cualquier altura; puede anclar un loop. `line: true` hace recto el tramo que llega a él |
+| `{ type: "hill", x, height, crestRadius }` | — | Colina con su cresta en x y ρ_c exacto |
+| `{ type: "end", x, line? }` | — | Fin de la parte libre; E está 8 m después |
+
+Si la configuración no trae `track`, se traduce de `mapId` con sus parámetros (o de `customPoints`) con las mismas fórmulas de siempre, así los escenarios y los JSON anteriores dan el mismo resultado. Si lo trae, `trackWidth` pasa a ser la x de `end`, y los parámetros de loop, colina y puntos quedan sin efecto geométrico. Hay como máximo 40 elementos.
 
 ### Trazado
 
 | Función | Recibe | Devuelve |
 | --- | --- | --- |
-| `buildTrack(config)` | configuración (parcial o completa) | `Track`: `segments`, `sections` (nombre, inicio y fin en m), `markers` (puntos críticos A–F con `distance` en m), `totalLength`, `brakeStart`, `stationStart` (m), `points` para dibujar, `loops`, `maxHeight` |
+| `buildTrack(config)` | configuración (parcial o completa) | `Track`: `segments`, `sections` (nombre, inicio y fin en m, y `element`: índice del elemento al que pertenece el tramo, o `null` en la llegada y el frenado), `markers` (puntos críticos A–F con `distance` en m), `totalLength`, `brakeStart`, `stationStart` (m), `points` para dibujar, `loops`, `maxHeight` |
 | `geometryAt(track, s)` | trazado, coordenada s (m) | `{x, y}` (m), `angle` θ (rad), `curvature` κ (1/m), `section`, `kind` |
 | `createLoop({x, y, height, topRadius})` / `loopPoint(loop, s)` | base (m), h_L (m), R (m) / distancia local (m) | loop (`reference`, `shape`, `bottomRadius`, `length`, `exitX`) / punto con θ y κ |
 | `hermitePoint(a, b, u, slope)` | nodos (m), parámetro 0–1, pendiente inicial | `{x, y, angle, curvature}` |
@@ -256,30 +273,27 @@ El código de salida es 0 si el trazado aprueba, 2 si se rechaza y 1 ante una co
 
 La app es un **taller de una sola pantalla**: del menú se entra directo al trazado del anexo, ya auditado.
 
-1. **Diseño sobre la pista.** Los puntos críticos son manijas que se arrastran sobre el lienzo, a escala real y con la cámara congelada mientras dura el gesto. Cada manija se mueve en una sola dirección:
+1. **Diseño sobre la pista, por elementos.** Todo trazado (el del anexo, los demás del selector o uno armado desde cero) es una lista de elementos que se editan directamente en el lienzo, a escala real y con la cámara congelada mientras dura el gesto:
 
-   | Manija | Movimiento | Parámetro |
+   | Manija | Movimiento | Qué cambia |
    |---|---|---|
    | A | vertical | H |
    | Flecha en A | a lo largo de la tangente | v₀ |
-   | C | vertical | h_L |
-   | Círculo osculador | horizontal | R |
-   | D | vertical | h_c |
+   | Punto (B en el del loop) | libre, en 2D | x y altura del punto |
+   | C | vertical | h_L de su loop |
+   | Círculo osculador | horizontal | R de su loop |
+   | Cresta D | libre, en 2D | x y altura de la colina |
    | Pie de la colina | horizontal | ρ_c |
-   | E | horizontal | W |
+   | E | horizontal | solo el largo de la recta final: el resto del trazado queda igual |
    | F | horizontal | d_f |
 
-   Mientras se arrastra, una etiqueta muestra el valor y su consecuencia física (p. ej. «necesita ≥ 5,9 m/s en la cima»). Si la geometría no se puede construir, la manija se detiene en el último valor válido y explica por qué.
+   - **Agregar y quitar:** doble clic sobre la vía agrega un punto. Al tocar un elemento aparece una mini barra para agregar un punto o una colina a su lado, poner o quitar su loop, o borrarlo. A y E no se borran. No hay límite de 9 puntos ni de 3 loops: el tope es de 40 elementos. Una colina nueva se achica si hace falta para entrar en el hueco.
+   - **Límites:** si la geometría no se puede construir, la manija se detiene en el último valor válido y explica por qué (p. ej. «La colina no cabe: con esa forma cada ladera mide 106,2 m y hasta su vecino hay 104,2 m»). Mientras se arrastra, una etiqueta muestra el valor.
+   - **Deshacer:** cada gesto, y cada clic de la mini barra, es un paso.
+   - **Letras:** cada letra va en su manija y dice qué es al pasar el puntero. «Puntos A–F», junto a la leyenda de fuerza g, lista las seis letras del anexo con las que el trazado no tiene («este trazado no tiene loop»).
+   - **Teclado:** Tab elige una manija. Las flechas mueven los puntos y las crestas 1 m, y las manijas de un eje un paso (Shift = ×10). Supr borra el elemento. En A, v₀ y F, Enter o doble clic permite escribir el valor.
 
-   Cada letra dice qué es al pasar el puntero, y «Puntos A–F», junto a la leyenda de fuerza g, lista las seis letras del anexo con las que el trazado no tiene («este trazado no tiene loop»).
-
-   Las manijas también responden al teclado: Tab para elegir, flechas para mover (Shift = ×10) y Enter o doble clic para escribir el valor.
-
-   **Trazado personalizado**, también sobre la pista:
-   - cada punto se arrastra en dos dimensiones;
-   - doble clic sobre la vía agrega un punto (hasta 9);
-   - al tocar un punto aparece una mini barra para agregar un punto a su lado (sin doble clic: teclado y tacto), agregar o quitar su loop (hasta 3, con manijas de altura y radio que también se mueven con las flechas) o borrarlo;
-   - el panel del punto permite escribir x, altura, h_L y R, y empezar desde una plantilla.
+   El trazado «Personalizado» del selector es solo un punto de partida más: se edita igual que los demás.
 2. **Auditoría en vivo, sobre la vía.** Cada cambio se simula completo en un Web Worker y la píldora de la barra muestra el dictamen: «Aprobado» o «Rechazado: …» con el motivo. El resultado se dibuja en la propia pista:
    - **Franja de fuerza g:** cada tramo se tiñe con lo que sienten los pasajeros. La leyenda permite ocultarla.
 
@@ -295,7 +309,8 @@ La app es un **taller de una sola pantalla**: del menú se entra directo al traz
 
    **Deshacer / Rehacer** (Ctrl+Z / Ctrl+Shift+Z) agrupa cada gesto en un solo paso.
 3. **Paneles a pedido**, uno a la vez, que se cierran con Esc:
-   - *Selección*: un clic en un tramo de la vía. La cámara encuadra esa parte y el panel muestra su estado y sus pocos valores, cada uno con un slider y un campo que acepta coma decimal.
+   - *Elemento*: un clic en un punto, un loop, una colina o la recta final, sobre su manija o sobre su tramo de vía. El panel («Loop», «Colina», «Punto N de M», «Recta final») muestra su lectura del dictamen y sus valores (x, altura, h_L y R, o h_c y ρ_c, o la x de E), cada uno con un slider y un campo que acepta coma decimal. La cámara no se mueve, salvo que la hoja del panel tape el elemento (en el teléfono).
+   - *Salida* y *Frenado*: un clic en la caída inicial o en la zona de frenado. La cámara encuadra esa parte y el panel muestra H, v₀ y μ, o el sistema de frenado.
    - *Dictamen*: fuerza g máxima y mínima, rapidez máxima, distancia de frenado, incumplimientos en lenguaje claro (cada uno lleva a su pin), «Ver informe de certificación» y un menú «Descargar».
    - *Reglas y precisión*: contacto con la vía, límites de fuerza g y parámetros numéricos.
    - *Tren y pasajeros*:
@@ -304,7 +319,7 @@ La app es un **taller de una sola pantalla**: del menú se entra directo al traz
      - vista previa de su reacción a 0 g y a 5 g.
 4. **Trazados y escenarios** en el selector de la barra: seis trazados con miniaturas a escala, los escenarios de referencia de la librería y la guía con los criterios (también en el teléfono).
 5. **Escala real y escena.** Tren, pasajeros, vía, soportes, estación (30 m al final de la zona de frenado) y feria se dibujan a escala real; cuando el tren mide menos de 12 px, un halo con flecha lo señala sin agrandarlo. La subida por cadena es una sola vía del suelo hasta A, y A es su cima: la siguen los rieles, la cadena y sus eslabones, los soportes, el motor y los carros que todavía están detrás de A.
-6. **Cámara.** El encuadre va del pie de la subida a F; se acerca con la rueda, con dos dedos o con los botones y se desplaza arrastrando el fondo. Doble clic vuelve al encuadre, y hay un modo para seguir al tren. La reproducción (reproducir, volver a A, saltar al final, línea de tiempo, velocidad) flota sobre el lienzo.
+6. **Cámara.** El encuadre va del pie de la subida a F; se acerca con la rueda, con dos dedos o con los botones y se desplaza arrastrando el fondo. Doble clic fuera de la vía vuelve al encuadre, y hay un modo para seguir al tren. Al soltar una manija la vista no cambia mientras el trazado siga entrando en ella. La reproducción (reproducir, volver a A, saltar al final, línea de tiempo, velocidad) flota sobre el lienzo.
 7. **Telemetría plegable** (Chart.js, ejes con unidades): lecturas de rapidez, fuerza g, energía y tramo, y una gráfica en tiempo real elegible entre siete magnitudes, o las siete a la vez. El eje horizontal puede ser tiempo o posición, con marcadores A–F, tramos e incumplimientos.
 8. **Informe de certificación** imprimible («Imprimir o guardar PDF»). El menú «Descargar» del dictamen ofrece los datos de cada instante en CSV (resolución completa, igual que `npm run headless`), el dictamen en JSON (con la vía) y el PDF.
 9. **Recursos.**
@@ -320,9 +335,9 @@ La app es un **taller de una sola pantalla**: del menú se entra directo al traz
 
    | | Antes del rediseño | Ahora |
    |---|---|---|
-   | JS + CSS que baja el menú | 178,5 KB (todo) | 30,2 KB |
-   | Al entrar al taller (escritorio, con telemetría y el worker de auditoría) | +10,4 KB (solo el worker) | +153,7 KB |
-   | Precarga en reposo (informe, guía, pasajeros, correcciones) | — | +22,5 KB |
+   | JS + CSS que baja el menú | 178,5 KB (todo) | 30,9 KB |
+   | Al entrar al taller (escritorio, con telemetría y el worker de auditoría) | +10,4 KB (solo el worker) | +158,6 KB |
+   | Precarga en reposo (informe, guía, pasajeros, correcciones) | — | +23,6 KB |
    | Imágenes y video del menú | 2,7 MB (PNG de 2 MB + GIF de 712 KB) | 216 KB |
 
    CPU del hilo principal (métricas de Chrome por CDP, 1440 × 900). Antes se midió en el servidor de desarrollo; ahora da lo mismo en desarrollo y en el build de producción:
@@ -330,7 +345,7 @@ La app es un **taller de una sola pantalla**: del menú se entra directo al traz
    | | Antes del rediseño | Ahora |
    |---|---|---|
    | En reposo en el taller | 22,7 % | 0 % |
-   | Reproduciendo | 47,9 % | ≈ 33 % |
+   | Reproduciendo | 47,9 % | ≈ 34 % |
 
 ![Informe de certificación con puntos críticos y extremos del recorrido](docs/img/reporte.png)
 

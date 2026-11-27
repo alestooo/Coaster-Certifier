@@ -1,6 +1,6 @@
 import { describe, test, expect } from "vitest";
 import { resolveConfig, ConfigError } from "../src/physics/index.js";
-import { friendlyConfigMessage, fieldByKey, visibleFields } from "../src/lib/field-definitions.ts";
+import { friendlyConfigMessage, fieldByKey, visibleFields, FIELD_GROUPS } from "../src/lib/field-definitions.ts";
 
 describe("Mensajes de validación legibles", () => {
   test("reemplaza la clave interna por la etiqueta y agrega la unidad", () => {
@@ -49,18 +49,24 @@ describe("Pistas calculadas junto a cada control", () => {
 describe("Campos visibles según el trazado y los sistemas elegidos", () => {
   const keysFor = input => visibleFields(resolveConfig(input)).map(field => field.key);
 
-  test("una línea sin loop ni colina no muestra sus parámetros", () => {
-    const keys = keysFor({ mapId: "slope" });
-
-    expect(keys).not.toContain("loopHeight");
-    expect(keys).not.toContain("hillHeight");
-    expect(keys).toContain("brakingLength");
-  });
-
-  test("el recorrido del anexo muestra loop y colina", () => {
+  test("no hay grupo de campos para W, loop ni colina: se editan por elemento", () => {
+    const ids = FIELD_GROUPS.map(group => group.id);
     const keys = keysFor({ mapId: "reference" });
 
-    expect(keys).toEqual(expect.arrayContaining(["loopHeight", "loopTopRadius", "hillHeight", "hillCrestRadius"]));
+    expect(ids).not.toEqual(expect.arrayContaining(["layout"]));
+    expect(ids).not.toContain("loop");
+    expect(ids).not.toContain("hill");
+    expect(keys).not.toContain("trackWidth");
+    expect(keys).not.toContain("loopHeight");
+    expect(keys).not.toContain("hillHeight");
+  });
+
+  test("μ está en el grupo de la salida y el loop y la colina conservan sus metadatos", () => {
+    const start = FIELD_GROUPS.find(group => group.id === "start");
+
+    expect(start?.fields.map(field => field.key)).toContain("friction");
+    expect(fieldByKey("loopTopRadius")?.label).toBe("Radio en la cima");
+    expect(fieldByKey("hillCrestRadius")?.symbol).toBe("ρ_c");
   });
 
   test("con resorte se ocultan los frenos y aparecen rigidez, amortiguador y compresión", () => {

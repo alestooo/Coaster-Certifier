@@ -18,6 +18,7 @@ import { maxOf, minOf } from "../utils.js";
  * @property {number} start Coordenada s de inicio (m).
  * @property {number} end Coordenada s de fin (m).
  * @property {number} length Longitud (m).
+ * @property {number | null} element Índice del elemento del trazado al que pertenece (el de su nodo de llegada; el loop, a su punto); null en la llegada y el frenado.
  */
 
 /**
@@ -55,18 +56,7 @@ const CACHE_SIZE = 16;
  * @param {import("../config.js").SimulationConfig} config
  */
 function cacheKey(config) {
-  return JSON.stringify([
-    config.mapId,
-    config.initialHeight,
-    config.trackWidth,
-    config.loopHeight,
-    config.loopTopRadius,
-    config.hillHeight,
-    config.hillCrestRadius,
-    config.brakingLength,
-    config.brakeMode,
-    config.customPoints
-  ]);
+  return JSON.stringify([config.track, config.initialHeight, config.brakingLength, config.brakeMode]);
 }
 
 /**
@@ -144,7 +134,7 @@ function assertLoopsFit(nodes) {
       throw new ConfigError(
         `El loop del punto ${index + 1} necesita más espacio horizontal: ` +
           "separá los puntos vecinos o reducí la altura del loop.",
-        "customPoints"
+        "track"
       );
     }
   });
@@ -175,7 +165,7 @@ export function buildTrack(input) {
 
   for (let index = 1; index < nodes.length; index++) {
     if (nodes[index].x <= nodes[index - 1].x) {
-      throw new ConfigError("Los puntos deben avanzar horizontalmente.", "customPoints");
+      throw new ConfigError("Los puntos deben avanzar horizontalmente.", "track");
     }
   }
 
@@ -208,20 +198,20 @@ export function buildTrack(input) {
     if (end.x <= start.x) {
       throw new ConfigError(
         "No queda espacio entre la salida del loop y el siguiente punto.",
-        "customPoints"
+        "track"
       );
     }
 
     const name = sectionName(start, end, index === 0, fromLoop);
 
-    if (config.mapId === "incline") {
+    if (end.line) {
       const metrics = lineMetrics(start, end);
-      push({ kind: "line", x: start.x, y: start.y, angle: metrics.angle, length: metrics.length, section: "Plano inclinado" });
+      push({ kind: "line", x: start.x, y: start.y, angle: metrics.angle, length: metrics.length, section: index === 0 ? "Plano inclinado" : "Recta", element: end.element });
     } else {
       const slope = index === 0 ? (end.y - start.y) / (end.x - start.x) : 0;
       const table = arcLengthTable(start, end, slope, ARC_LENGTH_SAMPLES);
 
-      push({ kind: "curve", a: start, b: end, slope, table, length: table[ARC_LENGTH_SAMPLES], section: name });
+      push({ kind: "curve", a: start, b: end, slope, table, length: table[ARC_LENGTH_SAMPLES], section: name, element: end.element });
     }
 
     if (end.role === "crest") {
@@ -247,7 +237,7 @@ export function buildTrack(input) {
 
       markers.push({ label: `B${suffix}`, name: "Entrada al loop", distance: totalLength, role: "loop-entry" });
       markers.push({ label: `C${suffix}`, name: "Cima del loop", distance: totalLength + loop.topDistance, role: "loop-top" });
-      push(loop);
+      push({ ...loop, element: end.element });
       previousExit = { x: loop.exitX, y: end.y, role: "plain" };
     }
   }
@@ -295,7 +285,8 @@ export function buildTrack(input) {
       name: segment.section,
       start: segment.start,
       end: segment.end,
-      length: segment.length
+      length: segment.length,
+      element: segment.element ?? null
     })),
     markers,
     totalLength,

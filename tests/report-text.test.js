@@ -1,6 +1,8 @@
 import { describe, test, expect } from "vitest";
 import { runSimulation, findScenario, resolveConfig } from "../src/physics/index.js";
-import { resultLines } from "../src/lib/report-text.ts";
+import { resultLines, elementRows } from "../src/lib/report-text.ts";
+import { mapTemplate } from "../src/game/maps.ts";
+import { formatNumber } from "../src/ui/format.ts";
 
 /** Un número con punto decimal («240.87»), que en la interfaz va con coma. */
 const DOT_DECIMAL = /\d\.\d/;
@@ -44,5 +46,22 @@ describe("Resultado del informe en español", () => {
     expect(lines.length).toBe(run.verdict.violations.length);
     expect(lines.join(" ")).not.toMatch(DOT_DECIMAL);
     expect(lines[0]).toMatch(/s = \d+,\d\d m, t = \d+,\d{3} s\.$/);
+  });
+});
+
+describe("Tabla de elementos del informe", () => {
+  test("lista cada elemento con tipo, x, altura y su loop o colina; W sale del final", () => {
+    // Arrange
+    const config = resolveConfig(mapTemplate("reference"));
+
+    // Act
+    const rows = elementRows(config);
+
+    // Assert
+    expect(rows.map(row => row.type)).toEqual(["Inicio A", "Punto", "Colina", "Final"]);
+    expect(rows[1]).toMatchObject({ x: "80,0 m", height: "0,0 m", detail: "loop de 21,5 m · radio en la cima 5 m" });
+    expect(rows[2]).toMatchObject({ height: "10,0 m", detail: "radio de la cresta 55 m" });
+    expect(rows.every(row => !/_/.test(row.detail))).toBe(true);
+    expect(rows[3].x).toBe(`${formatNumber(config.trackWidth, 1)} m`);
   });
 });

@@ -22,3 +22,9 @@ export type Verdict = ReturnType<typeof evaluateRun>;
 
 /** Punto del editor de pista personalizada. */
 export type TrackPoint = SimulationConfig["customPoints"][number];
+
+/** Elemento del trazado en metros (A, punto, colina o final). */
+export type TrackElement = SimulationConfig["track"][number];
+export type PointElement = Extract<TrackElement, { type: "point" }>;
+export type HillElement = Extract<TrackElement, { type: "hill" }>;
+export type EndElement = Extract<TrackElement, { type: "end" }>;

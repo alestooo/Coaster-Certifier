@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { fixTitle, changeText, changeReason, changeSymbol, changeValues } from "../src/lib/fix-text.ts";
+import { fixTitle, changeText, changeReason, changeSymbol, changeValues, changeLabel } from "../src/lib/fix-text.ts";
 
 const loopHigher = { key: "loopHeight", label: "Altura del loop", unit: "m", before: 21.5, after: 24 };
 const brakeShorter = { key: "brakingLength", label: "Zona de frenado", unit: "m", before: 80, after: 60 };
@@ -29,5 +29,13 @@ describe("Textos de las correcciones", () => {
 
   test("changeReason explica la física del cambio", () => {
     expect(changeReason(loopHigher)).toMatch(/abre la base/);
+  });
+
+  test("un cambio de elemento se titula con su nombre: «Aumentar radio en la cima del loop 2»", () => {
+    const change = { key: "loopTopRadius", element: 3, label: "Radio en la cima del loop 2", unit: "m", before: 5, after: 6.5 };
+
+    expect(fixTitle({ changes: [change] })).toBe("Aumentar radio en la cima del loop 2");
+    expect(changeLabel(change)).toBe("Radio en la cima del loop 2");
+    expect(changeSymbol(change)).toBe("R");
   });
 });

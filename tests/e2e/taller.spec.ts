@@ -137,35 +137,114 @@ test.describe("Taller de diseño", () => {
     expect(value).toBeLessThan(80);
   });
 
-  test("deshacer hasta un recorrido sin la parte encuadrada vuelve al encuadre completo", async ({ page }) => {
+  test("rehacer hasta un recorrido sin la colina elegida suelta la selección", async ({ page }) => {
     await openWorkshop(page);
     await chooseInPicker(page, /^Bajada simple ¿/);
     await page.keyboard.press("Control+z");
-    const crest = handle(page, /Cresta de la colina/);
+    const crest = page.getByRole("button", { name: /^Cresta de la colina/ });
     await expect(crest).toBeVisible();
-    await page.waitForTimeout(400);
 
-    // Clic en la vía junto a D (no sobre su manija): elige la colina y la encuadra; F sale por la derecha.
-    const fitted = (await center(brakeEnd(page))).x;
+    // Clic en la vía junto a D (no sobre su manija): elige la colina.
     const at = await center(crest);
     await page.mouse.click(at.x + 30, at.y + 1);
     await expect(page.getByRole("complementary", { name: "Colina" })).toBeVisible();
-    await page.waitForTimeout(600);
-    const zoomed = (await center(brakeEnd(page))).x;
 
-    // Rehacer «Bajada simple»: la colina ya no existe, la selección se descarta y la cámara vuelve al encuadre.
+    // Rehacer «Bajada simple»: la colina ya no existe; ni su panel ni su barra quedan abiertos.
     await page.keyboard.press("Control+Shift+z");
     await expect(page.getByRole("complementary", { name: "Colina" })).toHaveCount(0);
-    await page.waitForTimeout(600);
-    const after = (await center(brakeEnd(page))).x;
-    expect(Math.abs(after - fitted)).toBeLessThan(Math.abs(zoomed - fitted) / 4);
+    await expect(page.getByRole("toolbar", { name: /^Colina/ })).toHaveCount(0);
+  });
+
+  test("soltar una manija no cambia el encuadre si el trazado sigue entrando", async ({ page }) => {
+    await openWorkshop(page);
+    // Con E elegido el panel queda abierto: el lienzo no cambia de ancho durante la medición.
+    const e = brakeEntry(page);
+    await e.click();
+    await expect(page.getByRole("complementary", { name: "Recta final" })).toBeVisible();
+    await page.waitForTimeout(700);
+
+    const a = page.getByRole("slider", { name: /Cima de la subida A/ });
+    const b = page.getByRole("button", { name: /^Punto 2:/ });
+    const beforeA = await center(a);
+    const beforeB = await center(b);
+
+    // E 20 m a la izquierda: el trazado se achica, pero sigue entrando en la vista.
+    const from = await center(e);
+    const pxPerMeter = (from.x - beforeB.x) / (328 - 80);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(from.x - 20 * pxPerMeter, from.y, { steps: 8 });
+    await page.mouse.up();
+    await expect(e).toHaveAttribute("aria-valuetext", /308,0 m/);
+    await page.waitForTimeout(700);
+
+    // Misma escala (distancia A–B) y misma posición de A en pantalla.
+    const afterA = await center(a);
+    const afterB = await center(b);
+    expect(Math.abs(afterA.x - beforeA.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(afterA.y - beforeA.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(afterB.x - afterA.x - (beforeB.x - beforeA.x))).toBeLessThanOrEqual(1);
+  });
+
+  test("arrastrar E a la izquierda solo acorta la recta final: el loop, la colina y A no se mueven y F se corre con E", async ({ page }) => {
+    await openWorkshop(page);
+    const e = brakeEntry(page);
+    await e.click();
+    await expect(page.getByRole("complementary", { name: "Recta final" })).toBeVisible();
+    await page.waitForTimeout(700);
+
+    const fixed = {
+      A: page.getByRole("slider", { name: /Cima de la subida A/ }),
+      C: handle(page, /Cima del loop/),
+      D: page.getByRole("button", { name: /^Cresta de la colina/ })
+    };
+    const before = Object.fromEntries(await Promise.all(Object.entries(fixed).map(async ([name, locator]) => [name, await center(locator)])));
+    const eBefore = await center(e);
+    const fBefore = await center(brakeEnd(page));
+
+    await page.mouse.move(eBefore.x, eBefore.y);
+    await page.mouse.down();
+    await page.mouse.move(eBefore.x - 60, eBefore.y, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(700);
+
+    for (const [name, locator] of Object.entries(fixed)) {
+      const after = await center(locator);
+      expect(Math.abs(after.x - before[name].x), name).toBeLessThanOrEqual(1);
+      expect(Math.abs(after.y - before[name].y), name).toBeLessThanOrEqual(1);
+    }
+    const eShift = (await center(e)).x - eBefore.x;
+    const fShift = (await center(brakeEnd(page))).x - fBefore.x;
+    expect(eShift).toBeLessThan(-30);
+    expect(Math.abs(fShift - eShift)).toBeLessThanOrEqual(1);
+  });
+
+  test("arrastrar E más allá del borde derecho reencuadra al soltar: A y F quedan a la vista", async ({ page }) => {
+    await openWorkshop(page);
+    const e = brakeEntry(page);
+    const from = await center(e);
+    const viewport = page.viewportSize();
+    if (!viewport) throw new Error("Sin viewport");
+
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(viewport.width - 4, from.y, { steps: 10 });
+    await page.mouse.up();
+    await expect(page.getByRole("complementary", { name: "Recta final" })).toBeVisible();
+    await page.waitForTimeout(900);
+
+    const stage = await page.locator(".stage canvas").boundingBox();
+    if (!stage) throw new Error("Lienzo sin caja");
+    const a = await center(page.getByRole("slider", { name: /Cima de la subida A/ }));
+    const f = await center(brakeEnd(page));
+    expect(a.x).toBeGreaterThan(stage.x);
+    expect(f.x).toBeLessThan(stage.x + stage.width);
   });
 
   test("cambiar de recorrido con una parte encuadrada llega al encuadre nuevo sin un salto final", async ({ page }) => {
     await openWorkshop(page);
-    const at = await center(handle(page, /Cresta de la colina/));
-    await page.mouse.click(at.x + 30, at.y + 1);
-    await expect(page.getByRole("complementary", { name: "Colina" })).toBeVisible();
+    // Las áreas (salida y frenado) se encuadran con zoom; los elementos no.
+    await selectBraking(page);
     await page.waitForTimeout(600);
 
     // Posición de F en cada cuadro mientras la cámara vuelve al encuadre.
@@ -414,6 +493,97 @@ test.describe("Taller de diseño", () => {
     await expect(brakeEnd(page)).toHaveAttribute("aria-valuenow", designed ?? "");
   });
 
+  test("en el trazado del anexo, el punto del loop se arrastra en 2D, se vuelve a auditar y un Ctrl+Z lo deshace", async ({ page }) => {
+    await openWorkshop(page);
+    const point = page.getByRole("button", { name: /^Punto 2:/ });
+    await expect(point).toHaveAccessibleName(/x 80,0 m, altura 0,0 m/);
+
+    const from = await center(point);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(from.x + 30, from.y - 25, { steps: 8 });
+    await page.mouse.up();
+
+    // Se movió en las dos direcciones a la vez.
+    await expect(point).not.toHaveAccessibleName(/x 80,0 m/);
+    await expect(point).not.toHaveAccessibleName(/altura 0,0 m/);
+    await expect(verdict(page)).toContainText(/Aprobado|Rechazado/);
+
+    await page.keyboard.press("Control+z");
+    await expect(point).toHaveAccessibleName(/x 80,0 m, altura 0,0 m/);
+  });
+
+  test("la mini barra agrega una colina después de un punto, la borra y un Ctrl+Z la devuelve en un paso", async ({ page }) => {
+    await openWorkshop(page);
+    const crests = page.getByRole("button", { name: /^Cresta de la colina/ });
+    await expect(crests).toHaveCount(1);
+
+    await page.getByRole("button", { name: /^Punto 2:/ }).click();
+    await page.getByRole("toolbar", { name: "Punto 2" }).getByRole("button", { name: "Agregar colina" }).click();
+    await expect(crests).toHaveCount(2);
+
+    // La colina nueva queda elegida: su barra la borra.
+    await page.getByRole("toolbar", { name: /^Colina/ }).getByRole("button", { name: "Borrar colina" }).click();
+    await expect(crests).toHaveCount(1);
+
+    await page.keyboard.press("Control+z");
+    await expect(crests).toHaveCount(2);
+    await expect(verdict(page)).toContainText(/Aprobado|Rechazado/);
+  });
+
+  test("doble clic sobre la vía del anexo agrega un punto", async ({ page }) => {
+    await openWorkshop(page);
+    const points = page.getByRole("button", { name: /^Punto \d+:/ });
+    await expect(points).toHaveCount(1);
+
+    // Punto 2 está en x = 80 m y la manija E en 328 m: se hace doble clic en la recta final, cerca de 300 m.
+    const point = await center(page.getByRole("button", { name: /^Punto 2:/ }));
+    const e = await center(brakeEntry(page));
+    const pxPerMeter = (e.x - point.x) / (328 - 80);
+    await page.mouse.dblclick(e.x - 28 * pxPerMeter, e.y);
+
+    await expect(points).toHaveCount(2);
+    // Los puntos se numeran por su lugar en el trazado (A, el loop, la colina…): el nuevo es el 4.
+    await expect(page.getByRole("button", { name: /^Punto 4: x (29\d|30\d)/ })).toBeVisible();
+  });
+
+  test("tocar el loop abre su panel con sliders de x, altura, h_L y R, y el slider de R sigue h_L/2", async ({ page }) => {
+    await openWorkshop(page);
+
+    // Clic sobre la vía del loop, junto a su cima (no sobre la manija).
+    const top = await center(handle(page, /Cima del loop/));
+    await page.mouse.click(top.x + 14, top.y + 4);
+    const panel = page.getByRole("complementary", { name: "Loop" });
+    await expect(panel).toBeVisible();
+    for (const name of ["Posición horizontal", "Altura", "Altura del loop", "Radio en la cima"]) {
+      await expect(panel.getByRole("slider", { name, exact: true })).toBeVisible();
+    }
+
+    const height = panel.getByRole("textbox", { name: "Altura del loop" });
+    await height.fill("14");
+    await height.press("Enter");
+    await panel.getByRole("slider", { name: "Radio en la cima" }).focus();
+    await page.keyboard.press("End");
+    await expect(panel.getByRole("textbox", { name: "Radio en la cima" })).toHaveValue("7,00");
+  });
+
+  test("μ se edita desde el panel de la salida (A)", async ({ page }) => {
+    await openWorkshop(page);
+
+    // Clic sobre la caída inicial, entre A y el punto del loop.
+    const a = await center(page.getByRole("slider", { name: /Cima de la subida A/ }));
+    const b = await center(page.getByRole("button", { name: /^Punto 2:/ }));
+    await page.mouse.click(a.x + (b.x - a.x) * 0.3, a.y + (b.y - a.y) * 0.3);
+    const panel = page.getByRole("complementary", { name: "Salida" });
+    await expect(panel).toBeVisible();
+
+    const friction = panel.getByRole("textbox", { name: /Fricción/ });
+    await friction.fill("0,02");
+    await friction.press("Enter");
+    await expect(friction).toHaveValue("0,020");
+    await expect(panel).toContainText(/la fricción disipa \d+ %/);
+  });
+
   test("Personalizado: arrastrar un punto sobre la pista vuelve a auditar y un Ctrl+Z lo deshace", async ({ page }) => {
     await openWorkshop(page);
     await chooseInPicker(page, /^Personalizado Hasta/);
@@ -469,9 +639,12 @@ test.describe("Taller de diseño", () => {
     await openWorkshop(page);
     await chooseInPicker(page, /^Personalizado Hasta/);
 
-    // Junto a un punto ya existente (más cerca que el 5 % del ancho): «Está demasiado cerca de otro punto».
-    const point = await center(page.getByRole("button", { name: /^Punto 3:/ }));
-    await page.mouse.dblclick(point.x + 30, point.y + 1);
+    // Punto 4 en x = 120 m, el final en 160 m y su manija E en 168 m: a 1 m del final, lejos de toda manija,
+    // aparece «Está demasiado cerca de otro elemento».
+    const point = await center(page.getByRole("button", { name: /^Punto 4:/ }));
+    const e = await center(brakeEntry(page));
+    const pxPerMeter = (e.x - point.x) / (168 - 120);
+    await page.mouse.dblclick(e.x - 9 * pxPerMeter, e.y);
     const warning = page.locator(".hint.warn");
     await expect(warning).toContainText("demasiado cerca");
     await page.setViewportSize({ width: 390, height: 844 });
@@ -488,8 +661,8 @@ test.describe("Taller de diseño", () => {
     await page.getByRole("button", { name: /^Punto 3:/ }).click();
     await page.getByRole("button", { name: "Agregar loop" }).click();
 
-    const top = handle(page, /Cima del loop del punto 3/);
-    const radius = handle(page, /Radio en la cima del loop del punto 3/);
+    const top = handle(page, /Cima del loop/);
+    const radius = handle(page, /Radio en la cima del loop/);
     const height = Number(await top.getAttribute("aria-valuenow"));
     const topRadius = Number(await radius.getAttribute("aria-valuenow"));
 
@@ -520,7 +693,7 @@ test.describe("Taller de diseño", () => {
     const panel = page.getByRole("complementary", { name: "Punto 3" });
 
     // Un valor fuera de rango se recorta y el campo muestra el recortado, no lo escrito.
-    const height = panel.getByRole("textbox", { name: "Altura y" });
+    const height = panel.getByRole("textbox", { name: "Altura", exact: true });
     await height.fill("9999");
     await height.press("Enter");
     await expect(height).not.toHaveValue("9999");
@@ -533,11 +706,12 @@ test.describe("Taller de diseño", () => {
     // h_L = 0 no quita el loop: para eso está «Quitar loop».
     await page.getByRole("button", { name: /^Punto 3:/ }).click();
     await page.getByRole("button", { name: "Agregar loop" }).click();
-    const loopHeight = page.getByRole("complementary", { name: "Punto 3" }).getByRole("textbox", { name: /Altura del loop/ });
+    // Con loop, el panel del punto pasa a llamarse «Loop».
+    const loopHeight = page.getByRole("complementary", { name: "Loop" }).getByRole("textbox", { name: /Altura del loop/ });
     await loopHeight.fill("0");
     await loopHeight.press("Enter");
-    await expect(handle(page, /Cima del loop del punto 3/)).toBeVisible();
-    await expect(page.getByRole("complementary", { name: "Punto 3" }).getByRole("status")).toContainText("Quitar loop");
+    await expect(handle(page, /Cima del loop/)).toBeVisible();
+    await expect(page.getByRole("complementary", { name: "Loop" }).getByRole("status")).toContainText("Quitar loop");
   });
 
   test("Personalizado: doble clic sobre la vía agrega un punto", async ({ page }) => {
@@ -559,12 +733,12 @@ test.describe("Taller de diseño", () => {
 
     await page.getByRole("button", { name: /^Punto 3:/ }).click();
     await page.getByRole("button", { name: "Agregar loop" }).click();
-    await expect(handle(page, /Cima del loop del punto 3/)).toBeVisible();
+    await expect(handle(page, /Cima del loop/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Quitar loop" })).toBeVisible();
 
     await page.getByRole("button", { name: "Borrar punto" }).click();
     await expect(page.getByRole("button", { name: /^Punto \d+:/ })).toHaveCount(2);
-    await expect(handle(page, /Cima del loop del punto/)).toHaveCount(0);
+    await expect(handle(page, /Cima del loop/)).toHaveCount(0);
   });
 
   test("Personalizado: un doble clic humano, con pausa entre clics, agrega el punto donde se hizo", async ({ page }) => {
@@ -597,7 +771,7 @@ test.describe("Taller de diseño", () => {
     await page.mouse.move(to.x + 4, from.y, { steps: 10 });
     await page.mouse.up();
 
-    const reason = page.locator(".points").getByText(/necesita más espacio/i);
+    const reason = page.locator(".elements").getByText(/necesita más espacio/i);
     await expect(reason).toBeVisible();
     const message = await reason.boundingBox();
     for (const name of [/loop$/, "Borrar punto"]) {
@@ -609,7 +783,7 @@ test.describe("Taller de diseño", () => {
     }
 
     await page.getByRole("button", { name: /^Punto 4:/ }).click();
-    await expect(page.locator(".points em")).toHaveCount(0);
+    await expect(page.locator(".elements em")).toHaveCount(0);
   });
 
   test("Personalizado: al agregar un loop, la mini barra no tapa la manija de su cima", async ({ page }) => {
@@ -618,7 +792,7 @@ test.describe("Taller de diseño", () => {
     await page.getByRole("button", { name: /^Punto 3:/ }).click();
     await page.getByRole("button", { name: "Agregar loop" }).click();
 
-    const top = handle(page, /Cima del loop del punto 3/);
+    const top = handle(page, /Cima del loop/);
     const toolbar = page.getByRole("toolbar", { name: "Punto 3" });
     await expect(top).toBeVisible();
     await expect(toolbar).toBeVisible();
@@ -637,10 +811,10 @@ test.describe("Taller de diseño", () => {
       await chooseInPicker(page, /^Personalizado Hasta/);
       await page.getByRole("button", { name: /^Punto 3:/ }).click();
       await page.getByRole("button", { name: "Agregar loop" }).click();
-      await expect(handle(page, /Radio en la cima del loop del punto 3/)).toBeVisible();
+      await expect(handle(page, /Radio en la cima del loop/)).toBeVisible();
       await page.waitForTimeout(300);
 
-      for (const target of [page.getByRole("button", { name: /^Punto 3:/ }), handle(page, /Cima del loop del punto 3/), handle(page, /Radio en la cima del loop del punto 3/)]) {
+      for (const target of [page.getByRole("button", { name: /^Punto 3:/ }), handle(page, /Cima del loop/), handle(page, /Radio en la cima del loop/)]) {
         const at = await center(target);
         const hit = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.getAttribute("aria-label") ?? "", at);
         expect(hit).toBe(await target.getAttribute("aria-label"));
@@ -773,6 +947,8 @@ test.describe("Taller de diseño", () => {
     await page.mouse.down();
     await page.mouse.move(first.x - 40, first.y, { steps: 4 });
     await page.mouse.up();
+    // Al soltar se abre el panel y el lienzo se angosta: se toma F recién con el panel abierto, mientras la cámara se anima.
+    await expect(page.getByRole("complementary", { name: "Frenado" })).toBeVisible();
 
     const grab = await center(f);
     await page.mouse.move(grab.x, grab.y);
@@ -788,15 +964,16 @@ test.describe("Taller de diseño", () => {
 
   test("escribir en una manija un valor fuera del límite explica el recorte y devuelve el foco", async ({ page }) => {
     await openWorkshop(page);
-    const top = handle(page, /Cima del loop/);
+    // El valor escrito queda en las manijas globales (A, v₀, F); las del trazado tienen su panel.
+    const f = brakeEnd(page);
 
-    await top.focus();
+    await f.focus();
     await page.keyboard.press("Enter");
-    const input = page.getByRole("textbox", { name: /Cima del loop.*escribí el valor/ });
-    await input.fill("80");
+    const input = page.getByRole("textbox", { name: /Fin de la zona de frenado.*escribí el valor/ });
+    await input.fill("500");
     await input.press("Enter");
 
-    await expect(top).toBeFocused();
+    await expect(f).toBeFocused();
     await expect(page.locator(".handles .label em")).toBeVisible();
   });
 
@@ -890,7 +1067,8 @@ test.describe("Taller de diseño", () => {
     await openWorkshop(page);
 
     await expect(handle(page, /^Inicio de la zona de frenado E/)).toHaveAttribute("title", /E: Inicio de la zona de frenado/);
-    await expect(page.getByRole("img", { name: "B: Entrada al loop" })).toBeVisible();
+    // B va en la manija del punto del loop; la insignia aparece solo cuando las manijas se ocultan.
+    await expect(page.getByRole("button", { name: /^Punto 2:/ })).toHaveAttribute("title", /^B: Entrada al loop/);
 
     await page.getByRole("button", { name: "Puntos A–F" }).click();
     const legend = page.getByRole("list", { name: "Puntos críticos A–F" });
@@ -904,7 +1082,7 @@ test.describe("Taller de diseño", () => {
   test("los campos aceptan coma decimal, la muestran y descartan lo ilegible", async ({ page }) => {
     await openWorkshop(page);
     await handle(page, /Cima del loop/).click();
-    const radius = page.locator("#field-loopTopRadius");
+    const radius = page.getByRole("complementary", { name: "Loop" }).getByRole("textbox", { name: "Radio en la cima" });
 
     await radius.fill("3,25");
     await radius.press("Enter");
@@ -921,13 +1099,14 @@ test.describe("Taller de diseño", () => {
     await handle(page, /Cima del loop/).click();
     const panel = page.getByRole("complementary", { name: "Loop" });
 
-    const height = page.locator("#field-loopHeight");
-    await height.fill("9");
+    // h_L no baja de 2R (5 m → 10 m): con 12 m, el radio llega como mucho a 6 m.
+    const height = panel.getByRole("textbox", { name: "Altura del loop" });
+    await height.fill("12");
     await height.press("Enter");
     await panel.getByRole("slider", { name: "Radio en la cima" }).focus();
     await page.keyboard.press("End");
 
-    await expect(page.locator("#field-loopTopRadius")).toHaveValue("4,50");
+    await expect(panel.getByRole("textbox", { name: "Radio en la cima" })).toHaveValue("6,00");
   });
 
   test("volver al menú y entrar de nuevo conserva el diseño, y el menú no deshace cambios", async ({ page }) => {

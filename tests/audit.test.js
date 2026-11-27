@@ -167,4 +167,17 @@ describe("Auditoría en lenguaje claro", () => {
     expect(strict.audit.minG.limit).toBe(0);
     expect(wheels.audit.minG.limit).toBe(wheels.config.minLoad);
   });
+
+  test("con μ en la salida, su lectura dice cuánta energía disipa la fricción antes de frenar", () => {
+    // Arrange
+    const config = resolveConfig({ mapId: "reference", friction: 0.02 });
+    const run = runSimulation(config);
+
+    // Act
+    const audit = buildAudit(run.verdict, config);
+
+    // Assert
+    expect(audit.areas.start?.text).toMatch(/la fricción disipa \d+ %/);
+    expect(audit.areas).not.toHaveProperty("layout");
+  });
 });

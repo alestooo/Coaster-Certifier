@@ -150,31 +150,17 @@
     refocus(id);
   }
 
-  /** Guías de las manijas secundarias del área seleccionada (px). */
+  /** Guía de la flecha de v₀ cuando la salida está elegida (px). Las del loop y la colina están en ElementLayer. */
   function guideShapes() {
-    if (hidden) return { circle: null, arrow: null, span: null };
+    if (hidden) return { arrow: null };
 
-    const top = fresh("loopTop");
-    const radius = fresh("loopRadius");
     const speed = fresh("speed");
-    const foot = fresh("hillFoot");
-
-    const circle =
-      selectedArea === "loop" && top && radius
-        ? { cx: camera.toX(top.x), cy: camera.toY(top.y - radius.value), r: radius.value * camera.scale, hx: camera.toX(radius.x), hy: camera.toY(radius.y) }
-        : null;
-
     const arrow =
       selectedArea === "start" && speed?.anchor && speed.value > 0
         ? { x1: camera.toX(speed.anchor.x), y1: camera.toY(speed.anchor.y), x2: camera.toX(speed.x), y2: camera.toY(speed.y) }
         : null;
 
-    const span =
-      selectedArea === "hill" && foot?.anchor
-        ? { x1: camera.toX(foot.anchor.x), x2: camera.toX(foot.x), y: camera.toY(0) + 10 }
-        : null;
-
-    return { circle, arrow, span };
+    return { arrow };
   }
 </script>
 
@@ -185,18 +171,8 @@
         <path d="M0 0 L10 5 L0 10 z" style:fill="var(--handle)" />
       </marker>
     </defs>
-    {#if guides.circle}
-      <circle cx={guides.circle.cx} cy={guides.circle.cy} r={guides.circle.r} class="guide" />
-      <line x1={guides.circle.cx} y1={guides.circle.cy} x2={guides.circle.hx} y2={guides.circle.hy} class="guide thin" />
-      <circle cx={guides.circle.cx} cy={guides.circle.cy} r="2.5" class="guide-dot" />
-    {/if}
     {#if guides.arrow}
       <line x1={guides.arrow.x1} y1={guides.arrow.y1} x2={guides.arrow.x2} y2={guides.arrow.y2} class="arrow" marker-end="url(#speed-head)" />
-    {/if}
-    {#if guides.span}
-      <line x1={guides.span.x1} y1={guides.span.y} x2={guides.span.x2} y2={guides.span.y} class="guide thin" />
-      <line x1={guides.span.x1} y1={guides.span.y - 5} x2={guides.span.x1} y2={guides.span.y + 5} class="guide thin" />
-      <line x1={guides.span.x2} y1={guides.span.y - 5} x2={guides.span.x2} y2={guides.span.y + 5} class="guide thin" />
     {/if}
   </svg>
 

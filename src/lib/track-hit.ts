@@ -57,6 +57,20 @@ export function areaAtDistance(track: Track, distance: number): AreaId {
   return section ? areaForSection(section.name) : "layout";
 }
 
+/**
+ * Elemento del trazado dueño del tramo en la coordenada s: el loop es de su
+ * punto, los tramos de la colina de la colina y el resto del elemento al que
+ * llegan. La caída inicial y la llegada con el frenado no son de un elemento
+ * (null): siguen abriendo las áreas «Salida» y «Frenado».
+ */
+export function elementAtDistance(track: Track, distance: number): number | null {
+  if (distance >= track.stationStart - 1e-6) return null;
+
+  const section = track.sections.find(candidate => distance >= candidate.start && distance <= candidate.end);
+  if (!section || section.index === 0 || areaForSection(section.name) === "start") return null;
+  return section.element ?? null;
+}
+
 /** Caja (m) que encierra los tramos de un área, con margen; null si el área no está en la vía. */
 export function areaBounds(track: Track, area: AreaId): WorldBounds | null {
   const ranges = focusRanges(track, area);

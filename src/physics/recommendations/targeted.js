@@ -2,6 +2,7 @@ import { CRITERIA } from "../evaluation/criteria.js";
 import { MAX_BRAKE_DECELERATION } from "../constants.js";
 import { CONFIG_LIMITS } from "../config.js";
 import { maxOf } from "../utils.js";
+import { loopElements, loopElementForSection, crestElementNear, patchElement, scaleLoop, stretchTrack } from "./element-patches.js";
 
 /** Margen multiplicativo aplicado a las correcciones calculadas. */
 const MARGIN = 1.1;
@@ -29,9 +30,14 @@ function round(value, digits = 2) {
 export function targetedPatches(config, run) {
   const { summary, violations } = run.verdict;
   const g = config.gravity;
-  const code = violations[0]?.code;
-  const hasLoop = run.track.loops.length > 0;
-  const loop = run.track.loops[0];
+  const violation = violations[0];
+  const code = violation?.code;
+  // El loop y la cresta que fallan, como elementos del trazado.
+  const failingLoop = violation ? loopElementForSection(config.track, violation.section) : null;
+  const targetLoop = failingLoop ?? loopElements(config.track)[0] ?? null;
+  const loop = run.track.loops.find(candidate => candidate.section === violation?.section) ?? run.track.loops[0];
+  const crestElement = violation ? crestElementNear(run.track, violation.position) : null;
+  const crest = crestElement === null ? null : config.track[crestElement];
   const head = config.initialHeight + config.initialSpeed ** 2 / (2 * g);
   const lossHead = summary.dissipatedEnergy / (config.mass * g);
 
@@ -41,36 +47,41 @@ export function targetedPatches(config, run) {
   switch (code) {
     case CRITERIA.CONTACT:
     case CRITERIA.LOOP_CONTACT: {
-      if (hasLoop && violations[0].section.startsWith("Loop")) {
+      if (failingLoop !== null && loop) {
         const required = loop.y + loop.height + loop.topRadius / 2 + lossHead;
         patches.push({ initialHeight: round(required * MARGIN) });
         patches.push({ initialHeight: round(required * MARGIN * 1.1) });
 
         const scale = (head - lossHead) / (loop.height + loop.topRadius / 2) / MARGIN;
 
-        if (scale > 0.2 && scale < 1) {
-          patches.push({
-            loopHeight: round(config.loopHeight * scale),
-            loopTopRadius: round(config.loopTopRadius * scale)
-          });
-        }
-      } else {
-        const crest = summary.criticalPoints.find(point => point.role === "crest");
-        const speedSquared = (crest?.speed ?? summary.maxSpeed.value) ** 2;
+        if (scale > 0.2 && scale < 1) patches.push(scaleLoop(config, failingLoop, scale, scale));
+      } else if (crest && crestElement !== null) {
+        const critical = summary.criticalPoints.find(point => point.role === "crest");
+        const speedSquared = (critical?.speed ?? summary.maxSpeed.value) ** 2;
 
-        patches.push({ hillCrestRadius: round((speedSquared / g) * MARGIN) });
-        patches.push({ hillCrestRadius: round((speedSquared / g) * MARGIN * 1.2) });
+        if (crest.type === "hill") {
+          patches.push(patchElement(config, crestElement, { crestRadius: round((speedSquared / g) * MARGIN) }));
+          patches.push(patchElement(config, crestElement, { crestRadius: round((speedSquared / g) * MARGIN * 1.2) }));
+        } else if (crest.type === "point") {
+          patches.push(patchElement(config, crestElement, { y: round(crest.y * 0.8, 3) }));
+          patches.push(patchElement(config, crestElement, { y: round(crest.y * 0.6, 3) }));
+        }
       }
       break;
     }
 
     case CRITERIA.MIN_LOAD: {
-      const crest = summary.criticalPoints.find(point => point.role === "crest");
-      const speedSquared = (crest?.speed ?? summary.maxSpeed.value) ** 2;
+      const critical = summary.criticalPoints.find(point => point.role === "crest");
+      const speedSquared = (critical?.speed ?? summary.maxSpeed.value) ** 2;
       const allowed = 1 - config.minLoad;
 
-      patches.push({ hillCrestRadius: round((speedSquared / (g * allowed)) * MARGIN) });
-      patches.push({ hillHeight: round(config.hillHeight * 1.25) });
+      if (crest?.type === "hill" && crestElement !== null) {
+        patches.push(patchElement(config, crestElement, { crestRadius: round((speedSquared / (g * allowed)) * MARGIN) }));
+        patches.push(patchElement(config, crestElement, { height: round(crest.height * 1.25) }));
+      } else if (crest?.type === "point" && crestElement !== null) {
+        // Una cresta más alta llega más lenta: menos sensación de flotar.
+        patches.push(patchElement(config, crestElement, { y: round(crest.y * 1.15, 3) }));
+      }
       break;
     }
 
@@ -78,23 +89,23 @@ export function targetedPatches(config, run) {
       const allowed = config.maxLoad - 1;
       const speedSquared = summary.maxSpeed.value ** 2;
 
-      if (hasLoop) {
+      if (targetLoop !== null) {
+        const current = /** @type {{height: number, topRadius: number}} */ (
+          /** @type {import("../track/elements.js").PointElement} */ (config.track[targetLoop]).loop
+        );
         // En la familia de loops usada R_B = h_L − R: un R menor agranda la base.
         const bottomRadius = (speedSquared / (g * allowed)) * MARGIN;
-        const topRadius = config.loopHeight - bottomRadius;
+        const topRadius = current.height - bottomRadius;
 
-        if (topRadius >= 0.05 * config.loopHeight) {
-          patches.push({ loopTopRadius: round(topRadius) });
+        if (topRadius >= 0.05 * current.height) {
+          patches.push(patchElement(config, targetLoop, { loop: { height: current.height, topRadius: round(topRadius) } }));
         }
 
-        patches.push({
-          loopHeight: round(config.loopHeight * MARGIN * 1.1),
-          loopTopRadius: round(config.loopTopRadius * MARGIN * 1.1)
-        });
+        patches.push(scaleLoop(config, targetLoop, MARGIN * 1.1, MARGIN * 1.1));
       }
 
       patches.push({ initialHeight: round(config.initialHeight / MARGIN ** 2) });
-      patches.push({ trackWidth: round(config.trackWidth * MARGIN * 1.2) });
+      patches.push(stretchTrack(config, MARGIN * 1.2));
       break;
     }
 
@@ -149,10 +160,15 @@ export function targetedPatches(config, run) {
       patches.push({ initialHeight: round(required * MARGIN * 1.15) });
       patches.push({ friction: round(config.friction / 2, 4) });
 
-      // Con una colina, bajarla también alcanza: que la cresta quede por debajo de la energía disponible.
-      if (["valley", "reference"].includes(config.mapId) && config.hillHeight > 0) {
-        const lower = (head - lossHead - CLEARANCE_M) / MARGIN;
-        if (lower > 0 && lower < config.hillHeight) patches.push({ hillHeight: round(lower) });
+      // Bajar el obstáculo también alcanza: que su cima quede por debajo de la energía disponible.
+      const top = run.track.nodes.slice(1).reduce((best, node) => (node.y > best.y ? node : best));
+      const obstacleElement = top.element === undefined ? null : config.track[top.element];
+      const lower = (head - lossHead - CLEARANCE_M) / MARGIN;
+
+      if (obstacleElement?.type === "hill" && lower > 0 && lower < obstacleElement.height) {
+        patches.push(patchElement(config, /** @type {number} */ (top.element), { height: round(lower) }));
+      } else if (obstacleElement?.type === "point" && lower > 0 && lower < obstacleElement.y) {
+        patches.push(patchElement(config, /** @type {number} */ (top.element), { y: round(lower, 3) }));
       }
       break;
     }

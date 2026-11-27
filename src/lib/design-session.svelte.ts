@@ -6,7 +6,7 @@
  * reproducción, se valida y se audita tras una breve espera (los arrastres
  * se agrupan); un valor inválido nunca reemplaza al último diseño válido.
  */
-import { resolveConfig, buildTrack, ConfigError, DEFAULT_CONFIG } from "../physics/index.js";
+import { resolveConfig, buildTrack, ConfigError, DEFAULT_CONFIG, mergeConfigPatch, copyElement } from "../physics/index.js";
 import { mapTemplate } from "../game/maps";
 import { SimulationRunner } from "./simulation-runner.svelte";
 import { LiveAudit } from "./live-audit.svelte";
@@ -22,7 +22,7 @@ import {
   calculateCartCount,
   type Passenger
 } from "../game/passengers";
-import type { ConfigInput, SimulationConfig, Track } from "./types";
+import type { ConfigInput, SimulationConfig, Track, TrackElement } from "./types";
 
 /** Espera máxima entre un cambio y su simulación (ms): agrupa los arrastres. */
 export const COMMIT_THROTTLE_MS = 120;
@@ -50,7 +50,12 @@ interface Design {
 }
 
 function copyConfig(source: SimulationConfig): SimulationConfig {
-  return { ...source, customPoints: source.customPoints.map(point => ({ ...point })) };
+  return {
+    ...source,
+    customPoints: source.customPoints.map(point => ({ ...point })),
+    // Sin definir mientras se vuelve a derivar de la forma vieja (ver mergeConfigPatch).
+    track: source.track?.map(copyElement)
+  };
 }
 
 function copyPassengers(source: readonly Passenger[]): Passenger[] {
@@ -129,12 +134,24 @@ export class DesignSession {
     if (options.discardInvalid && this.errorMessage) {
       this.cartMass = this.#lastValid.cartMass;
       this.passengers = copyPassengers(this.#lastValid.passengers);
-      this.draft = { ...copyConfig(this.#lastValid.config), ...partial };
+      this.draft = mergeConfigPatch(copyConfig(this.#lastValid.config), partial);
     } else {
-      this.draft = { ...this.draft, ...partial };
+      this.draft = mergeConfigPatch(this.draft, partial);
     }
 
     this.#scheduleCommit();
+  }
+
+  /**
+   * Reemplaza el trazado por elementos (manijas, mini barra, panel del
+   * elemento). Como las manijas, no se bloquea si otro campo quedó inválido.
+   * Con `step` (agregar, borrar, poner o quitar un loop) es un paso de
+   * deshacer propio aunque llegue enseguida de otro cambio.
+   */
+  setTrack(track: TrackElement[], options: { step?: boolean } = {}): void {
+    if (options.step) this.#flushPending();
+    this.patch({ track }, { discardInvalid: true });
+    if (options.step) this.#commitAndRecord();
   }
 
   /** Empieza un gesto continuo: todo lo que cambie hasta `endGesture` es un solo paso de deshacer. */
@@ -165,7 +182,7 @@ export class DesignSession {
     this.#flushPending();
     this.runner.pause();
     // Cada trazado carga su propio diseño (el de su miniatura): el del anexo, con los valores del anexo.
-    this.draft = copyConfig(resolveConfig({ ...this.draft, ...geometryDefaults(), ...mapTemplate(mapId), mapId }));
+    this.draft = copyConfig(resolveConfig(mergeConfigPatch(this.draft, { ...geometryDefaults(), ...mapTemplate(mapId), mapId })));
     this.#commitAndRecord();
   }
 

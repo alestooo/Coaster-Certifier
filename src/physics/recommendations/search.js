@@ -51,7 +51,7 @@ export function* recommendationSearch(input) {
   let tested = 0;
 
   for (const candidate of candidates) {
-    const strategy = candidate.changes.map(change => change.key).sort().join("|");
+    const strategy = candidate.changes.map(change => `${change.key}${change.element ?? ""}`).sort().join("|");
 
     if (strategies.has(strategy)) continue;
 

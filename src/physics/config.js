@@ -6,6 +6,7 @@ import {
   DEFAULT_MIN_SPEED,
   DEFAULT_MAX_SUBSTEP
 } from "./constants.js";
+import { legacyElements, validateElements, copyElement } from "./track/elements.js";
 
 /**
  * @typedef {Object} CustomPoint
@@ -41,7 +42,11 @@ import {
  * @property {number} maxTime Tiempo máximo de observación (s).
  * @property {number} timeStep Paso de reporte dt (s).
  * @property {number} maxSubstep Paso máximo del integrador (s).
- * @property {CustomPoint[]} customPoints Nodos del trazado personalizado.
+ * @property {CustomPoint[]} customPoints Nodos del trazado personalizado (forma vieja, relativa).
+ * @property {import("./track/elements.js").TrackElement[]} track Elementos del trazado en metros: la única
+ *   fuente de la geometría. Si la entrada no lo trae, se traduce de `mapId` y sus parámetros (o de
+ *   `customPoints`); si lo trae, `trackWidth` pasa a ser la x del final y los parámetros viejos de loop,
+ *   colina y puntos quedan sin efecto geométrico.
  */
 
 export const MAP_IDS = Object.freeze([
@@ -281,14 +286,22 @@ function validateCustomPoints(config) {
  * @throws {ConfigError} cuando algún parámetro es inválido.
  */
 export function resolveConfig(input = {}) {
+  const given = input.track ?? null;
+
+  if (given) validateElements(given);
+
   /** @type {SimulationConfig} */
   const config = {
     ...DEFAULT_CONFIG,
     ...input,
     customPoints: (input.customPoints ?? DEFAULT_CONFIG.customPoints).map(point => ({
       ...point
-    }))
+    })),
+    track: given ? given.map(copyElement) : []
   };
+
+  // Con elementos, W es un dato derivado: la x del final.
+  if (given) config.trackWidth = /** @type {import("./track/elements.js").EndElement} */ (config.track[config.track.length - 1]).x;
 
   for (const key of Object.keys(CONFIG_LIMITS)) {
     assertRange(config, key);
@@ -324,6 +337,8 @@ export function resolveConfig(input = {}) {
     );
   }
 
+  if (given) return config;
+
   if (config.mapId === "loop" || config.mapId === "reference") {
     assertLoopShape(config.loopHeight, config.loopTopRadius);
   }
@@ -332,5 +347,5 @@ export function resolveConfig(input = {}) {
     validateCustomPoints(config);
   }
 
-  return config;
+  return { ...config, track: legacyElements(config) };
 }

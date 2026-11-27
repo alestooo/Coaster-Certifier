@@ -247,6 +247,52 @@ describe("Recomendaciones", () => {
     }
   }, SCENARIO_SEARCH_TIMEOUT_MS);
 
+  /** Corre la búsqueda de correcciones hasta el final. */
+  function searchAll(input) {
+    const search = recommendationSearch(input);
+    let result = search.next();
+    while (!result.done) result = search.next();
+    return result.value;
+  }
+
+  it("un loop circular sobre un punto del personalizado recibe una corrección verificada que cambia ese loop", () => {
+    const input = {
+      mapId: "custom",
+      initialHeight: 30,
+      initialSpeed: 2,
+      track: [{ type: "start" }, { type: "point", x: 80, y: 0 }, { type: "point", x: 150, y: 0, loop: { height: 21.5, topRadius: 10.75 } }, { type: "end", x: 300 }]
+    };
+    const { recommendations } = searchAll(input);
+
+    expect(recommendations.length).toBeGreaterThan(0);
+    expect(recommendations.some(option => option.changes.some(change => change.element === 2 && ["loopTopRadius", "loopHeight"].includes(change.key)))).toBe(true);
+    for (const option of recommendations) expect(runSimulation(option.config).verdict.approved).toBe(true);
+  }, SCENARIO_SEARCH_TIMEOUT_MS);
+
+  it("con dos loops, el parche apunta al loop que falla", () => {
+    const input = {
+      mapId: "custom",
+      initialHeight: 30,
+      initialSpeed: 2,
+      track: [
+        { type: "start" },
+        // El primero es el loop del anexo (aprueba); el segundo, circular (supera 5 g).
+        { type: "point", x: 70, y: 0, loop: { height: 21.5, topRadius: 5 } },
+        { type: "point", x: 150, y: 0 },
+        { type: "point", x: 230, y: 0, loop: { height: 21.5, topRadius: 10.75 } },
+        { type: "end", x: 380 }
+      ]
+    };
+    const run = runSimulation(input);
+    expect(run.verdict.violations[0].section).toBe("Loop 2");
+
+    const { recommendations } = searchAll(input);
+    const loopChanges = recommendations.flatMap(option => option.changes).filter(change => ["loopTopRadius", "loopHeight"].includes(change.key));
+
+    expect(loopChanges.length).toBeGreaterThan(0);
+    expect(loopChanges.every(change => change.element === 3)).toBe(true);
+  }, SCENARIO_SEARCH_TIMEOUT_MS);
+
   it.each(["circular-loop", "loop-contact", "stall", "brake-short", "spring-ideal"])(
     "el escenario que falla «%s» recibe al menos una corrección verificada",
     id => {

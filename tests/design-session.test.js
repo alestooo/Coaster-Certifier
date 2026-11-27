@@ -163,6 +163,23 @@ describe("Sesión de diseño", () => {
     expect(session.runner.config.brakingLength).toBe(70);
   });
 
+  test("dos cambios discretos del trazado (agregar y borrar) seguidos son dos pasos de deshacer", () => {
+    // Arrange: agregar un punto y enseguida borrarlo, a menos de 600 ms.
+    const original = session.runner.config.track;
+    const added = [...original.slice(0, -1), { type: "point", x: original.at(-1).x - 6, y: 0 }, original.at(-1)];
+    session.setTrack(added, { step: true });
+    vi.advanceTimersByTime(50);
+    session.setTrack(original, { step: true });
+
+    // Act
+    session.undo();
+
+    // Assert
+    expect(session.runner.config.track).toHaveLength(original.length + 1);
+    session.undo();
+    expect(session.runner.config.track).toHaveLength(original.length);
+  });
+
   test("una manija descarta un valor inválido de otro campo en lugar de quedar bloqueada", () => {
     // Arrange: n_máx fuera de rango escrito en el panel de reglas.
     session.patch({ maxLoad: 50 });

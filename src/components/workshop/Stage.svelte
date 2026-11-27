@@ -11,8 +11,8 @@
   import LoadError from "../LoadError.svelte";
   import { workshopParts } from "../../lib/workshop-parts";
   import TrackProbe from "./TrackProbe.svelte";
-  import PointLayer from "./PointLayer.svelte";
-  import { pointHandles, insertPoint } from "../../lib/custom-points";
+  import ElementLayer from "./ElementLayer.svelte";
+  import { elementHandles, insertPoint } from "../../lib/track-edit";
   import { probeAt, probeLines } from "../../lib/probe";
   import type { FixSearch } from "../../lib/fix-search.svelte";
   import { renderSimulation, RENDER_DEFAULT_OPTIONS, MIN_ZOOM, MAX_ZOOM, MIN_VIEW_ZOOM, MAX_VIEW_ZOOM, frameViewAbove, fitBounds } from "../../ui/renderer/index.js";
@@ -22,12 +22,13 @@
   import { createFrameLoop, type FrameLoop } from "../../lib/frame-loop";
   import { wheelZoomFactor, zoomAround, pinchPose, type PinchStart, type Viewport } from "../../lib/camera-gestures";
   import { handlesFor } from "../../lib/handles";
-  import { nearestTrackPoint, areaAtDistance, areaBounds } from "../../lib/track-hit";
-  import { focusRanges } from "../../lib/track-focus";
+  import { nearestTrackPoint, areaAtDistance, areaBounds, elementAtDistance } from "../../lib/track-hit";
+  import { focusRanges, elementRanges } from "../../lib/track-focus";
+  import { needsReframe } from "../../lib/view-fit";
   import { geometryAt, buildTrack } from "../../physics/index.js";
   import { loadProfile, ribbonRuns } from "../../lib/load-profile";
   import type { AuditResult } from "../../lib/live-audit.svelte";
-  import type { SimulationConfig, Track, TrackPoint } from "../../lib/types";
+  import type { SimulationConfig, Track } from "../../lib/types";
   import type { DesignSession } from "../../lib/design-session.svelte";
   import type { AuditReport, AreaId } from "../../lib/audit";
   import type { Passenger } from "../../game/passengers";
@@ -52,10 +53,10 @@
     selectedArea: AreaId | null;
     onSelect: (area: AreaId | null) => void;
     /** Punto elegido del trazado personalizado. */
-    selectedPoint: number | null;
+    selectedElement: number | null;
     /** Alto de la hoja del panel en el teléfono (0 si el panel va al costado). */
     sheetInset?: number;
-    onSelectPoint: (index: number | null) => void;
+    onSelectElement: (index: number | null) => void;
   }
 
   let {
@@ -73,9 +74,9 @@
     onApplyFix,
     selectedArea,
     onSelect,
-    selectedPoint,
+    selectedElement,
     sheetInset = 0,
-    onSelectPoint
+    onSelectElement
   }: Props = $props();
 
 
@@ -133,14 +134,19 @@
   let viewBeforeDrag: CameraView = FIT_VIEW;
   /** El encuadre actual viene de enfocar una selección: al deseleccionar se vuelve al ajuste. */
   let zoomedForSelection = false;
+  /**
+   * La vista quedó conservada al soltar una manija desde el encuadre completo:
+   * si después el lienzo cambia de tamaño (se abre un panel) y el trazado ya
+   * no entra, se vuelve a encuadrar. Cualquier otro cambio de vista lo apaga.
+   */
+  let keptFromFit = false;
 
   let runner = $derived(session.runner);
   let live = $derived(!runner.running && session.preview ? session.preview : { config: runner.config, track: runner.track });
 
-  // Un aviso de «no se puede agregar» vale hasta que los puntos (o el recorrido) cambian.
+  // Un aviso de «no se puede agregar» vale hasta que el trazado cambia.
   $effect(() => {
-    void live.config.customPoints;
-    void isCustom;
+    void live.config.track;
     untrack(() => (pointMessage = ""));
   });
 
@@ -150,16 +156,17 @@
     untrack(() => (hover = null));
   });
   let handles = $derived(handlesFor(live.track, live.config));
-  let isCustom = $derived(live.config.mapId === "custom");
-  let customHandles = $derived(isCustom ? pointHandles(live.track, live.config) : []);
-  let focus = $derived(focusRanges(live.track, selectedArea));
-  // En el personalizado los puntos ya son manijas: B, C y D se muestran igual (qué es cada punto), sobre el punto.
+  let trackHandles = $derived(elementHandles(live.track, live.config));
+  /** Letras que ya lleva una manija de elemento (B, C, D, E…): no se repiten como insignia. */
+  let handleLetters = $derived(new Set(trackHandles.map(handle => handle.letter).filter(Boolean)));
+  let focus = $derived(selectedElement !== null ? elementRanges(live.track, selectedElement) : focusRanges(live.track, selectedArea));
+  // Las letras van en las manijas; durante la reproducción las manijas se ocultan y quedan solo las letras.
   let markers = $derived(
     live.track.markers
-      .filter(marker => !isCustom || ["B", "C", "D"].includes(marker.label))
+      .filter(marker => runner.running || !handleLetters.has(marker.label))
       .map(marker => {
         const point = geometryAt(live.track, marker.distance);
-        return { label: marker.label, x: point.x, y: point.y, raised: isCustom };
+        return { label: marker.label, x: point.x, y: point.y };
       })
   );
   let issues = $derived(report?.issues ?? []);
@@ -328,6 +335,7 @@
   }
 
   function animateTo(target: CameraView) {
+    keptFromFit = false;
     if (!camera || reducedMotion) {
       view = target;
       return;
@@ -385,15 +393,88 @@
     });
   });
 
+  /** Tamaño del lienzo en el último cuadro (px), para saber cuándo cambió. */
+  let lastSize = { width: 0, height: 0 };
+
+  $effect(() => {
+    const current = camera;
+    if (!current) return;
+    void current.width;
+    void current.height;
+    untrack(() => {
+      const previous = lastSize;
+      lastSize = { width: current.width, height: current.height };
+      const resized = previous.width > 0 && (previous.width !== current.width || previous.height !== current.height);
+
+      // En pleno arrastre (p. ej. se abre un panel y el lienzo se angosta), la esquina superior izquierda
+      // queda fija: la pista no se corre bajo el cursor.
+      if (resized && dragging && view.mode === "fit" && view.centerX !== undefined && view.centerY !== undefined) {
+        view = {
+          ...view,
+          centerX: view.centerX - (previous.width - current.width) / (2 * current.scale),
+          centerY: view.centerY + (previous.height - current.height) / (2 * current.scale)
+        };
+        return;
+      }
+
+      // Con la vista conservada, si el lienzo cambia de tamaño y el trazado ya no entra, se encuadra.
+      if (!keptFromFit || dragging) return;
+      if (needsReframe(fitBounds(live.track, liftPath(live.track)), current)) animateTo(FIT_VIEW);
+    });
+  });
+
+  /** Margen (px) que el elemento elegido guarda con la hoja del panel (teléfono). */
+  const REVEAL_MARGIN_PX = 48;
+
+  /**
+   * Si la hoja del panel (teléfono) o un borde tapa el elemento elegido, corre
+   * la vista sin cambiar el zoom hasta dejarlo en la parte visible. Si ya se
+   * ve, la cámara no se mueve.
+   */
+  function revealElement(x: number, y: number) {
+    // Un reencuadre en curso (p. ej. al soltar una manija fuera de la vista) ya lo va a mostrar todo.
+    if (!camera || dragging || animation) return;
+
+    const covered = coveredBottom();
+    const visible = camera.height - covered;
+    const screenX = camera.toX(x);
+    const screenY = camera.toY(y);
+    // Contra la hoja del panel se deja margen; contra los bordes, solo si quedó fuera del lienzo.
+    const hiddenY = screenY > visible - (covered > 0 ? REVEAL_MARGIN_PX : 0) || screenY < 0;
+    const hiddenX = screenX > camera.width || screenX < 0;
+    if (!hiddenX && !hiddenY) return;
+
+    const pose = poseOf(camera);
+    animateTo({
+      mode: "fit",
+      zoom: pose.zoom,
+      centerX: hiddenX ? pose.centerX + (screenX - camera.width / 2) / camera.scale : pose.centerX,
+      centerY: hiddenY ? pose.centerY - (screenY - visible / 2) / camera.scale : pose.centerY
+    });
+  }
+
+  // El elemento elegido (o la hoja que aparece después) no queda tapado.
+  $effect(() => {
+    const index = selectedElement;
+    void sheetInset;
+    untrack(() => {
+      if (index === null) return;
+      const anchor = trackHandles.find(handle => handle.index === index && (handle.kind === "point" || handle.kind === "hillCrest" || handle.kind === "end"));
+      if (anchor) revealElement(anchor.x, anchor.y);
+    });
+  });
+
   /** Vuelve al encuadre completo si el zoom actual vino de una selección. */
   export function leaveFocus() {
     if (!zoomedForSelection) return;
     zoomedForSelection = false;
+    keptFromFit = false;
     animateTo(FIT_VIEW);
   }
 
   function fit() {
     zoomedForSelection = false;
+    keptFromFit = false;
     animateTo(FIT_VIEW);
   }
 
@@ -402,6 +483,7 @@
     if (!camera || dragging) return;
 
     zoomedForSelection = false;
+    keptFromFit = false;
     cancelAnimation();
 
     if (view.mode === "follow") {
@@ -457,6 +539,7 @@
       press = null;
       panning = false;
       zoomedForSelection = false;
+      keptFromFit = false;
       pinch = { pose: poseFor(view), distance: Math.max(1, span.distance), x: span.x, y: span.y };
       return;
     }
@@ -501,6 +584,7 @@
     press.moved = true;
     panning = true;
     zoomedForSelection = false;
+    keptFromFit = false;
     view = clampToTrack({
       mode: "fit",
       zoom: Math.min(MAX_VIEW_ZOOM, Math.max(MIN_VIEW_ZOOM, press.scale / press.fitScale)),
@@ -526,26 +610,29 @@
     const hit = trackHit(point.x, point.y);
 
     if (hit) {
+      // Un tramo de un elemento (punto, loop, colina, recta final) elige el elemento; la caída y el frenado, su área.
+      const element = elementAtDistance(live.track, hit.distance);
       const area = areaAtDistance(live.track, hit.distance);
       const choose = () => {
         pendingSelect = null;
         showHint = false;
+        if (element !== null) {
+          onSelectElement(element);
+          return;
+        }
         onSelect(area);
         focusArea(area);
       };
 
+      // Se espera por si es un doble clic (agrega un punto).
       if (pendingSelect) clearTimeout(pendingSelect);
-      if (isCustom) {
-        pendingSelect = setTimeout(choose, DOUBLE_CLICK_MS);
-      } else {
-        choose();
-      }
+      pendingSelect = setTimeout(choose, DOUBLE_CLICK_MS);
     } else if (selectedArea) {
       onSelect(null);
       leaveFocus();
-    } else if (selectedPoint !== null) {
+    } else if (selectedElement !== null) {
       // Clic en el cielo: suelta el punto elegido.
-      onSelectPoint(null);
+      onSelectElement(null);
     }
   }
 
@@ -555,6 +642,7 @@
     if (active) {
       // Si la cámara venía animándose, al soltar se vuelve a su destino y no a la pose intermedia.
       viewBeforeDrag = animation ? animation.target : view;
+      keptFromFit = false;
       cancelAnimation();
       session.beginGesture();
       showHint = false;
@@ -568,31 +656,38 @@
     session.endGesture();
     const before = viewBeforeDrag;
 
-    if (before.mode === "follow" || before.centerX === undefined) {
+    if (before.mode === "follow") {
+      animateTo(before);
+      return;
+    }
+
+    // Desde el encuadre completo, solo se vuelve a encuadrar si el trazado nuevo ya no entra en la vista.
+    if (before.centerX === undefined && needsReframe(fitBounds(live.track, liftPath(live.track)), camera)) {
       animateTo(before);
       return;
     }
 
     // Se queda donde está, con la escala expresada como zoom del nuevo encuadre.
     const fitScale = createCamera(camera.width, camera.height, { state: runner.viewState, track: live.track, camera: FIT_VIEW }).fitScale;
-    view = clampToTrack({
+    const zoom = camera.scale / fitScale;
+    const kept: CameraView = {
       mode: "fit",
-      zoom: Math.min(MAX_VIEW_ZOOM, Math.max(MIN_VIEW_ZOOM, camera.scale / fitScale)),
+      zoom: Math.min(MAX_VIEW_ZOOM, Math.max(MIN_VIEW_ZOOM, zoom)),
       centerX: camera.fromX(camera.width / 2),
       centerY: camera.fromY(camera.height / 2)
-    });
+    };
+    // Con un trazado más chico, la escala actual queda por debajo del encuadre completo (zoom < 1):
+    // se conserva exacta, como durante el arrastre, hasta que se use el zoom o «Encuadrar».
+    view = clampToTrack(zoom < MIN_VIEW_ZOOM ? { ...kept, scale: camera.scale } : kept);
+    keptFromFit = before.centerX === undefined;
   }
 
-  function setPoints(points: TrackPoint[]) {
-    session.patch({ customPoints: points }, { discardInvalid: true });
-  }
-
-  /** Doble clic: en el personalizado agrega un punto sobre la vía; en el resto (o fuera de la vía) encuadra. */
+  /** Doble clic: sobre la vía agrega un punto; fuera de la vía encuadra. */
   function onDoubleClick(event: MouseEvent) {
     if (pendingSelect) clearTimeout(pendingSelect);
     pendingSelect = null;
 
-    const hit = isCustom && camera ? trackHit(event.clientX - canvas.getBoundingClientRect().left, event.clientY - canvas.getBoundingClientRect().top) : null;
+    const hit = camera ? trackHit(event.clientX - canvas.getBoundingClientRect().left, event.clientY - canvas.getBoundingClientRect().top) : null;
 
     if (!hit) {
       fit();
@@ -606,12 +701,13 @@
     }
 
     pointMessage = "";
-    session.patch({ customPoints: result.points }, { discardInvalid: true });
-    onSelectPoint(result.index);
+    session.setTrack(result.track, { step: true });
+    onSelectElement(result.index);
   }
 
   function toggleFollow() {
     zoomedForSelection = false;
+    keptFromFit = false;
     view = view.mode === "follow" ? FIT_VIEW : { mode: "follow", zoom: FOLLOW_ZOOM };
   }
 
@@ -655,18 +751,16 @@
       onSelect={area => onSelect(area)}
     />
 
-    {#if isCustom}
-      <PointLayer
-        {camera}
-        handles={customHandles}
-        config={live.config}
-        {selectedPoint}
-        hidden={runner.running}
-        {onDragState}
-        onPoints={setPoints}
-        {onSelectPoint}
-      />
-    {/if}
+    <ElementLayer
+      {camera}
+      handles={trackHandles}
+      config={live.config}
+      selected={selectedElement}
+      hidden={runner.running}
+      {onDragState}
+      onTrack={(track, step) => session.setTrack(track, { step })}
+      onSelect={onSelectElement}
+    />
   {/if}
 
   {#if camera}
@@ -715,16 +809,11 @@
   {/if}
 
   <div class="overlay top-left">
-    {#if isCustom && pointMessage}
+    {#if pointMessage}
       <p class="hint warn" role="status">{pointMessage}</p>
-    {:else if isCustom && showHint && !runner.running}
-      <p class="hint">
-        Arrastrá un punto para moverlo · doble clic en la vía agrega otro · tocá un punto para ver sus opciones
-        <IconButton label="Ocultar ayuda" icon={X} size="sm" onclick={() => (showHint = false)} />
-      </p>
     {:else if showHint && !runner.running}
       <p class="hint">
-        Arrastrá los círculos <span class="dot" aria-hidden="true"></span> para cambiar la forma · tocá un tramo para editar sus valores
+        Arrastrá los círculos <span class="dot" aria-hidden="true"></span> para cambiar la forma · doble clic en la vía agrega un punto · tocá un punto para ver sus opciones
         <IconButton label="Ocultar ayuda" icon={X} size="sm" onclick={() => (showHint = false)} />
       </p>
     {/if}

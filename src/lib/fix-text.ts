@@ -7,6 +7,8 @@ import type { SimulationConfig } from "./types";
 
 export interface FixChange {
   key: string;
+  /** Índice del elemento del trazado que cambia (loop, colina…). */
+  element?: number;
   label: string;
   unit: string;
   before: number | null;
@@ -27,6 +29,8 @@ export interface FixOption {
 const numbers = new Intl.NumberFormat("es-CR", { maximumFractionDigits: 3 });
 
 function labelOf(change: FixChange): string {
+  // Un cambio de un elemento trae su propio nombre («Radio en la cima del loop 2»).
+  if (change.element !== undefined) return change.label;
   return fieldByKey(change.key)?.label ?? change.label;
 }
 
